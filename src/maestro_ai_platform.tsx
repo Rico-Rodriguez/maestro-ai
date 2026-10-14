@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Music, Upload, Play, Pause, RotateCcw, Sliders, Mic, MicOff, Cpu, CheckCircle2,
   AlertTriangle, Sparkles, BookOpen, Layers, Volume2, VolumeX, Repeat, ChevronRight,
-  Activity, Award, FileText, Download, Eye, Wrench, ShieldCheck, Headphones,
-  Radio, HelpCircle, Plus, Trash2, Check, X, RefreshCw, Zap, Compass, Settings
+  ChevronLeft, Activity, Award, FileText, Download, Eye, Wrench, ShieldCheck,
+  Radio, Plus, Check, X, RefreshCw, Compass, Sun, Moon, Smartphone, Maximize2
 } from 'lucide-react';
 
 // ============================================================================
@@ -53,17 +53,13 @@ export function getDiatonicSpelling(midi) {
   return { step: info.step, alter: info.alter, octave };
 }
 
-// Compute vertical staff offset (in half-staff-spaces) relative to Treble E4 or Bass G2
 export function getStaffYOffset(midi, clef = 'treble') {
   const { step, octave } = getDiatonicSpelling(midi);
   const diatonicNumber = octave * 7 + DIATONIC_INDEX[step];
-  // Treble bottom line is E4 (4*7 + 2 = 30), top line is F5 (5*7 + 3 = 38)
-  // Bass bottom line is G2 (2*7 + 4 = 18), top line is A3 (3*7 + 5 = 26)
   const bottomLineDiatonic = clef === 'treble' ? 30 : 18;
   return diatonicNumber - bottomLineDiatonic;
 }
 
-// Computer Keyboard to MIDI mapping (2 octaves + chromatics)
 const KEYBOARD_TO_MIDI = {
   'z': 48, 's': 49, 'x': 50, 'd': 51, 'c': 52, 'v': 53, 'g': 54, 'b': 55, 'h': 56, 'n': 57, 'j': 58, 'm': 59,
   'q': 60, '2': 61, 'w': 62, '3': 63, 'e': 64, 'r': 65, '5': 66, 't': 67, '6': 68, 'y': 69, '7': 70, 'u': 71,
@@ -104,15 +100,15 @@ function buildSongFromEvents({
       confidence: n.confidence ?? 0.98,
       alternatives: n.alternatives || [
         { pitch: n.pitch + 1, label: `${midiToPitchName(n.pitch + 1)} (Sharp Accidental)`, confidence: 0.22 },
-        { pitch: n.pitch - 2, label: `${midiToPitchName(n.pitch - 2)} (Ledger Line Shift)`, confidence: 0.14 }
+        { pitch: n.pitch - 2, label: `${midiToPitchName(n.pitch - 2)} (Staff Line Shift)`, confidence: 0.14 }
       ],
       verified: (n.confidence ?? 0.98) >= 0.85,
       harmony: n.harmony || 'C',
       bbox: {
-        x: 0.12 + colProgress * 0.78,
-        y: 0.18 + row * 0.24 + (n.hand === 'L' ? 0.08 : 0.0),
-        w: 0.045,
-        h: 0.06
+        x: 0.10 + colProgress * 0.80,
+        y: 0.20 + row * 0.22 + (n.hand === 'L' ? 0.07 : 0.0),
+        w: 0.055,
+        h: 0.065
       },
       totalMeasures
     };
@@ -137,14 +133,14 @@ function buildSongFromEvents({
 const INITIAL_SONGS = [
   buildSongFromEvents({
     id: 'ode-to-joy',
-    title: 'Ode to Joy (Symphony No. 9 Theme)',
+    title: 'Ode to Joy',
     composer: 'Ludwig van Beethoven',
     genre: 'Classical',
     difficulty: 'Beginner',
-    tempo: 108,
+    tempo: 104,
     timeSignature: [4, 4],
     keySignature: 'C Major',
-    sourceFormat: 'Scanned PDF (OMR Reconstructed)',
+    sourceFormat: 'Scanned Score (OMR)',
     license: 'Public Domain',
     rawNotes: [
       { pitch: 64, onset: 0, duration: 1, hand: 'R', finger: 3, confidence: 0.99, harmony: 'C' },
@@ -157,8 +153,8 @@ const INITIAL_SONGS = [
       { pitch: 55, onset: 4, duration: 2, hand: 'L', finger: 1, confidence: 0.94, harmony: 'G' },
       { pitch: 65, onset: 5, duration: 1, hand: 'R', finger: 4, confidence: 0.72, harmony: 'G',
         alternatives: [
-          { pitch: 66, label: 'F#4 (Faint smudge near notehead)', confidence: 0.68 },
-          { pitch: 64, label: 'E4 (Staff line bleed)', confidence: 0.19 }
+          { pitch: 65, label: 'F4 Natural (Diatonic Match)', confidence: 0.72 },
+          { pitch: 66, label: 'F#4 (Ink Smudge Near Notehead)', confidence: 0.28 }
         ]
       },
       { pitch: 64, onset: 6, duration: 1, hand: 'R', finger: 3, confidence: 0.98, harmony: 'C' },
@@ -172,43 +168,20 @@ const INITIAL_SONGS = [
       { pitch: 64, onset: 11, duration: 1, hand: 'R', finger: 3, confidence: 0.98, harmony: 'C' },
       { pitch: 64, onset: 12, duration: 1.5, hand: 'R', finger: 3, confidence: 0.76, harmony: 'G',
         alternatives: [
-          { pitch: 64, label: 'E4 Dotted Quarter (1.5 beats)', confidence: 0.76 },
-          { pitch: 62, label: 'D4 Quarter Note', confidence: 0.21 }
+          { pitch: 64, label: 'E4 Dotted Quarter (1.5 Beats)', confidence: 0.76 },
+          { pitch: 62, label: 'D4 Quarter Note', confidence: 0.24 }
         ]
       },
       { pitch: 55, onset: 12, duration: 2, hand: 'L', finger: 1, confidence: 0.94, harmony: 'G' },
       { pitch: 62, onset: 13.5, duration: 0.5, hand: 'R', finger: 2, confidence: 0.92, harmony: 'G' },
       { pitch: 62, onset: 14, duration: 2, hand: 'R', finger: 2, confidence: 0.99, harmony: 'G' },
-      { pitch: 43, onset: 14, duration: 2, hand: 'L', finger: 5, confidence: 0.96, harmony: 'G' },
-      { pitch: 64, onset: 16, duration: 1, hand: 'R', finger: 3, confidence: 0.99, harmony: 'C' },
-      { pitch: 48, onset: 16, duration: 2, hand: 'L', finger: 5, confidence: 0.98, harmony: 'C' },
-      { pitch: 64, onset: 17, duration: 1, hand: 'R', finger: 3, confidence: 0.99, harmony: 'C' },
-      { pitch: 65, onset: 18, duration: 1, hand: 'R', finger: 4, confidence: 0.98, harmony: 'C' },
-      { pitch: 52, onset: 18, duration: 2, hand: 'L', finger: 3, confidence: 0.96, harmony: 'C' },
-      { pitch: 67, onset: 19, duration: 1, hand: 'R', finger: 5, confidence: 0.99, harmony: 'C' },
-      { pitch: 67, onset: 20, duration: 1, hand: 'R', finger: 5, confidence: 0.98, harmony: 'G' },
-      { pitch: 55, onset: 20, duration: 2, hand: 'L', finger: 1, confidence: 0.96, harmony: 'G' },
-      { pitch: 65, onset: 21, duration: 1, hand: 'R', finger: 4, confidence: 0.97, harmony: 'G' },
-      { pitch: 64, onset: 22, duration: 1, hand: 'R', finger: 3, confidence: 0.98, harmony: 'C' },
-      { pitch: 52, onset: 22, duration: 2, hand: 'L', finger: 3, confidence: 0.95, harmony: 'C' },
-      { pitch: 62, onset: 23, duration: 1, hand: 'R', finger: 2, confidence: 0.97, harmony: 'G' },
-      { pitch: 60, onset: 24, duration: 1, hand: 'R', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 48, onset: 24, duration: 2, hand: 'L', finger: 5, confidence: 0.98, harmony: 'C' },
-      { pitch: 60, onset: 25, duration: 1, hand: 'R', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 62, onset: 26, duration: 1, hand: 'R', finger: 2, confidence: 0.98, harmony: 'G' },
-      { pitch: 55, onset: 26, duration: 2, hand: 'L', finger: 1, confidence: 0.95, harmony: 'G' },
-      { pitch: 64, onset: 27, duration: 1, hand: 'R', finger: 3, confidence: 0.98, harmony: 'C' },
-      { pitch: 62, onset: 28, duration: 1.5, hand: 'R', finger: 2, confidence: 0.96, harmony: 'G7' },
-      { pitch: 43, onset: 28, duration: 2, hand: 'L', finger: 5, confidence: 0.95, harmony: 'G7' },
-      { pitch: 60, onset: 29.5, duration: 0.5, hand: 'R', finger: 1, confidence: 0.94, harmony: 'C' },
-      { pitch: 60, onset: 30, duration: 2, hand: 'R', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 48, onset: 30, duration: 2, hand: 'L', finger: 5, confidence: 0.99, harmony: 'C' }
+      { pitch: 43, onset: 14, duration: 2, hand: 'L', finger: 5, confidence: 0.96, harmony: 'G' }
     ]
   }),
 
   buildSongFromEvents({
     id: 'minuet-in-g',
-    title: 'Minuet in G Major, BWV Anh. 114',
+    title: 'Minuet in G Major',
     composer: 'Christian Petzold / J.S. Bach',
     genre: 'Baroque',
     difficulty: 'Intermediate',
@@ -234,7 +207,7 @@ const INITIAL_SONGS = [
       { pitch: 72, onset: 7, duration: 0.5, hand: 'R', finger: 1, confidence: 0.78, harmony: 'C',
         alternatives: [
           { pitch: 72, label: 'C5 Eighth Note', confidence: 0.78 },
-          { pitch: 73, label: 'C#5 Accidental', confidence: 0.18 }
+          { pitch: 73, label: 'C#5 Accidental', confidence: 0.22 }
         ]
       },
       { pitch: 74, onset: 7.5, duration: 0.5, hand: 'R', finger: 2, confidence: 0.96, harmony: 'C' },
@@ -274,32 +247,20 @@ const INITIAL_SONGS = [
       { pitch: 65, onset: 6, duration: 0.5, hand: 'R', finger: 5, confidence: 0.98, harmony: 'Dm7/C' },
       { pitch: 57, onset: 6.5, duration: 0.5, hand: 'R', finger: 1, confidence: 0.98, harmony: 'Dm7/C' },
       { pitch: 62, onset: 7, duration: 0.5, hand: 'R', finger: 3, confidence: 0.98, harmony: 'Dm7/C' },
-      { pitch: 65, onset: 7.5, duration: 0.5, hand: 'R', finger: 5, confidence: 0.98, harmony: 'Dm7/C' },
-      { pitch: 47, onset: 8, duration: 2, hand: 'L', finger: 5, confidence: 0.99, harmony: 'G7/B' },
-      { pitch: 50, onset: 8.5, duration: 1.5, hand: 'L', finger: 2, confidence: 0.99, harmony: 'G7/B' },
-      { pitch: 55, onset: 9, duration: 0.5, hand: 'R', finger: 1, confidence: 0.99, harmony: 'G7/B' },
-      { pitch: 62, onset: 9.5, duration: 0.5, hand: 'R', finger: 4, confidence: 0.99, harmony: 'G7/B' },
-      { pitch: 65, onset: 10, duration: 0.5, hand: 'R', finger: 5, confidence: 0.99, harmony: 'G7/B' },
-      { pitch: 55, onset: 10.5, duration: 0.5, hand: 'R', finger: 1, confidence: 0.99, harmony: 'G7/B' },
-      { pitch: 62, onset: 11, duration: 0.5, hand: 'R', finger: 4, confidence: 0.99, harmony: 'G7/B' },
-      { pitch: 65, onset: 11.5, duration: 0.5, hand: 'R', finger: 5, confidence: 0.99, harmony: 'G7/B' },
-      { pitch: 48, onset: 12, duration: 4, hand: 'L', finger: 5, confidence: 0.99, harmony: 'C' },
-      { pitch: 52, onset: 12, duration: 4, hand: 'L', finger: 3, confidence: 0.99, harmony: 'C' },
-      { pitch: 60, onset: 12, duration: 4, hand: 'R', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 64, onset: 12, duration: 4, hand: 'R', finger: 3, confidence: 0.99, harmony: 'C' }
+      { pitch: 65, onset: 7.5, duration: 0.5, hand: 'R', finger: 5, confidence: 0.98, harmony: 'Dm7/C' }
     ]
   }),
 
   buildSongFromEvents({
     id: 'gymnopedie-no-1',
-    title: 'Gymnopédie No. 1 (Lent et douloureux)',
+    title: 'Gymnopédie No. 1',
     composer: 'Erik Satie',
     genre: 'Impressionist',
     difficulty: 'Intermediate',
     tempo: 76,
     timeSignature: [3, 4],
     keySignature: 'D Major',
-    sourceFormat: 'Audio Transcription (Basic-Pitch)',
+    sourceFormat: 'Audio Transcription',
     license: 'Public Domain',
     rawNotes: [
       { pitch: 43, onset: 0, duration: 3, hand: 'L', finger: 5, confidence: 0.95, harmony: 'Gmaj7' },
@@ -325,7 +286,7 @@ const INITIAL_SONGS = [
 ];
 
 // ============================================================================
-// 3. REAL BINARY MIDI (.MID) PARSER & EXPORTER + MUSICXML EXPORTER
+// 3. REAL BINARY MIDI (.MID) PARSER & MUSICXML EXPORTER
 // ============================================================================
 
 function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
@@ -334,9 +295,7 @@ function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
 
   const readStr = (len) => {
     let s = '';
-    for (let i = 0; i < len && pos < bytes.length; i++) {
-      s += String.fromCharCode(bytes[pos++]);
-    }
+    for (let i = 0; i < len && pos < bytes.length; i++) s += String.fromCharCode(bytes[pos++]);
     return s;
   };
   const readU16 = () => {
@@ -360,9 +319,7 @@ function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
   };
 
   const headerId = readStr(4);
-  if (headerId !== 'MThd') {
-    throw new Error('Invalid MIDI header (Expected MThd).');
-  }
+  if (headerId !== 'MThd') throw new Error('Invalid MIDI header (Expected MThd).');
   const headerLen = readU32();
   const format = readU16();
   const numTracks = readU16();
@@ -447,10 +404,7 @@ function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
     pos = trackEnd;
   }
 
-  if (parsedNotes.length === 0) {
-    throw new Error('No playable MIDI note events found in file.');
-  }
-
+  if (parsedNotes.length === 0) throw new Error('No playable MIDI note events found in file.');
   parsedNotes.sort((a, b) => a.onset - b.onset || a.pitch - b.pitch);
   const sliced = parsedNotes.slice(0, 96);
   const cleanTitle = filename.replace(/\.(mid|midi)$/i, '');
@@ -458,8 +412,8 @@ function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
   return buildSongFromEvents({
     id: `midi-${Date.now()}`,
     title: cleanTitle,
-    composer: `Imported SMF Format ${format}`,
-    genre: 'User Imported MIDI',
+    composer: `MIDI Format ${format}`,
+    genre: 'Imported Score',
     difficulty: sliced.length > 40 ? 'Intermediate' : 'Beginner',
     tempo: Math.min(180, Math.max(50, tempoBpm)),
     timeSignature: timeSig,
@@ -474,9 +428,7 @@ function parseMusicXMLString(xmlText, filename = 'Imported Score.musicxml') {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'application/xml');
   const noteNodes = Array.from(doc.querySelectorAll('note'));
-  if (noteNodes.length === 0) {
-    throw new Error('No <note> elements found in MusicXML document.');
-  }
+  if (noteNodes.length === 0) throw new Error('No <note> elements found in MusicXML document.');
   const divisionsNode = doc.querySelector('divisions');
   const divisions = divisionsNode ? parseInt(divisionsNode.textContent || '4', 10) : 4;
 
@@ -503,9 +455,7 @@ function parseMusicXMLString(xmlText, filename = 'Imported Score.musicxml') {
         harmony: step
       });
     }
-    if (!isChord) {
-      currentOnset += durBeats;
-    }
+    if (!isChord) currentOnset += durBeats;
   });
 
   return buildSongFromEvents({
@@ -694,9 +644,7 @@ class MaestroAudioEngine {
   autoCorrelate(buf, sampleRate) {
     let size = buf.length;
     let rms = 0;
-    for (let i = 0; i < size; i++) {
-      rms += buf[i] * buf[i];
-    }
+    for (let i = 0; i < size; i++) rms += buf[i] * buf[i];
     rms = Math.sqrt(rms / size);
     if (rms < 0.018) return -1;
 
@@ -734,16 +682,33 @@ class MaestroAudioEngine {
 const audioEngine = new MaestroAudioEngine();
 
 // ============================================================================
-// 5. MAIN APPLICATION COMPONENT
+// 5. MAIN APPLICATION COMPONENT (MOBILE-FIRST & CONSERVATORY DESIGN SYSTEM)
 // ============================================================================
 
 export default function App() {
-  // Navigation & Core State (Home, Practice, Cleanup, Import, Library, Connections, Teacher)
-  const [activeTab, setActiveTab] = useState('home');
+  // Primary 4-Pillar Navigation + Theme & Viewport
+  const [activeTab, setActiveTab] = useState('practice'); // Default directly into interactive experience or repertoire
+  const [darkMode, setDarkMode] = useState(false); // Warm Ivory Sheet-Music Light Mode by default
   const [songs, setSongs] = useState(INITIAL_SONGS);
   const [selectedSongId, setSelectedSongId] = useState(INITIAL_SONGS[0].id);
   const [libraryFilter, setLibraryFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Responsive Keyboard Range (2 Octaves on Mobile for fat-finger playability, 4 Octaves on Desktop)
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [keyboardRangeMode, setKeyboardRangeMode] = useState('compact'); // 'compact' (C3-C5) | 'full' (C2-C6)
+  const [octaveShift, setOctaveShift] = useState(0); // Shift compact keyboard up/down
+
+  useEffect(() => {
+    const checkViewport = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobileView(mobile);
+      setKeyboardRangeMode(mobile ? 'compact' : 'full');
+    };
+    checkViewport();
+    window.addEventListener('resize', checkViewport);
+    return () => window.removeEventListener('resize', checkViewport);
+  }, []);
 
   const currentSong = useMemo(
     () => songs.find(s => s.id === selectedSongId) || songs[0],
@@ -755,28 +720,28 @@ export default function App() {
   const [currentBeat, setCurrentBeat] = useState(0);
   const [tempoScale, setTempoScale] = useState(1.0);
   const [handFilter, setHandFilter] = useState('BOTH');
-  const [practiceMode, setPracticeMode] = useState('wait');
-  const [viewLayout, setViewLayout] = useState('combined');
+  const [practiceMode, setPracticeMode] = useState('wait'); // 'wait' | 'continuous' | 'autoplay'
+  const [viewLayout, setViewLayout] = useState('notation'); // 'notation' | 'falling' | 'combined'
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [loopRange, setLoopRange] = useState({ enabled: false, startMeasure: 1, endMeasure: 2 });
   const [instrumentVoice, setInstrumentVoice] = useState('grand-piano');
-  const [simplifiedMode, setSimplifiedMode] = useState(false);
+  const [showPracticeSettings, setShowPracticeSettings] = useState(false);
+  const [showDeviceModal, setShowDeviceModal] = useState(false);
 
   // Live Input & Real-Time Evaluation State
   const [activePressedNotes, setActivePressedNotes] = useState(new Set());
   const [evaluatedEvents, setEvaluatedEvents] = useState({});
-  const [liveFeedbackBanner, setLiveFeedbackBanner] = useState({
-    type: 'ready',
-    message: 'Press any key on your MIDI keyboard, microphone, or computer keys (Q–P / Z–M) to play!'
+  const [liveToast, setLiveToast] = useState({
+    status: 'idle',
+    text: 'Tap the highlighted keys below (or use your MIDI keyboard / computer keys Q–P) to advance the score.'
   });
   const [sessionStats, setSessionStats] = useState({
-    hits: 14,
+    hits: 18,
     misses: 2,
-    extraNotes: 0,
-    streak: 6,
-    dailyMinutes: 18,
+    streak: 8,
+    dailyMinutes: 19,
     dailyGoal: 25,
-    timingOffsetsMs: [-12, 8, -4, 15, 6, -9],
+    timingOffsetsMs: [-9, 6, -3, 11, 4, -7],
     struggleMeasures: { 2: 3, 4: 2 }
   });
 
@@ -789,22 +754,23 @@ export default function App() {
 
   // OMR Cleanup Studio State
   const [selectedEventId, setSelectedEventId] = useState(null);
+  const [cleanupMobilePane, setCleanupMobilePane] = useState('digital'); // 'scan' | 'digital'
   const [importStatus, setImportStatus] = useState(null);
 
-  // Refs for 60fps animation & lookahead scheduling
+  // Refs for 60fps animation, auto-scrolling notation, and canvas
   const rafRef = useRef(null);
   const lastFrameTimeRef = useRef(null);
   const playedSynthIdsRef = useRef(new Set());
   const lastMetronomeBeatRef = useRef(-1);
   const fallingCanvasRef = useRef(null);
+  const notationScrollRef = useRef(null);
 
   const activeEvents = useMemo(() => {
     return currentSong.events.filter(ev => {
       if (handFilter !== 'BOTH' && ev.hand !== handFilter) return false;
-      if (simplifiedMode && ev.hand === 'L' && ev.beat > 1.1) return false;
       return true;
     });
-  }, [currentSong, handFilter, simplifiedMode]);
+  }, [currentSong, handFilter]);
 
   const beatsPerMeasure = useMemo(
     () => currentSong.timeSignature[0] * (4 / currentSong.timeSignature[1]),
@@ -823,11 +789,20 @@ export default function App() {
     return unplayed.filter(ev => Math.abs(ev.onset - nextOnset) < 0.15);
   }, [activeEvents, evaluatedEvents, currentBeat]);
 
+  // Auto-scroll notation container smoothly as playhead advances
+  useEffect(() => {
+    const container = notationScrollRef.current;
+    if (!container) return;
+    const playheadPx = 88 + currentBeat * 56;
+    const targetScroll = Math.max(0, playheadPx - container.clientWidth * 0.38);
+    container.scrollTo({ left: targetScroll, behavior: 'smooth' });
+  }, [ Math.floor(currentBeat * 2) ]);
+
   // ============================================================================
   // 6. REAL-TIME SCORE FOLLOWING & ALIGNMENT ENGINE
   // ============================================================================
 
-  const handleUserNoteInput = useCallback((midiPitch, velocity = 90, source = 'virtual') => {
+  const handleUserNoteInput = useCallback((midiPitch, velocity = 90, source = 'touch') => {
     audioEngine.playNote(midiPitch, 0.45, velocity);
 
     setActivePressedNotes(prev => {
@@ -836,7 +811,7 @@ export default function App() {
       return next;
     });
 
-    const windowToleranceBeats = practiceMode === 'wait' ? 1.5 : 0.65;
+    const windowToleranceBeats = practiceMode === 'wait' ? 1.6 : 0.65;
     const candidateEvents = activeEvents.filter(
       ev => !evaluatedEvents[ev.id] && Math.abs(ev.onset - currentBeat) <= windowToleranceBeats
     );
@@ -846,7 +821,6 @@ export default function App() {
     if (matchedEvent) {
       const beatDiff = currentBeat - matchedEvent.onset;
       const msDiff = Math.round((beatDiff * 60000) / (currentSong.tempo * tempoScale));
-      const isTight = Math.abs(msDiff) <= 95;
 
       setEvaluatedEvents(prev => ({
         ...prev,
@@ -860,10 +834,10 @@ export default function App() {
         timingOffsetsMs: [...prev.timingOffsetsMs.slice(-29), msDiff]
       }));
 
-      setLiveFeedbackBanner({
-        type: 'hit',
-        message: `Spot on! ${matchedEvent.pitchName} (${source.toUpperCase()}) · ${
-          practiceMode === 'wait' ? 'Score Followed' : `${msDiff >= 0 ? '+' : ''}${msDiff}ms (${isTight ? 'Perfect Rhythm' : 'Slightly Early/Late'})`
+      setLiveToast({
+        status: 'hit',
+        text: `Great! ${matchedEvent.pitchName} (Finger ${matchedEvent.finger}) · ${
+          practiceMode === 'wait' ? 'Advancing Score' : `${msDiff >= 0 ? '+' : ''}${msDiff}ms`
         }`
       });
 
@@ -879,9 +853,9 @@ export default function App() {
           } else {
             setCurrentBeat(0);
             setEvaluatedEvents({});
-            setLiveFeedbackBanner({
-              type: 'hit',
-              message: 'Passage completed! Looping back for mastery.'
+            setLiveToast({
+              status: 'hit',
+              text: 'Piece completed! Looping back to Measure 1.'
             });
           }
         }
@@ -898,9 +872,9 @@ export default function App() {
           [curMeasure]: (prev.struggleMeasures[curMeasure] || 0) + 1
         }
       }));
-      setLiveFeedbackBanner({
-        type: 'miss',
-        message: `Played ${midiToPitchName(midiPitch)} — Expected ${targetNames} in Measure ${curMeasure}. Take your time!`
+      setLiveToast({
+        status: 'miss',
+        text: `Played ${midiToPitchName(midiPitch)} — Look for highlighted ${targetNames} in Measure ${curMeasure}`
       });
     }
   }, [activeEvents, evaluatedEvents, currentBeat, practiceMode, currentSong.tempo, tempoScale, expectedPlayheadEvents, beatsPerMeasure]);
@@ -993,13 +967,14 @@ export default function App() {
     };
   }, [isPlaying, currentSong, tempoScale, practiceMode, activeEvents, evaluatedEvents, metronomeOn, loopRange, beatsPerMeasure, totalSongBeats]);
 
-  const handleSelectSong = (songId) => {
+  const handleSelectSong = (songId, targetTab = 'practice') => {
     setIsPlaying(false);
     setSelectedSongId(songId);
     setCurrentBeat(0);
     setEvaluatedEvents({});
     playedSynthIdsRef.current.clear();
     setSelectedEventId(null);
+    setActiveTab(targetTab);
   };
 
   // ============================================================================
@@ -1023,7 +998,7 @@ export default function App() {
             input.onmidimessage = (msg) => {
               const [status, data1, data2] = msg.data;
               const cmd = status & 0xf0;
-              setLastMidiPacket({ status: `0x${status.toString(16)}`, note: data1, velocity: data2, time: new Date().toLocaleTimeString() });
+              setLastMidiPacket({ status: `0x${status.toString(16)}`, note: data1, velocity: data2 });
               if (cmd === 0x90 && data2 > 0) {
                 handleUserNoteInput(data1, data2, 'midi');
               } else if (cmd === 0x80 || (cmd === 0x90 && data2 === 0)) {
@@ -1051,9 +1026,7 @@ export default function App() {
         return;
       }
       const midi = KEYBOARD_TO_MIDI[e.key.toLowerCase()];
-      if (midi) {
-        handleUserNoteInput(midi, 92, 'kbd');
-      }
+      if (midi) handleUserNoteInput(midi, 92, 'kbd');
     };
     const up = (e) => {
       const midi = KEYBOARD_TO_MIDI[e.key.toLowerCase()];
@@ -1090,17 +1063,25 @@ export default function App() {
         });
         setMicActive(true);
       } catch (err) {
-        setLiveFeedbackBanner({
-          type: 'miss',
-          message: 'Microphone permission denied or unavailable in this browser environment.'
+        setLiveToast({
+          status: 'miss',
+          text: 'Microphone access was blocked by your browser settings.'
         });
       }
     }
   };
 
   // ============================================================================
-  // 9. CANVAS FALLING-NOTE RENDERER (60FPS SYNCHRONIZED)
+  // 9. CANVAS FALLING-NOTE RENDERER (ADAPTS TO COMPACT OR FULL KEYBOARD)
   // ============================================================================
+
+  const keyboardMidiBounds = useMemo(() => {
+    if (keyboardRangeMode === 'compact') {
+      const baseMin = 48 + octaveShift * 12; // Default C3 (48) to C5 (72) - 15 white keys
+      return { minMidi: Math.max(36, baseMin), maxMidi: Math.min(84, baseMin + 24) };
+    }
+    return { minMidi: 36, maxMidi: 84 };
+  }, [keyboardRangeMode, octaveShift]);
 
   useEffect(() => {
     const canvas = fallingCanvasRef.current;
@@ -1111,8 +1092,7 @@ export default function App() {
 
     ctx.clearRect(0, 0, width, height);
 
-    const minMidi = 36;
-    const maxMidi = 84;
+    const { minMidi, maxMidi } = keyboardMidiBounds;
     const whiteKeys = [];
     for (let m = minMidi; m <= maxMidi; m++) {
       if (![1, 3, 6, 8, 10].includes(m % 12)) whiteKeys.push(m);
@@ -1123,35 +1103,22 @@ export default function App() {
       const isBlack = [1, 3, 6, 8, 10].includes(midi % 12);
       if (!isBlack) {
         const idx = whiteKeys.indexOf(midi);
-        return { x: idx * whiteKeyWidth + 2, w: whiteKeyWidth - 4, isBlack: false };
+        return { x: idx * whiteKeyWidth + 2, w: whiteKeyWidth - 4 };
       } else {
         const lowerWhiteIdx = whiteKeys.indexOf(midi - 1);
-        return {
-          x: (lowerWhiteIdx + 0.65) * whiteKeyWidth,
-          w: whiteKeyWidth * 0.68,
-          isBlack: true
-        };
+        return { x: (lowerWhiteIdx + 0.65) * whiteKeyWidth, w: whiteKeyWidth * 0.68 };
       }
     };
 
-    whiteKeys.forEach((m, i) => {
-      if (m % 12 === 0) {
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(i * whiteKeyWidth, 0);
-        ctx.lineTo(i * whiteKeyWidth, height);
-        ctx.stroke();
-      }
-    });
-
-    const lookaheadBeats = 6;
+    const lookaheadBeats = 5;
     const pixelsPerBeat = height / lookaheadBeats;
 
     for (let b = Math.floor(currentBeat); b <= currentBeat + lookaheadBeats; b++) {
       const y = height - (b - currentBeat) * pixelsPerBeat;
       const isMeasureLine = b % beatsPerMeasure === 0;
-      ctx.strokeStyle = isMeasureLine ? 'rgba(99, 102, 241, 0.35)' : 'rgba(148, 163, 184, 0.08)';
+      ctx.strokeStyle = isMeasureLine
+        ? (darkMode ? 'rgba(217, 119, 6, 0.35)' : 'rgba(180, 83, 9, 0.25)')
+        : (darkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(120, 113, 108, 0.12)');
       ctx.lineWidth = isMeasureLine ? 1.5 : 1;
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -1165,46 +1132,33 @@ export default function App() {
 
       const { x, w } = getKeyXAndWidth(ev.pitch);
       const noteBottomY = height - (ev.onset - currentBeat) * pixelsPerBeat;
-      const noteHeight = Math.max(14, ev.duration * pixelsPerBeat - 4);
+      const noteHeight = Math.max(18, ev.duration * pixelsPerBeat - 4);
       const noteTopY = noteBottomY - noteHeight;
 
       const evalState = evaluatedEvents[ev.id];
       const isRightHand = ev.hand === 'R';
 
-      let fillGrad = ctx.createLinearGradient(x, noteTopY, x, noteBottomY);
       if (evalState?.status === 'hit') {
-        fillGrad.addColorStop(0, '#34d399');
-        fillGrad.addColorStop(1, '#059669');
+        ctx.fillStyle = '#059669';
       } else if (ev.confidence < 0.85 && !ev.verified) {
-        fillGrad.addColorStop(0, '#fbbf24');
-        fillGrad.addColorStop(1, '#d97706');
+        ctx.fillStyle = '#d97706';
       } else if (isRightHand) {
-        fillGrad.addColorStop(0, '#818cf8');
-        fillGrad.addColorStop(1, '#4f46e5');
+        ctx.fillStyle = '#c2410c'; // Conservatory Terracotta for Right Hand
       } else {
-        fillGrad.addColorStop(0, '#38bdf8');
-        fillGrad.addColorStop(1, '#0284c7');
+        ctx.fillStyle = '#0369a1'; // Deep Teal/Ocean for Left Hand
       }
 
-      ctx.fillStyle = fillGrad;
       ctx.beginPath();
       ctx.roundRect(x, noteTopY, w, noteHeight, 6);
       ctx.fill();
 
-      if (noteHeight >= 20) {
+      if (noteHeight >= 20 && w >= 18) {
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px Inter, system-ui, sans-serif';
-        ctx.fillText(`${ev.pitchName}`, x + 4, noteBottomY - 6);
+        ctx.font = 'bold 10px system-ui, sans-serif';
+        ctx.fillText(`${ev.pitchName}`, x + 4, noteBottomY - 5);
       }
     });
-
-    ctx.strokeStyle = '#6366f1';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(0, height - 2);
-    ctx.lineTo(width, height - 2);
-    ctx.stroke();
-  }, [currentBeat, activeEvents, evaluatedEvents, beatsPerMeasure, viewLayout, activeTab]);
+  }, [currentBeat, activeEvents, evaluatedEvents, beatsPerMeasure, viewLayout, activeTab, keyboardMidiBounds, darkMode]);
 
   // ============================================================================
   // 10. FILE UPLOAD & UNIVERSAL INGESTION HANDLER
@@ -1215,49 +1169,47 @@ export default function App() {
     if (!file) return;
 
     const ext = file.name.split('.').pop()?.toLowerCase();
-    setImportStatus({ step: 1, label: `Ingesting ${file.name} into Universal Ingestion Pipeline...` });
+    setImportStatus({ step: 1, label: `Analyzing ${file.name}...` });
 
     try {
       if (ext === 'mid' || ext === 'midi') {
         const buf = await file.arrayBuffer();
         const parsedSong = parseStandardMidiFile(buf, file.name);
         setSongs(prev => [parsedSong, ...prev]);
-        handleSelectSong(parsedSong.id);
+        handleSelectSong(parsedSong.id, 'practice');
         setImportStatus({
           step: 4,
           success: true,
-          label: `Parsed ${parsedSong.events.length} MIDI events into Maestro Music Graph v1.0!`
+          label: `Imported "${parsedSong.title}" (${parsedSong.events.length} notes). Ready to play!`
         });
-        setTimeout(() => setActiveTab('practice'), 900);
       } else if (ext === 'musicxml' || ext === 'xml') {
         const text = await file.text();
         const parsedSong = parseMusicXMLString(text, file.name);
         setSongs(prev => [parsedSong, ...prev]);
-        handleSelectSong(parsedSong.id);
+        handleSelectSong(parsedSong.id, 'practice');
         setImportStatus({
           step: 4,
           success: true,
-          label: `Parsed ${parsedSong.events.length} MusicXML notes into Maestro Music Graph!`
+          label: `Imported MusicXML "${parsedSong.title}" (${parsedSong.events.length} notes).`
         });
-        setTimeout(() => setActiveTab('practice'), 900);
       } else {
-        setTimeout(() => setImportStatus({ step: 2, label: 'Stage 2/4: Deskewing page geometry, staff removal & symbol segmentation...' }), 500);
-        setTimeout(() => setImportStatus({ step: 3, label: 'Stage 3/4: Validating measure rhythmic constraints & pitch confidence...' }), 1100);
+        setTimeout(() => setImportStatus({ step: 2, label: 'Deskewing page geometry & detecting staff lines...' }), 450);
+        setTimeout(() => setImportStatus({ step: 3, label: 'Checking measure rhythm & pitch confidence...' }), 950);
         setTimeout(() => {
           const cleanName = file.name.replace(/\.[^.]+$/, '');
           const isAudio = ['mp3', 'wav', 'flac', 'm4a', 'ogg'].includes(ext);
           const importedSong = buildSongFromEvents({
             id: `omr-${Date.now()}`,
-            title: `${cleanName} (${isAudio ? 'Audio Transcribed' : 'OMR Reconstructed'})`,
-            composer: isAudio ? 'Polyphonic Audio Engine (Basic-Pitch)' : 'Optical Music Recognition Engine',
-            genre: isAudio ? 'Audio Transcription' : 'Scanned Sheet Music',
+            title: cleanName,
+            composer: isAudio ? 'Audio Transcription' : 'Scanned Sheet Music',
+            genre: isAudio ? 'Audio Recording' : 'Sheet Scan',
             difficulty: 'Intermediate',
             tempo: 100,
             timeSignature: [4, 4],
             keySignature: 'C Major',
-            sourceFormat: isAudio ? `Audio (${ext.toUpperCase()})` : `Scanned Document (${ext.toUpperCase()})`,
-            license: 'Private User Upload',
-            rawNotes: INITIAL_SONGS[0].events.slice(0, 24).map((ev, i) => ({
+            sourceFormat: isAudio ? `Audio (${ext.toUpperCase()})` : `Scanned Score (${ext.toUpperCase()})`,
+            license: 'Private User Import',
+            rawNotes: INITIAL_SONGS[0].events.slice(0, 20).map((ev, i) => ({
               pitch: ev.pitch,
               onset: ev.onset,
               duration: ev.duration,
@@ -1268,20 +1220,19 @@ export default function App() {
             }))
           });
           setSongs(prev => [importedSong, ...prev]);
-          handleSelectSong(importedSong.id);
+          setSelectedSongId(importedSong.id);
           setImportStatus({
             step: 4,
             success: true,
-            label: `Reconstructed Maestro Music Graph! 2 uncertain symbols flagged for Cleanup Studio.`
+            label: `Score reconstructed! 2 uncertain notes flagged for quick review.`
           });
-          setTimeout(() => setActiveTab('cleanup'), 1100);
-        }, 1800);
+        }, 1500);
       }
     } catch (err) {
       setImportStatus({
         step: 0,
         error: true,
-        label: `Ingestion Error: ${err.message}`
+        label: `Import failed: ${err.message}`
       });
     }
   };
@@ -1328,12 +1279,11 @@ export default function App() {
   );
 
   // ============================================================================
-  // 11. INTERACTIVE PIANO KEYBOARD COMPONENT (C2 - C6)
+  // 11. MOBILE-FRIENDLY, TOUCH-RESPONSIVE PIANO KEYBOARD
   // ============================================================================
 
   const renderInteractiveKeyboard = () => {
-    const minMidi = 36;
-    const maxMidi = 84;
+    const { minMidi, maxMidi } = keyboardMidiBounds;
     const whiteMidis = [];
     for (let m = minMidi; m <= maxMidi; m++) {
       if (![1, 3, 6, 8, 10].includes(m % 12)) whiteMidis.push(m);
@@ -1345,8 +1295,51 @@ export default function App() {
     expectedPlayheadEvents.forEach(e => { fingerByPitch[e.pitch] = e.finger; });
 
     return (
-      <div className="relative w-full h-36 bg-slate-950 border-t border-slate-800 select-none overflow-hidden px-1 pt-1">
-        <div className="relative w-full h-full flex">
+      <div className={`w-full select-none border-t ${darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-900 border-stone-300'}`}>
+        {/* Compact Octave Switcher Bar for Mobile & Tablet */}
+        <div className="flex items-center justify-between px-3 py-1.5 bg-stone-900 text-stone-300 text-xs border-b border-stone-800">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-600 inline-block" /> Right Hand
+            </span>
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block" /> Left Hand
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {keyboardRangeMode === 'compact' && (
+              <div className="flex items-center bg-stone-800 rounded-lg p-0.5">
+                <button
+                  onClick={() => setOctaveShift(s => Math.max(-1, s - 1))}
+                  className="px-2 py-0.5 hover:text-white"
+                  title="Octave Down"
+                >
+                  -8va
+                </button>
+                <span className="px-2 text-[11px] font-mono text-amber-400">
+                  {midiToPitchName(minMidi)}–{midiToPitchName(maxMidi)}
+                </span>
+                <button
+                  onClick={() => setOctaveShift(s => Math.min(1, s + 1))}
+                  className="px-2 py-0.5 hover:text-white"
+                  title="Octave Up"
+                >
+                  +8va
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => setKeyboardRangeMode(m => m === 'compact' ? 'full' : 'compact')}
+              className="px-2.5 py-1 rounded-md bg-stone-800 hover:bg-stone-700 text-stone-200 text-[11px] font-semibold"
+            >
+              {keyboardRangeMode === 'compact' ? '25 Keys (Touch)' : '49 Keys (Full)'}
+            </button>
+          </div>
+        </div>
+
+        {/* Piano Keys Container */}
+        <div className="relative w-full h-36 sm:h-44 px-1 pt-1 pb-1.5 flex touch-none">
           {whiteMidis.map((midi) => {
             const isPressed = activePressedNotes.has(midi);
             const isExpectedR = expectedSetR.has(midi);
@@ -1360,54 +1353,58 @@ export default function App() {
             return (
               <div key={midi} className="relative flex-1 h-full mx-[1px]">
                 <button
-                  onMouseDown={() => handleUserNoteInput(midi, 90, 'mouse')}
-                  onMouseUp={() => handleUserNoteRelease(midi)}
-                  onMouseLeave={() => activePressedNotes.has(midi) && handleUserNoteRelease(midi)}
-                  className={`w-full h-full rounded-b-md border transition-all flex flex-col justify-end items-center pb-1.5 text-[10px] font-semibold ${
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    handleUserNoteInput(midi, 92, 'touch');
+                  }}
+                  onPointerUp={() => handleUserNoteRelease(midi)}
+                  onPointerLeave={() => activePressedNotes.has(midi) && handleUserNoteRelease(midi)}
+                  className={`w-full h-full rounded-b-lg border transition-transform flex flex-col justify-end items-center pb-2 text-[11px] font-semibold ${
                     isPressed
-                      ? 'bg-emerald-400 border-emerald-500 text-slate-950 translate-y-[2px] shadow-inner'
+                      ? 'bg-emerald-400 border-emerald-600 text-stone-950 translate-y-[2px] shadow-inner'
                       : isExpectedR
-                      ? 'bg-indigo-200 border-indigo-400 text-indigo-950 ring-2 ring-indigo-500'
+                      ? 'bg-orange-100 border-orange-500 text-orange-950 ring-2 ring-orange-500'
                       : isExpectedL
-                      ? 'bg-sky-200 border-sky-400 text-sky-950 ring-2 ring-sky-500'
-                      : 'bg-slate-100 hover:bg-white border-slate-300 text-slate-500'
+                      ? 'bg-sky-100 border-sky-500 text-sky-950 ring-2 ring-sky-500'
+                      : 'bg-[#fdfbf7] hover:bg-white border-stone-300 text-stone-500 shadow-sm'
                   }`}
                 >
                   {(isExpectedR || isExpectedL) && fingerByPitch[midi] && (
-                    <span className={`mb-0.5 w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold text-white ${
-                      isExpectedR ? 'bg-indigo-600' : 'bg-sky-600'
+                    <span className={`mb-1 w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold text-white shadow ${
+                      isExpectedR ? 'bg-orange-600' : 'bg-sky-600'
                     }`}>
                       {fingerByPitch[midi]}
                     </span>
                   )}
-                  <span className={midi % 12 === 0 ? 'font-bold text-slate-800' : 'opacity-65'}>
+                  <span className={midi % 12 === 0 ? 'font-bold text-stone-800' : 'opacity-70'}>
                     {midi % 12 === 0 ? midiToPitchName(midi) : NOTE_NAMES[midi % 12]}
                   </span>
                 </button>
 
                 {hasBlackRight && (
                   <button
-                    onMouseDown={(e) => {
+                    onPointerDown={(e) => {
                       e.stopPropagation();
-                      handleUserNoteInput(blackMidi, 95, 'mouse');
+                      e.preventDefault();
+                      handleUserNoteInput(blackMidi, 95, 'touch');
                     }}
-                    onMouseUp={(e) => {
+                    onPointerUp={(e) => {
                       e.stopPropagation();
                       handleUserNoteRelease(blackMidi);
                     }}
-                    onMouseLeave={() => activePressedNotes.has(blackMidi) && handleUserNoteRelease(blackMidi)}
-                    className={`absolute top-0 -right-[34%] w-[68%] h-[62%] z-20 rounded-b-md border transition-all flex flex-col justify-end items-center pb-1 text-[9px] font-bold ${
+                    onPointerLeave={() => activePressedNotes.has(blackMidi) && handleUserNoteRelease(blackMidi)}
+                    className={`absolute top-0 -right-[35%] w-[70%] h-[60%] z-20 rounded-b-md border transition-transform flex flex-col justify-end items-center pb-1.5 text-[9px] font-bold ${
                       isBlackPressed
-                        ? 'bg-emerald-500 border-emerald-300 text-slate-950 translate-y-[2px]'
+                        ? 'bg-emerald-500 border-emerald-300 text-stone-950 translate-y-[2px]'
                         : isBlackExpectedR
-                        ? 'bg-indigo-500 border-indigo-300 text-white ring-2 ring-indigo-400'
+                        ? 'bg-orange-600 border-orange-300 text-white ring-2 ring-orange-400'
                         : isBlackExpectedL
-                        ? 'bg-sky-500 border-sky-300 text-white ring-2 ring-sky-400'
-                        : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-400 shadow-md'
+                        ? 'bg-sky-600 border-sky-300 text-white ring-2 ring-sky-400'
+                        : 'bg-stone-900 hover:bg-stone-800 border-stone-700 text-stone-400 shadow-md'
                     }`}
                   >
                     {(isBlackExpectedR || isBlackExpectedL) && fingerByPitch[blackMidi] && (
-                      <span className="w-3.5 h-3.5 rounded-full bg-white text-slate-900 text-[8px] flex items-center justify-center">
+                      <span className="w-4 h-4 rounded-full bg-white text-stone-900 text-[9px] flex items-center justify-center">
                         {fingerByPitch[blackMidi]}
                       </span>
                     )}
@@ -1422,47 +1419,61 @@ export default function App() {
   };
 
   // ============================================================================
-  // 12. INTERACTIVE SVG GRAND STAFF NOTATION ENGRAVER
+  // 12. INTERACTIVE SVG GRAND STAFF NOTATION ENGRAVER (PAPER & STUDIO THEMES)
   // ============================================================================
 
   const renderGrandStaffNotation = (interactiveCleanup = false) => {
-    const svgWidth = Math.max(880, totalSongBeats * 52 + 140);
-    const svgHeight = 250;
+    const beatPx = 56;
+    const svgWidth = Math.max(760, totalSongBeats * beatPx + 140);
+    const svgHeight = 236;
     const leftMargin = 88;
-    const beatPx = 50;
 
-    const trebleBottomY = 85;
-    const bassBottomY = 185;
+    const trebleBottomY = 82;
+    const bassBottomY = 178;
     const staffLines = [0, 1, 2, 3, 4];
 
     const playheadX = leftMargin + currentBeat * beatPx;
     const totalMeasures = Math.ceil(totalSongBeats / beatsPerMeasure);
 
+    const staffStroke = darkMode ? '#57534e' : '#a8a29e';
+    const clefFill = darkMode ? '#e7e5e4' : '#1c1917';
+
     return (
-      <div className="w-full overflow-x-auto bg-slate-900/90 border border-slate-800 rounded-xl p-2 shadow-inner">
-        <svg width={svgWidth} height={svgHeight} className="select-none">
+      <div
+        ref={notationScrollRef}
+        className={`w-full overflow-x-auto rounded-2xl border shadow-inner transition-colors ${
+          darkMode
+            ? 'bg-stone-900/95 border-stone-800'
+            : 'bg-[#fcfaf5] border-stone-300/90'
+        }`}
+      >
+        <svg width={svgWidth} height={svgHeight} className="select-none block">
+          {/* Measure Loop Highlight */}
           {loopRange.enabled && (
             <rect
               x={leftMargin + (loopRange.startMeasure - 1) * beatsPerMeasure * beatPx}
-              y={22}
+              y={18}
               width={(loopRange.endMeasure - loopRange.startMeasure + 1) * beatsPerMeasure * beatPx}
-              height={185}
-              fill="rgba(99, 102, 241, 0.09)"
-              stroke="rgba(99, 102, 241, 0.35)"
+              height={186}
+              fill={darkMode ? 'rgba(217, 119, 6, 0.12)' : 'rgba(217, 119, 6, 0.08)'}
+              stroke="#d97706"
               strokeDasharray="4 4"
-              rx={6}
+              rx={8}
             />
           )}
 
-          <line x1={26} y1={45} x2={26} y2={185} stroke="#94a3b8" strokeWidth={3} />
-          <text x={34} y={78} fill="#e2e8f0" fontSize="34" fontFamily="serif">𝄞</text>
-          <text x={34} y={174} fill="#e2e8f0" fontSize="28" fontFamily="serif">𝄢</text>
+          {/* System Brace & Clefs */}
+          <line x1={26} y1={42} x2={26} y2={178} stroke={clefFill} strokeWidth={2.5} />
+          <text x={34} y={76} fill={clefFill} fontSize="34" fontFamily="Georgia, serif">𝄞</text>
+          <text x={34} y={168} fill={clefFill} fontSize="28" fontFamily="Georgia, serif">𝄢</text>
 
-          <text x={64} y={64} fill="#cbd5e1" fontSize="16" fontWeight="bold">{currentSong.timeSignature[0]}</text>
-          <text x={64} y={82} fill="#cbd5e1" fontSize="16" fontWeight="bold">{currentSong.timeSignature[1]}</text>
-          <text x={64} y={164} fill="#cbd5e1" fontSize="16" fontWeight="bold">{currentSong.timeSignature[0]}</text>
-          <text x={64} y={182} fill="#cbd5e1" fontSize="16" fontWeight="bold">{currentSong.timeSignature[1]}</text>
+          {/* Time Signature */}
+          <text x={64} y={60} fill={clefFill} fontSize="15" fontWeight="bold" fontFamily="Georgia, serif">{currentSong.timeSignature[0]}</text>
+          <text x={64} y={78} fill={clefFill} fontSize="15" fontWeight="bold" fontFamily="Georgia, serif">{currentSong.timeSignature[1]}</text>
+          <text x={64} y={156} fill={clefFill} fontSize="15" fontWeight="bold" fontFamily="Georgia, serif">{currentSong.timeSignature[0]}</text>
+          <text x={64} y={174} fill={clefFill} fontSize="15" fontWeight="bold" fontFamily="Georgia, serif">{currentSong.timeSignature[1]}</text>
 
+          {/* 5-Line Treble & Bass Staves */}
           {staffLines.map(i => (
             <g key={i}>
               <line
@@ -1470,7 +1481,7 @@ export default function App() {
                 y1={trebleBottomY - i * 10}
                 x2={svgWidth - 24}
                 y2={trebleBottomY - i * 10}
-                stroke="#475569"
+                stroke={staffStroke}
                 strokeWidth={1}
               />
               <line
@@ -1478,26 +1489,27 @@ export default function App() {
                 y1={bassBottomY - i * 10}
                 x2={svgWidth - 24}
                 y2={bassBottomY - i * 10}
-                stroke="#475569"
+                stroke={staffStroke}
                 strokeWidth={1}
               />
             </g>
           ))}
 
+          {/* Barlines, Measure Numbers & Harmonic Analysis */}
           {Array.from({ length: totalMeasures + 1 }).map((_, mIdx) => {
             const x = leftMargin + mIdx * beatsPerMeasure * beatPx;
             const firstEvInMeasure = activeEvents.find(e => e.measure === mIdx + 1);
             return (
               <g key={mIdx}>
-                <line x1={x} y1={45} x2={x} y2={185} stroke="#64748b" strokeWidth={mIdx === totalMeasures ? 2.5 : 1.2} />
+                <line x1={x} y1={42} x2={x} y2={178} stroke={staffStroke} strokeWidth={mIdx === totalMeasures ? 2.5 : 1.2} />
                 {mIdx < totalMeasures && (
                   <>
-                    <text x={x + 6} y={34} fill="#94a3b8" fontSize="10" fontWeight="600">
-                      M.{mIdx + 1}
+                    <text x={x + 6} y={30} fill={darkMode ? '#a8a29e' : '#78716c'} fontSize="10" fontWeight="700">
+                      Bar {mIdx + 1}
                     </text>
                     {firstEvInMeasure?.harmony && (
-                      <text x={x + 42} y={34} fill="#818cf8" fontSize="11" fontWeight="700">
-                        [{firstEvInMeasure.harmony}]
+                      <text x={x + 44} y={30} fill="#c2410c" fontSize="11" fontWeight="800" fontFamily="Georgia, serif">
+                        {firstEvInMeasure.harmony}
                       </text>
                     )}
                   </>
@@ -1506,39 +1518,40 @@ export default function App() {
             );
           })}
 
+          {/* Synchronized Playhead Cursor */}
           {!interactiveCleanup && (
             <g>
               <line
                 x1={playheadX}
-                y1={25}
+                y1={20}
                 x2={playheadX}
-                y2={205}
-                stroke="#10b981"
+                y2={198}
+                stroke="#059669"
                 strokeWidth={2.5}
               />
-              <polygon
-                points={`${playheadX - 6},22 ${playheadX + 6},22 ${playheadX},30`}
-                fill="#10b981"
-              />
+              <circle cx={playheadX} cy={20} r={4.5} fill="#059669" />
             </g>
           )}
 
+          {/* Engraved Noteheads, Stems, Beams & Fingering */}
           {activeEvents.map((ev) => {
             const clef = ev.hand === 'R' ? 'treble' : 'bass';
             const stepOffset = getStaffYOffset(ev.pitch, clef);
             const baseBottomY = clef === 'treble' ? trebleBottomY : bassBottomY;
             const cy = baseBottomY - stepOffset * 5;
-            const cx = leftMargin + ev.onset * beatPx + 16;
+            const cx = leftMargin + ev.onset * beatPx + 18;
 
             const evalState = evaluatedEvents[ev.id];
             const isSelected = selectedEventId === ev.id;
             const isUncertain = ev.confidence < 0.85 && !ev.verified;
             const isHollow = ev.duration >= 2;
 
-            let noteColor = ev.hand === 'R' ? '#818cf8' : '#38bdf8';
-            if (evalState?.status === 'hit') noteColor = '#34d399';
-            if (isUncertain) noteColor = '#f59e0b';
-            if (isSelected) noteColor = '#ec4899';
+            let noteColor = ev.hand === 'R'
+              ? (darkMode ? '#fb923c' : '#c2410c')
+              : (darkMode ? '#38bdf8' : '#0369a1');
+            if (evalState?.status === 'hit') noteColor = '#059669';
+            if (isUncertain) noteColor = '#d97706';
+            if (isSelected) noteColor = '#e11d48';
 
             const needsLedger = stepOffset <= -2 || stepOffset >= 10;
 
@@ -1550,16 +1563,16 @@ export default function App() {
                   audioEngine.playNote(ev.pitch, 0.4, ev.velocity);
                   if (!interactiveCleanup) setCurrentBeat(ev.onset);
                 }}
-                className="cursor-pointer group"
+                className="cursor-pointer"
               >
                 {isUncertain && (
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={13}
-                    fill="rgba(245, 158, 11, 0.18)"
-                    stroke="#f59e0b"
-                    strokeDasharray="2 2"
+                    r={14}
+                    fill="rgba(217, 119, 6, 0.16)"
+                    stroke="#d97706"
+                    strokeDasharray="3 2"
                   />
                 )}
 
@@ -1569,7 +1582,7 @@ export default function App() {
                     y1={cy}
                     x2={cx + 11}
                     y2={cy}
-                    stroke="#cbd5e1"
+                    stroke={clefFill}
                     strokeWidth={1.5}
                   />
                 )}
@@ -1581,16 +1594,16 @@ export default function App() {
                 <ellipse
                   cx={cx}
                   cy={cy}
-                  rx={6.2}
-                  ry={4.6}
+                  rx={6.4}
+                  ry={4.8}
                   transform={`rotate(-18 ${cx} ${cy})`}
-                  fill={isHollow ? '#0f172a' : noteColor}
+                  fill={isHollow ? (darkMode ? '#1c1917' : '#fcfaf5') : noteColor}
                   stroke={noteColor}
                   strokeWidth={2}
                 />
 
                 {ev.duration === 1.5 && (
-                  <circle cx={cx + 10} cy={cy - 2} r={2} fill={noteColor} />
+                  <circle cx={cx + 10} cy={cy - 2} r={2.2} fill={noteColor} />
                 )}
 
                 {ev.duration < 4 && (
@@ -1604,25 +1617,12 @@ export default function App() {
                   />
                 )}
 
-                {ev.duration <= 0.5 && (
-                  <path
-                    d={
-                      stepOffset >= 4
-                        ? `M ${cx - 5.5} ${cy + 28} Q ${cx + 4} ${cy + 24} ${cx + 3} ${cy + 16}`
-                        : `M ${cx + 5.5} ${cy - 28} Q ${cx + 15} ${cy - 22} ${cx + 12} ${cy - 14}`
-                    }
-                    stroke={noteColor}
-                    strokeWidth={2}
-                    fill="none"
-                  />
-                )}
-
                 <text
-                  x={cx - 4}
+                  x={cx - 3.5}
                   y={clef === 'treble' ? cy - 11 : cy + 16}
-                  fill="#94a3b8"
-                  fontSize="9"
-                  fontWeight="bold"
+                  fill={darkMode ? '#a8a29e' : '#57534e'}
+                  fontSize="9.5"
+                  fontWeight="700"
                 >
                   {ev.finger}
                 </text>
@@ -1635,10 +1635,290 @@ export default function App() {
   };
 
   // ============================================================================
-  // 13. SCREEN RENDERERS (HOME, PRACTICE, CLEANUP, IMPORT, LIBRARY, CONNECTIONS, TEACHER)
+  // 13. VIEW 1: INTERACTIVE PRACTICE STUDIO (CLEAN, FOCUSED, MOBILE-READY)
   // ============================================================================
 
-  const renderHomeDashboard = () => {
+  const renderPracticeView = () => (
+    <div className="flex flex-col gap-3">
+      {/* Compact Primary Transport & Mode Bar */}
+      <div className={`rounded-2xl border p-3 flex flex-wrap items-center justify-between gap-2.5 shadow-sm ${
+        darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90'
+      }`}>
+        {/* Play / Restart + Song Selector */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              audioEngine.init();
+              setIsPlaying(p => !p);
+            }}
+            className={`px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition shadow-sm ${
+              isPlaying
+                ? 'bg-amber-500 hover:bg-amber-400 text-stone-950'
+                : 'bg-orange-700 hover:bg-orange-600 text-white'
+            }`}
+          >
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            <span>{isPlaying ? 'Pause' : 'Play'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsPlaying(false);
+              setCurrentBeat(loopRange.enabled ? (loopRange.startMeasure - 1) * beatsPerMeasure : 0);
+              setEvaluatedEvents({});
+              playedSynthIdsRef.current.clear();
+            }}
+            className={`p-2.5 rounded-xl border transition ${
+              darkMode ? 'bg-stone-800 border-stone-700 text-stone-300' : 'bg-stone-100 border-stone-200 text-stone-700 hover:bg-stone-200'
+            }`}
+            title="Restart from Measure 1"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+
+          <div className="pl-1">
+            <select
+              value={currentSong.id}
+              onChange={(e) => handleSelectSong(e.target.value, 'practice')}
+              className={`rounded-xl px-3 py-2 text-xs sm:text-sm font-bold border focus:outline-none ${
+                darkMode
+                  ? 'bg-stone-950 border-stone-800 text-stone-100'
+                  : 'bg-stone-50 border-stone-200 text-stone-900'
+              }`}
+            >
+              {songs.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.title} ({s.difficulty})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Practice Mode Pill Selector */}
+        <div className={`flex rounded-xl p-1 text-xs font-semibold border ${
+          darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-100 border-stone-200'
+        }`}>
+          {[
+            { id: 'wait', label: 'Wait for Me' },
+            { id: 'continuous', label: 'In Tempo' },
+            { id: 'autoplay', label: 'Listen Demo' }
+          ].map(mode => (
+            <button
+              key={mode.id}
+              onClick={() => {
+                setPracticeMode(mode.id);
+                setEvaluatedEvents({});
+                playedSynthIdsRef.current.clear();
+              }}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                practiceMode === mode.id
+                  ? (darkMode ? 'bg-orange-700 text-white' : 'bg-white text-stone-900 shadow-sm')
+                  : (darkMode ? 'text-stone-400 hover:text-stone-200' : 'text-stone-600 hover:text-stone-900')
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Quick Hand & Settings Drawer Toggle */}
+        <div className="flex items-center gap-2">
+          <div className={`hidden sm:flex rounded-xl p-1 text-xs font-semibold border ${
+            darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-100 border-stone-200'
+          }`}>
+            {[
+              { id: 'BOTH', label: 'Both Hands' },
+              { id: 'R', label: 'Right' },
+              { id: 'L', label: 'Left' }
+            ].map(h => (
+              <button
+                key={h.id}
+                onClick={() => setHandFilter(h.id)}
+                className={`px-2.5 py-1.5 rounded-lg transition ${
+                  handFilter === h.id
+                    ? (darkMode ? 'bg-stone-800 text-orange-400' : 'bg-white text-orange-700 shadow-sm')
+                    : 'text-stone-500'
+                }`}
+              >
+                {h.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setShowPracticeSettings(s => !s)}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+              showPracticeSettings || loopRange.enabled || metronomeOn
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300'
+                : (darkMode ? 'bg-stone-950 border-stone-800 text-stone-300' : 'bg-stone-100 border-stone-200 text-stone-700')
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>{Math.round(currentSong.tempo * tempoScale)} BPM</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Collapsible Tempo, Loop, View Layout & Voice Drawer (Prevents Mobile Clutter) */}
+      {showPracticeSettings && (
+        <div className={`rounded-2xl border p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs ${
+          darkMode ? 'bg-stone-900/90 border-stone-800' : 'bg-stone-50 border-stone-200'
+        }`}>
+          <div className="flex flex-col gap-1.5">
+            <span className="font-bold text-stone-500 uppercase tracking-wider text-[10px]">Tempo Speed ({Math.round(tempoScale * 100)}%)</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="0.4"
+                max="1.4"
+                step="0.05"
+                value={tempoScale}
+                onChange={(e) => setTempoScale(parseFloat(e.target.value))}
+                className="flex-1 accent-orange-600"
+              />
+              <span className="font-mono font-bold">{Math.round(currentSong.tempo * tempoScale)} BPM</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="font-bold text-stone-500 uppercase tracking-wider text-[10px]">Practice Tools</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setLoopRange(l => ({ ...l, enabled: !l.enabled }))}
+                className={`flex-1 py-1.5 px-2.5 rounded-lg border font-semibold flex items-center justify-center gap-1.5 ${
+                  loopRange.enabled ? 'bg-orange-600 text-white border-orange-600' : 'border-stone-300 dark:border-stone-700'
+                }`}
+              >
+                <Repeat className="w-3.5 h-3.5" />
+                Loop Bars {loopRange.startMeasure}–{loopRange.endMeasure}
+              </button>
+              <button
+                onClick={() => setMetronomeOn(m => !m)}
+                className={`py-1.5 px-3 rounded-lg border font-semibold flex items-center gap-1.5 ${
+                  metronomeOn ? 'bg-amber-500 text-stone-950 border-amber-500' : 'border-stone-300 dark:border-stone-700'
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+                Click
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="font-bold text-stone-500 uppercase tracking-wider text-[10px]">Visual Layout</span>
+            <div className="flex rounded-lg p-0.5 border border-stone-300 dark:border-stone-700">
+              {[
+                { id: 'notation', label: 'Sheet Music' },
+                { id: 'combined', label: 'Split' },
+                { id: 'falling', label: 'Falling Notes' }
+              ].map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => setViewLayout(v.id)}
+                  className={`flex-1 py-1 rounded-md font-semibold ${
+                    viewLayout === v.id ? 'bg-orange-700 text-white' : ''
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="font-bold text-stone-500 uppercase tracking-wider text-[10px]">Instrument Sound</span>
+            <select
+              value={instrumentVoice}
+              onChange={(e) => {
+                setInstrumentVoice(e.target.value);
+                audioEngine.instrument = e.target.value;
+              }}
+              className={`rounded-lg px-2.5 py-1.5 border font-semibold ${
+                darkMode ? 'bg-stone-950 border-stone-700 text-stone-200' : 'bg-white border-stone-300 text-stone-800'
+              }`}
+            >
+              <option value="grand-piano">Concert Grand Piano</option>
+              <option value="electric-rhodes">Warm Rhodes Electric</option>
+              <option value="warm-strings">Chamber Strings</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Subtle Real-Time Guidance Bar */}
+      <div className={`px-4 py-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm ${
+        liveToast.status === 'hit'
+          ? (darkMode ? 'bg-emerald-950/40 border-emerald-700/50 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-900')
+          : liveToast.status === 'miss'
+          ? (darkMode ? 'bg-rose-950/40 border-rose-700/50 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-900')
+          : (darkMode ? 'bg-stone-900 border-stone-800 text-stone-300' : 'bg-stone-100/90 border-stone-200 text-stone-700')
+      }`}>
+        <div className="flex items-center gap-2 font-medium">
+          <span className={`w-2 h-2 rounded-full ${
+            liveToast.status === 'hit' ? 'bg-emerald-500' : liveToast.status === 'miss' ? 'bg-rose-500' : 'bg-orange-500'
+          }`} />
+          <span>{liveToast.text}</span>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs font-semibold">
+          {expectedPlayheadEvents.length > 0 && (
+            <span className={`px-2.5 py-0.5 rounded-full border ${
+              darkMode ? 'bg-stone-950 border-stone-700 text-orange-300' : 'bg-white border-stone-300 text-orange-800'
+            }`}>
+              Play: {expectedPlayheadEvents.map(e => `${e.pitchName} (F${e.finger})`).join(' + ')}
+            </span>
+          )}
+          <span className="font-mono text-emerald-600 dark:text-emerald-400">{sessionStats.hits} Hits</span>
+          <span className="font-mono text-amber-600 dark:text-amber-400">{sessionStats.streak} Streak</span>
+        </div>
+      </div>
+
+      {/* Synchronized Sheet Music Stage */}
+      {(viewLayout === 'notation' || viewLayout === 'combined') && (
+        <div>
+          <div className="flex items-center justify-between mb-1.5 px-1 text-xs">
+            <span className="font-semibold text-stone-500 dark:text-stone-400">
+              {currentSong.composer} · {currentSong.keySignature} · Measure {Math.floor(currentBeat / beatsPerMeasure) + 1}
+            </span>
+            {uncertainEventsCount > 0 && (
+              <button
+                onClick={() => setActiveTab('cleanup')}
+                className="text-amber-600 dark:text-amber-400 hover:underline font-semibold flex items-center gap-1"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {uncertainEventsCount} OMR notes to verify →
+              </button>
+            )}
+          </div>
+          {renderGrandStaffNotation(false)}
+        </div>
+      )}
+
+      {/* Falling Notes Highway + Touch-Friendly Piano Keyboard */}
+      <div className="rounded-2xl overflow-hidden border border-stone-300 dark:border-stone-800 shadow-lg">
+        {(viewLayout === 'combined' || viewLayout === 'falling') && (
+          <div className={`relative w-full h-36 sm:h-44 ${
+            darkMode ? 'bg-stone-950' : 'bg-[#f3efe6]'
+          }`}>
+            <canvas
+              ref={fallingCanvasRef}
+              width={960}
+              height={176}
+              className="w-full h-full block"
+            />
+          </div>
+        )}
+        {renderInteractiveKeyboard()}
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // 14. VIEW 2: REPERTOIRE & UNIVERSAL IMPORT
+  // ============================================================================
+
+  const renderRepertoireAndImport = () => {
     const filteredSongs = songs.filter(s => {
       if (libraryFilter !== 'ALL' && s.difficulty.toUpperCase() !== libraryFilter) return false;
       if (searchQuery && !s.title.toLowerCase().includes(searchQuery.toLowerCase()) && !s.composer.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -1647,163 +1927,171 @@ export default function App() {
 
     return (
       <div className="space-y-6">
-        {/* Hero Continue Learning & Daily Goal Row */}
+        {/* Top Row: Quick Universal Dropzone + Daily Progress */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-8 bg-gradient-to-br from-indigo-950/80 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 flex flex-col justify-between shadow-xl">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5" />
-                Continue Learning · Canonical Music Graph Ready
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                {currentSong.title}
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-300">
-                {currentSong.composer} · {currentSong.keySignature} · {currentSong.tempo} BPM · Source: <span className="text-indigo-300 font-semibold">{currentSong.sourceFormat}</span>
+          <div className={`lg:col-span-8 rounded-2xl border p-5 sm:p-6 flex flex-col justify-between ${
+            darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+          }`}>
+            <div className="space-y-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
+                Universal Music Ingestion
+              </span>
+              <h2 className="text-xl sm:text-2xl font-serif font-bold">
+                Bring Any Sheet Music, MIDI, or Audio Recording
+              </h2>
+              <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 max-w-xl">
+                Upload a PDF/photo of sheet music, a Standard MIDI (`.mid`) file, MusicXML, or an audio track. Maestro converts it into an interactive score you can practice at any tempo.
               </p>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => setActiveTab('practice')}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition"
-              >
-                <Play className="w-4 h-4" />
-                Launch Interactive Practice
-              </button>
-              <button
-                onClick={() => setActiveTab('cleanup')}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-2 border border-slate-700 transition"
-              >
-                <Wrench className="w-4 h-4 text-amber-400" />
-                Open OMR Cleanup Studio ({uncertainEventsCount} flagged)
-              </button>
-              <button
-                onClick={() => setActiveTab('import')}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-indigo-300 font-semibold text-xs flex items-center gap-2 border border-indigo-500/30 transition"
-              >
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <label className="px-4 py-2.5 rounded-xl bg-orange-700 hover:bg-orange-600 text-white font-bold text-xs sm:text-sm cursor-pointer flex items-center gap-2 shadow-sm transition">
                 <Upload className="w-4 h-4" />
-                Quick-Import Sheet / MIDI / Audio
-              </button>
+                <span>Upload Sheet / MIDI / Audio</span>
+                <input
+                  type="file"
+                  accept=".mid,.midi,.musicxml,.xml,.pdf,.png,.jpg,.jpeg,.wav,.mp3"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+              <span className="text-xs text-stone-500">
+                Supports `.mid`, `.musicxml`, `.pdf`, `.jpg`, `.png`, `.wav`, `.mp3`
+              </span>
             </div>
+
+            {importStatus && (
+              <div className={`mt-4 p-3 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 ${
+                importStatus.error
+                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-300'
+                  : importStatus.success
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <RefreshCw className={`w-4 h-4 ${!importStatus.success && !importStatus.error ? 'animate-spin' : ''}`} />
+                  <span>{importStatus.label}</span>
+                </div>
+                {importStatus.success && (
+                  <button
+                    onClick={() => setActiveTab('cleanup')}
+                    className="underline font-bold"
+                  >
+                    Review in Score Cleanup →
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Daily Practice Goal & Hardware Status */}
-          <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+          <div className={`lg:col-span-4 rounded-2xl border p-5 flex flex-col justify-between gap-4 ${
+            darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+          }`}>
             <div>
-              <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                <span className="font-bold uppercase tracking-wider text-slate-300">Daily Practice Goal</span>
-                <span className="font-mono text-emerald-400 font-bold">{sessionStats.dailyMinutes} / {sessionStats.dailyGoal} min</span>
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="font-bold uppercase tracking-wider text-stone-500">Today&apos;s Practice</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  {sessionStats.dailyMinutes} / {sessionStats.dailyGoal} min
+                </span>
               </div>
-              <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+              <div className="w-full h-2.5 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full"
+                  className="h-full bg-emerald-600 rounded-full"
                   style={{ width: `${Math.min(100, Math.round((sessionStats.dailyMinutes / sessionStats.dailyGoal) * 100))}%` }}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5 text-xs">
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <div className="text-slate-400">Notes Mastered</div>
-                <div className="text-lg font-extrabold text-white mt-0.5">{sessionStats.hits} Notes</div>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <div className="text-slate-400">Current Streak</div>
-                <div className="text-lg font-extrabold text-amber-400 mt-0.5">{sessionStats.streak} 🔥</div>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-emerald-400" />
-                <div>
-                  <div className="font-semibold text-white">Instrument Input</div>
-                  <div className="text-[11px] text-slate-400">
-                    {midiDevices.length > 0 ? `${midiDevices[0].name}` : micActive ? 'Acoustic Mic Active' : 'Keyboard / MIDI Ready'}
-                  </div>
+              <div className={`p-3 rounded-xl border ${darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-200'}`}>
+                <div className="text-stone-500">Accuracy</div>
+                <div className="text-lg font-bold mt-0.5">
+                  {Math.round((sessionStats.hits / Math.max(1, sessionStats.hits + sessionStats.misses)) * 100)}%
                 </div>
               </div>
-              <button
-                onClick={() => setActiveTab('connections')}
-                className="text-indigo-400 hover:text-indigo-300 font-semibold"
-              >
-                Configure →
-              </button>
+              <div className={`p-3 rounded-xl border ${darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-200'}`}>
+                <div className="text-stone-500">Current Streak</div>
+                <div className="text-lg font-bold text-amber-600 dark:text-amber-400 mt-0.5">{sessionStats.streak} Notes</div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Song Library & Filter Explorer */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        {/* Curated & Imported Repertoire Grid */}
+        <div className={`rounded-2xl border p-5 space-y-4 ${
+          darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+        }`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-400" />
-                Song Library & Reconstructed Scores
-              </h2>
-              <p className="text-xs text-slate-400">
-                Select any piece to inspect its Maestro Music Graph, edit OMR detections, or practice in real time
-              </p>
+              <h3 className="text-lg font-serif font-bold">Repertoire Library</h3>
+              <p className="text-xs text-stone-500">Tap any piece to open the interactive score or inspect OMR detections</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
-                placeholder="Search title or composer..."
+                placeholder="Search pieces..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                className={`rounded-xl px-3 py-1.5 text-xs border focus:outline-none ${
+                  darkMode ? 'bg-stone-950 border-stone-800 text-stone-200' : 'bg-stone-50 border-stone-200 text-stone-800'
+                }`}
               />
-              <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs">
+              <div className={`flex rounded-xl p-0.5 text-xs border ${
+                darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-100 border-stone-200'
+              }`}>
                 {['ALL', 'BEGINNER', 'INTERMEDIATE'].map(lvl => (
                   <button
                     key={lvl}
                     onClick={() => setLibraryFilter(lvl)}
-                    className={`px-2.5 py-1 rounded-md font-semibold transition ${
-                      libraryFilter === lvl ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                    className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                      libraryFilter === lvl
+                        ? (darkMode ? 'bg-orange-700 text-white' : 'bg-white text-stone-900 shadow-sm')
+                        : 'text-stone-500'
                     }`}
                   >
-                    {lvl === 'ALL' ? 'All Levels' : lvl.charAt(0) + lvl.slice(1).toLowerCase()}
+                    {lvl === 'ALL' ? 'All' : lvl.charAt(0) + lvl.slice(1).toLowerCase()}
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {filteredSongs.map(song => {
               const isSelected = song.id === currentSong.id;
               const flagged = song.events.filter(e => e.confidence < 0.85 && !e.verified).length;
               return (
                 <div
                   key={song.id}
-                  onClick={() => handleSelectSong(song.id)}
-                  className={`p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between gap-3 ${
+                  onClick={() => handleSelectSong(song.id, 'practice')}
+                  className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between gap-3 ${
                     isSelected
-                      ? 'bg-indigo-950/30 border-indigo-500/60 ring-1 ring-indigo-500/40'
-                      : 'bg-slate-950/70 hover:bg-slate-950 border-slate-800'
+                      ? (darkMode ? 'bg-stone-950 border-orange-500/60 ring-1 ring-orange-500/40' : 'bg-orange-50/40 border-orange-400')
+                      : (darkMode ? 'bg-stone-950/60 hover:bg-stone-950 border-stone-800' : 'bg-stone-50/60 hover:bg-stone-50 border-stone-200')
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-white">{song.title}</h3>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300 font-semibold">
+                        <h4 className="font-serif font-bold text-base">{song.title}</h4>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          darkMode ? 'bg-stone-800 text-stone-300' : 'bg-stone-200 text-stone-700'
+                        }`}>
                           {song.difficulty}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5">{song.composer} · {song.genre}</p>
+                      <p className="text-xs text-stone-500 mt-0.5">{song.composer} · {song.keySignature}</p>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-400">{song.tempo} BPM</span>
+                    <span className="text-xs font-mono text-stone-500">{song.tempo} BPM</span>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
+                  <div className="flex items-center justify-between pt-2 border-t border-stone-200/70 dark:border-stone-800 text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400">{song.sourceFormat}</span>
+                      <span className="text-stone-500">{song.sourceFormat}</span>
                       {flagged > 0 && (
-                        <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-semibold">
-                          {flagged} OMR Review
+                        <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 font-semibold text-[11px]">
+                          {flagged} to verify
                         </span>
                       )}
                     </div>
@@ -1811,20 +2099,20 @@ export default function App() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSelectSong(song.id);
-                          setActiveTab('cleanup');
+                          handleSelectSong(song.id, 'cleanup');
                         }}
-                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium"
+                        className={`px-2.5 py-1.5 rounded-lg font-semibold border ${
+                          darkMode ? 'border-stone-700 hover:bg-stone-800' : 'border-stone-300 hover:bg-white'
+                        }`}
                       >
                         Cleanup
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSelectSong(song.id);
-                          setActiveTab('practice');
+                          handleSelectSong(song.id, 'practice');
                         }}
-                        className="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg bg-orange-700 hover:bg-orange-600 text-white font-semibold flex items-center gap-1"
                       >
                         Practice <ChevronRight className="w-3.5 h-3.5" />
                       </button>
@@ -1839,247 +2127,8 @@ export default function App() {
     );
   };
 
-  const renderPracticeView = () => (
-    <div className="flex flex-col gap-3">
-      {/* Top Practice Transport & Control Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              audioEngine.init();
-              setIsPlaying(p => !p);
-            }}
-            className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 transition ${
-              isPlaying
-                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20'
-            }`}
-          >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            {isPlaying ? 'Pause' : 'Start Practice'}
-          </button>
-
-          <button
-            onClick={() => {
-              setIsPlaying(false);
-              setCurrentBeat(loopRange.enabled ? (loopRange.startMeasure - 1) * beatsPerMeasure : 0);
-              setEvaluatedEvents({});
-              playedSynthIdsRef.current.clear();
-            }}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
-            title="Restart Passage"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-
-          <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs">
-            {[
-              { id: 'wait', label: 'Wait for Note' },
-              { id: 'continuous', label: 'Live Evaluation' },
-              { id: 'autoplay', label: 'Synth Demo' }
-            ].map(mode => (
-              <button
-                key={mode.id}
-                onClick={() => {
-                  setPracticeMode(mode.id);
-                  setEvaluatedEvents({});
-                  playedSynthIdsRef.current.clear();
-                }}
-                className={`px-2.5 py-1.5 rounded-md font-medium transition ${
-                  practiceMode === mode.id
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {mode.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs">
-            {[
-              { id: 'BOTH', label: 'Both Hands' },
-              { id: 'R', label: 'Right Hand' },
-              { id: 'L', label: 'Left Hand' }
-            ].map(h => (
-              <button
-                key={h.id}
-                onClick={() => setHandFilter(h.id)}
-                className={`px-2.5 py-1.5 rounded-md font-medium transition ${
-                  handFilter === h.id
-                    ? 'bg-slate-800 text-indigo-300 border border-indigo-500/40'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {h.label}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setSimplifiedMode(s => !s)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
-              simplifiedMode
-                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
-                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {simplifiedMode ? 'Simplified Arrangement' : 'Original Arrangement'}
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1">
-            <span className="text-[11px] text-slate-400">Tempo</span>
-            <input
-              type="range"
-              min="0.4"
-              max="1.5"
-              step="0.05"
-              value={tempoScale}
-              onChange={(e) => setTempoScale(parseFloat(e.target.value))}
-              className="w-20 accent-indigo-500"
-            />
-            <span className="text-xs font-mono font-bold text-indigo-400">
-              {Math.round(currentSong.tempo * tempoScale)} BPM ({Math.round(tempoScale * 100)}%)
-            </span>
-          </div>
-
-          <button
-            onClick={() => setLoopRange(l => ({ ...l, enabled: !l.enabled }))}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition ${
-              loopRange.enabled
-                ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
-                : 'bg-slate-950 border-slate-800 text-slate-400'
-            }`}
-          >
-            <Repeat className="w-3.5 h-3.5" />
-            Loop M.{loopRange.startMeasure}–{loopRange.endMeasure}
-          </button>
-
-          <button
-            onClick={() => setMetronomeOn(m => !m)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition ${
-              metronomeOn
-                ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                : 'bg-slate-950 border-slate-800 text-slate-400'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            Metronome
-          </button>
-
-          <select
-            value={instrumentVoice}
-            onChange={(e) => {
-              setInstrumentVoice(e.target.value);
-              audioEngine.instrument = e.target.value;
-            }}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
-          >
-            <option value="grand-piano">Concert Grand Piano</option>
-            <option value="electric-rhodes">Stage Electric Piano</option>
-            <option value="warm-strings">Chamber Synth Strings</option>
-          </select>
-
-          <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs">
-            {[
-              { id: 'combined', label: 'Split View' },
-              { id: 'notation', label: 'Score Only' },
-              { id: 'falling', label: 'Falling Notes' }
-            ].map(v => (
-              <button
-                key={v.id}
-                onClick={() => setViewLayout(v.id)}
-                className={`px-2 py-1 rounded font-medium ${
-                  viewLayout === v.id ? 'bg-slate-800 text-white' : 'text-slate-400'
-                }`}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Real-Time Performance Feedback Banner */}
-      <div className={`px-4 py-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 transition ${
-        liveFeedbackBanner.type === 'hit'
-          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
-          : liveFeedbackBanner.type === 'miss'
-          ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
-          : 'bg-slate-900/90 border-slate-800 text-slate-300'
-      }`}>
-        <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
-          <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
-          <span>{liveFeedbackBanner.message}</span>
-        </div>
-
-        <div className="flex items-center gap-4 text-xs">
-          {expectedPlayheadEvents.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1 rounded-md border border-slate-800">
-              <span className="text-slate-400">Next Expected:</span>
-              <span className="font-bold text-indigo-300">
-                {expectedPlayheadEvents.map(e => `${e.pitchName} (Finger ${e.finger})`).join(' + ')}
-              </span>
-            </div>
-          )}
-          <div className="flex items-center gap-3 font-mono">
-            <span className="text-emerald-400">Hits: {sessionStats.hits}</span>
-            <span className="text-rose-400">Misses: {sessionStats.misses}</span>
-            <span className="text-amber-300">Streak: {sessionStats.streak}🔥</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Synchronized Notation View */}
-      {(viewLayout === 'combined' || viewLayout === 'notation') && (
-        <div>
-          <div className="flex items-center justify-between mb-1 px-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-              Synchronized Grand Staff · Measure {Math.floor(currentBeat / beatsPerMeasure) + 1} · Beat {Math.floor((currentBeat % beatsPerMeasure) + 1)}
-            </span>
-            {uncertainEventsCount > 0 && (
-              <button
-                onClick={() => setActiveTab('cleanup')}
-                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-medium"
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />
-                {uncertainEventsCount} uncertain OMR symbols flagged — Open Cleanup Studio
-              </button>
-            )}
-          </div>
-          {renderGrandStaffNotation(false)}
-        </div>
-      )}
-
-      {/* Falling Notes Canvas + Interactive 61-Key Piano */}
-      <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-        {(viewLayout === 'combined' || viewLayout === 'falling') && (
-          <div className="relative w-full h-48 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-            <canvas
-              ref={fallingCanvasRef}
-              width={1080}
-              height={192}
-              className="w-full h-full block"
-            />
-            <div className="absolute top-2 left-3 flex items-center gap-3 text-[11px] text-slate-400 bg-slate-950/80 px-2.5 py-1 rounded-md border border-slate-800">
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-500 inline-block" /> Right Hand</span>
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-sky-500 inline-block" /> Left Hand</span>
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" /> OMR Review</span>
-            </div>
-          </div>
-        )}
-        {renderInteractiveKeyboard()}
-      </div>
-    </div>
-  );
-
   // ============================================================================
-  // 14. OMR MUSIC CLEANUP STUDIO (SIDE-BY-SIDE SOURCE VS. RECONSTRUCTED)
+  // 15. VIEW 3: OMR SCORE CLEANUP STUDIO (RESPONSIVE TABS ON MOBILE)
   // ============================================================================
 
   const renderCleanupStudio = () => {
@@ -2088,347 +2137,234 @@ export default function App() {
       currentSong.events[0];
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+      <div className="space-y-4">
+        {/* Top Context Header + Mobile Pane Switcher */}
+        <div className={`rounded-2xl border p-4 flex flex-wrap items-center justify-between gap-3 ${
+          darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+        }`}>
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-indigo-400" />
-                  Original Source Document Overlay
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Source coordinates preserved in Maestro Music Graph · Click any bounding box to inspect
-                </p>
-              </div>
-              <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold">
-                {uncertainEventsCount} Flagged
-              </span>
-            </div>
-
-            <div className="relative w-full h-72 rounded-lg overflow-hidden bg-[#f4efe4] border-2 border-stone-400 shadow-inner p-4 text-stone-900">
-              <div
-                className="w-full h-full relative"
-                style={{ transform: 'rotate(-0.6deg)' }}
-              >
-                <div className="text-center font-serif border-b border-stone-400/60 pb-1 mb-3">
-                  <div className="text-sm font-bold tracking-wide text-stone-800">{currentSong.title}</div>
-                  <div className="text-[10px] italic text-stone-600">{currentSong.composer} · Scanned Source Page 1</div>
-                </div>
-
-                {[0.24, 0.52, 0.78].map((sysY, idx) => (
-                  <div
-                    key={idx}
-                    className="absolute left-4 right-4 h-8 border-t border-b border-stone-500/60 flex items-center"
-                    style={{ top: `${sysY * 100}%` }}
-                  >
-                    <div className="w-full border-t border-stone-400/50" />
-                  </div>
-                ))}
-
-                {currentSong.events.slice(0, 24).map((ev) => {
-                  const isFlagged = ev.confidence < 0.85 && !ev.verified;
-                  const isCurr = selectedEv?.id === ev.id;
-                  return (
-                    <button
-                      key={ev.id}
-                      onClick={() => {
-                        setSelectedEventId(ev.id);
-                        audioEngine.playNote(ev.pitch, 0.4, ev.velocity);
-                      }}
-                      style={{
-                        left: `${ev.bbox.x * 100}%`,
-                        top: `${ev.bbox.y * 100}%`,
-                        width: `${ev.bbox.w * 100}%`,
-                        height: `${ev.bbox.h * 100}%`
-                      }}
-                      className={`absolute rounded transition-all flex items-center justify-center text-[9px] font-bold ${
-                        isCurr
-                          ? 'ring-2 ring-pink-600 bg-pink-500/30 text-stone-950 z-20 scale-110'
-                          : isFlagged
-                          ? 'border-2 border-amber-600 bg-amber-400/40 text-stone-950 z-10 animate-pulse'
-                          : 'border border-indigo-600/40 bg-indigo-500/15 text-stone-800 hover:bg-indigo-500/30'
-                      }`}
-                      title={`${ev.pitchName} (Confidence: ${Math.round(ev.confidence * 100)}%)`}
-                    >
-                      ●
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <h2 className="text-base sm:text-lg font-serif font-bold flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-orange-600" />
+              OMR Score Cleanup Studio · {currentSong.title}
+            </h2>
+            <p className="text-xs text-stone-500">
+              Compare the original camera scan with the reconstructed digital engraving. Tap any amber-highlighted note to confirm or fix it.
+            </p>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-            <span>OMR Engine: Dewarped + Staff-Line Morphology + Theory Constraint Check</span>
+          <div className="flex items-center gap-2">
+            {/* Mobile Toggle between Scan and Digital Score */}
+            <div className="flex lg:hidden rounded-xl p-0.5 border border-stone-300 dark:border-stone-700 text-xs font-semibold">
+              <button
+                onClick={() => setCleanupMobilePane('digital')}
+                className={`px-3 py-1.5 rounded-lg ${cleanupMobilePane === 'digital' ? 'bg-orange-700 text-white' : ''}`}
+              >
+                Digital Score
+              </button>
+              <button
+                onClick={() => setCleanupMobilePane('scan')}
+                className={`px-3 py-1.5 rounded-lg ${cleanupMobilePane === 'scan' ? 'bg-orange-700 text-white' : ''}`}
+              >
+                Original Scan
+              </button>
+            </div>
+
             <button
               onClick={handleDownloadMusicXML}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-orange-700 hover:bg-orange-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm"
             >
               <Download className="w-3.5 h-3.5" />
-              Export Clean MusicXML
+              Export MusicXML
             </button>
           </div>
         </div>
 
-        <div className="lg:col-span-7 flex flex-col gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-emerald-400" />
-                Reconstructed Digital Engraving (Click Any Note to Edit)
-              </h3>
-              <span className="text-xs text-slate-400">
-                Canonical Graph Version {currentSong.mmgVersion}
-              </span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Left Column: Original Source Scan Overlay */}
+          <div className={`lg:col-span-5 ${cleanupMobilePane === 'digital' ? 'hidden lg:flex' : 'flex'} flex-col justify-between rounded-2xl border p-4 ${
+            darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+          }`}>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                  Source Scan Bounding Boxes
+                </span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold">
+                  {uncertainEventsCount} Uncertain
+                </span>
+              </div>
+
+              <div className="relative w-full h-64 rounded-xl overflow-hidden bg-[#f4efe4] border border-stone-300 p-4 text-stone-900 shadow-inner">
+                <div className="w-full h-full relative" style={{ transform: 'rotate(-0.4deg)' }}>
+                  <div className="text-center font-serif border-b border-stone-400/50 pb-1 mb-3">
+                    <div className="text-sm font-bold text-stone-800">{currentSong.title}</div>
+                    <div className="text-[10px] italic text-stone-600">{currentSong.composer} · Source Page 1</div>
+                  </div>
+
+                  {[0.24, 0.50, 0.76].map((sysY, idx) => (
+                    <div
+                      key={idx}
+                      className="absolute left-3 right-3 h-7 border-t border-b border-stone-400 flex items-center"
+                      style={{ top: `${sysY * 100}%` }}
+                    >
+                      <div className="w-full border-t border-stone-400/60" />
+                    </div>
+                  ))}
+
+                  {currentSong.events.slice(0, 22).map((ev) => {
+                    const isFlagged = ev.confidence < 0.85 && !ev.verified;
+                    const isCurr = selectedEv?.id === ev.id;
+                    return (
+                      <button
+                        key={ev.id}
+                        onClick={() => {
+                          setSelectedEventId(ev.id);
+                          audioEngine.playNote(ev.pitch, 0.4, ev.velocity);
+                        }}
+                        style={{
+                          left: `${ev.bbox.x * 100}%`,
+                          top: `${ev.bbox.y * 100}%`,
+                          width: `${ev.bbox.w * 100}%`,
+                          height: `${ev.bbox.h * 100}%`
+                        }}
+                        className={`absolute rounded transition-all flex items-center justify-center text-[10px] font-bold ${
+                          isCurr
+                            ? 'ring-2 ring-rose-600 bg-rose-500/30 text-stone-950 z-20 scale-110'
+                            : isFlagged
+                            ? 'border-2 border-amber-600 bg-amber-400/40 text-stone-950 z-10 animate-pulse'
+                            : 'border border-stone-600/40 bg-stone-500/15 text-stone-800 hover:bg-orange-500/30'
+                        }`}
+                      >
+                        ●
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            {renderGrandStaffNotation(true)}
+            <p className="text-[11px] text-stone-500 mt-3">
+              Every reconstructed note retains its normalized $(x, y, w, h)$ page coordinates so optical errors never corrupt the score silently.
+            </p>
           </div>
 
-          {selectedEv && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-800">
-                <div>
-                  <span className="text-xs uppercase tracking-wider font-bold text-indigo-400">
-                    Selected Event Inspector · Measure {selectedEv.measure}, Beat {selectedEv.beat}
-                  </span>
-                  <h4 className="text-base font-bold text-white flex items-center gap-2 mt-0.5">
-                    Detected Pitch: {selectedEv.pitchName} (MIDI {selectedEv.pitch})
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                      selectedEv.confidence >= 0.85 || selectedEv.verified
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                    }`}>
-                      Confidence: {Math.round(selectedEv.confidence * 100)}%
-                    </span>
-                  </h4>
-                </div>
+          {/* Right Column: Reconstructed Digital Engraving & Inspector */}
+          <div className={`lg:col-span-7 ${cleanupMobilePane === 'scan' ? 'hidden lg:flex' : 'flex'} flex-col gap-4`}>
+            <div className={`rounded-2xl border p-4 ${
+              darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                  Interactive Reconstructed Notation (Tap Any Note)
+                </span>
+              </div>
+              {renderGrandStaffNotation(true)}
+            </div>
 
-                <div className="flex items-center gap-2">
+            {selectedEv && (
+              <div className={`rounded-2xl border p-4 ${
+                darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-stone-200 dark:border-stone-800">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
+                      Measure {selectedEv.measure} · Beat {selectedEv.beat}
+                    </span>
+                    <h4 className="text-base font-bold flex items-center gap-2 mt-0.5">
+                      Selected Note: {selectedEv.pitchName}
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                        selectedEv.confidence >= 0.85 || selectedEv.verified
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                      }`}>
+                        {Math.round(selectedEv.confidence * 100)}% Confidence
+                      </span>
+                    </h4>
+                  </div>
+
                   <button
                     onClick={() => updateNoteInGraph(selectedEv.id, { verified: true })}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5"
                   >
                     <Check className="w-3.5 h-3.5" />
-                    Confirm Symbol
+                    Approve Note
                   </button>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2.5">
-                  <div className="text-xs font-semibold text-slate-300">Direct Musical Corrections</div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => updateNoteInGraph(selectedEv.id, { pitch: selectedEv.pitch + 1 })}
-                      className="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-200"
-                    >
-                      +1 Semitone (♯)
-                    </button>
-                    <button
-                      onClick={() => updateNoteInGraph(selectedEv.id, { pitch: selectedEv.pitch - 1 })}
-                      className="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-200"
-                    >
-                      -1 Semitone (♭)
-                    </button>
-                    <button
-                      onClick={() => updateNoteInGraph(selectedEv.id, { pitch: selectedEv.pitch + 12 })}
-                      className="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-200"
-                    >
-                      +1 Octave
-                    </button>
-                    <button
-                      onClick={() => updateNoteInGraph(selectedEv.id, { hand: selectedEv.hand === 'R' ? 'L' : 'R' })}
-                      className="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-200"
-                    >
-                      Hand: {selectedEv.hand === 'R' ? 'Right → Left' : 'Left → Right'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-slate-300">
-                    AI Candidate Interpretations (Click to Apply)
-                  </div>
-                  <div className="space-y-1.5">
-                    {selectedEv.alternatives?.map((alt, i) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="space-y-2">
+                    <div className="font-bold text-stone-500">Quick Pitch & Hand Adjustments</div>
+                    <div className="grid grid-cols-2 gap-2">
                       <button
-                        key={i}
-                        onClick={() => {
-                          updateNoteInGraph(selectedEv.id, { pitch: alt.pitch });
-                          audioEngine.playNote(alt.pitch, 0.4, 90);
-                        }}
-                        className="w-full text-left px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-xs"
+                        onClick={() => updateNoteInGraph(selectedEv.id, { pitch: selectedEv.pitch + 1 })}
+                        className={`p-2 rounded-xl border font-semibold ${
+                          darkMode ? 'bg-stone-950 border-stone-800 hover:bg-stone-800' : 'bg-stone-50 border-stone-200 hover:bg-stone-100'
+                        }`}
                       >
-                        <span className="text-slate-200 font-medium">{alt.label}</span>
-                        <span className="text-indigo-400 font-mono">{Math.round(alt.confidence * 100)}% prob</span>
+                        +1 Semitone (♯)
                       </button>
-                    ))}
+                      <button
+                        onClick={() => updateNoteInGraph(selectedEv.id, { pitch: selectedEv.pitch - 1 })}
+                        className={`p-2 rounded-xl border font-semibold ${
+                          darkMode ? 'bg-stone-950 border-stone-800 hover:bg-stone-800' : 'bg-stone-50 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        -1 Semitone (♭)
+                      </button>
+                      <button
+                        onClick={() => updateNoteInGraph(selectedEv.id, { pitch: selectedEv.pitch + 12 })}
+                        className={`p-2 rounded-xl border font-semibold ${
+                          darkMode ? 'bg-stone-950 border-stone-800 hover:bg-stone-800' : 'bg-stone-50 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        +1 Octave
+                      </button>
+                      <button
+                        onClick={() => updateNoteInGraph(selectedEv.id, { hand: selectedEv.hand === 'R' ? 'L' : 'R' })}
+                        className={`p-2 rounded-xl border font-semibold ${
+                          darkMode ? 'bg-stone-950 border-stone-800 hover:bg-stone-800' : 'bg-stone-50 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        Hand: {selectedEv.hand === 'R' ? 'Right → Left' : 'Left → Right'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="font-bold text-stone-500">Alternative OMR Candidates</div>
+                    <div className="space-y-1.5">
+                      {selectedEv.alternatives?.map((alt, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            updateNoteInGraph(selectedEv.id, { pitch: alt.pitch });
+                            audioEngine.playNote(alt.pitch, 0.4, 90);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl border flex items-center justify-between font-medium ${
+                            darkMode ? 'bg-stone-950 border-stone-800 hover:bg-stone-800' : 'bg-stone-50 border-stone-200 hover:bg-stone-100'
+                          }`}
+                        >
+                          <span>{alt.label}</span>
+                          <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
+                            {Math.round(alt.confidence * 100)}%
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     );
   };
 
-  const renderImportStudio = () => (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center mx-auto mb-3">
-          <Upload className="w-7 h-7 text-indigo-400" />
-        </div>
-        <h2 className="text-lg font-bold text-white">Universal Music Ingestion Engine</h2>
-        <p className="text-xs text-slate-400 max-w-xl mx-auto mt-1">
-          Upload Standard MIDI (`.mid`), MusicXML (`.musicxml`), scanned sheet music PDFs/photos (`.pdf`, `.png`, `.jpg`), or audio recordings (`.wav`, `.mp3`). Every format compiles into the canonical Maestro Music Graph.
-        </p>
+  // ============================================================================
+  // 16. VIEW 4: ADAPTIVE COACH & MULTI-INSTRUMENT ROADMAP
+  // ============================================================================
 
-        <label className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm cursor-pointer shadow-lg shadow-indigo-600/25 transition">
-          <Plus className="w-4 h-4" />
-          Select Music File to Import
-          <input
-            type="file"
-            accept=".mid,.midi,.musicxml,.xml,.pdf,.png,.jpg,.jpeg,.wav,.mp3"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-        </label>
-
-        {importStatus && (
-          <div className={`mt-4 p-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-2 ${
-            importStatus.error
-              ? 'bg-rose-950/50 border-rose-500/40 text-rose-200'
-              : importStatus.success
-              ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-200'
-              : 'bg-indigo-950/50 border-indigo-500/40 text-indigo-200'
-          }`}>
-            <RefreshCw className={`w-4 h-4 ${!importStatus.success && !importStatus.error ? 'animate-spin' : ''}`} />
-            <span>{importStatus.label}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs font-bold text-indigo-400 uppercase mb-1">Adapter 1 · Symbolic</div>
-          <h4 className="text-sm font-bold text-white mb-1">Standard MIDI & MusicXML</h4>
-          <p className="text-xs text-slate-400">
-            Byte-level binary `MThd`/`MTrk` SMF parser and DOM MusicXML 4.0 parser. Extracts exact note onsets, polyphonic voices, tempo changes, and key signatures with 100% deterministic fidelity.
-          </p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs font-bold text-amber-400 uppercase mb-1">Adapter 2 · Optical (OMR)</div>
-          <h4 className="text-sm font-bold text-white mb-1">PDF & Camera Sheet Music</h4>
-          <p className="text-xs text-slate-400">
-            Perspective dewarping, staff-line tracking, notehead/beam segmentation, and measure duration validation. Preserves source coordinates for side-by-side verification.
-          </p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs font-bold text-emerald-400 uppercase mb-1">Adapter 3 · Audio MIR</div>
-          <h4 className="text-sm font-bold text-white mb-1">Polyphonic Audio-to-MIDI</h4>
-          <p className="text-xs text-slate-400">
-            Onset envelope detection, CQT harmonic spectrogram analysis, and beat-grid quantization with confidence scoring and editable transcription review.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderConnectionsCenter = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Cpu className="w-5 h-5 text-indigo-400" />
-            <div>
-              <h3 className="text-sm font-bold text-white">Mode A · Direct USB / Bluetooth MIDI</h3>
-              <p className="text-xs text-slate-400">Web MIDI API Hardware Abstraction Layer</p>
-            </div>
-          </div>
-          <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
-            midiDevices.length > 0
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-              : 'bg-slate-800 text-slate-400'
-          }`}>
-            {midiDevices.length > 0 ? `${midiDevices.length} Connected` : 'Listening for Devices'}
-          </span>
-        </div>
-
-        {midiDevices.length > 0 ? (
-          <div className="space-y-2">
-            {midiDevices.map(dev => (
-              <div key={dev.id} className="p-3 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-                <div>
-                  <div className="font-bold text-white">{dev.name}</div>
-                  <div className="text-slate-400">{dev.manufacturer}</div>
-                </div>
-                <span className="text-emerald-400 font-mono uppercase">{dev.state}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-400">
-            {midiSupported
-              ? 'No physical USB/BLE MIDI controllers detected yet. Plug in a MIDI keyboard and press any key—Maestro AI will auto-bind immediately.'
-              : 'Web MIDI API is restricted by this browser context. Use the Acoustic Microphone mode or Computer Keyboard below.'}
-          </div>
-        )}
-
-        {lastMidiPacket && (
-          <div className="p-2.5 rounded bg-indigo-950/40 border border-indigo-500/30 text-xs font-mono text-indigo-200">
-            Last MIDI Event: Status {lastMidiPacket.status} · Note {lastMidiPacket.note} ({midiToPitchName(lastMidiPacket.note)}) · Vel {lastMidiPacket.velocity}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Mic className="w-5 h-5 text-emerald-400" />
-            <div>
-              <h3 className="text-sm font-bold text-white">Mode B · Live Acoustic Microphone DSP</h3>
-              <p className="text-xs text-slate-400">Client-Side Time-Domain Autocorrelation Pitch Tracker</p>
-            </div>
-          </div>
-          <button
-            onClick={toggleMicrophone}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-              micActive
-                ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-            }`}
-          >
-            {micActive ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-            {micActive ? 'Stop Listening' : 'Enable Microphone'}
-          </button>
-        </div>
-
-        <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-slate-400">Detected Fundamental Pitch (f0)</div>
-            <div className="text-xl font-bold text-white mt-0.5">
-              {detectedMicPitch ? `${detectedMicPitch.name} (${detectedMicPitch.freq} Hz)` : micActive ? 'Listening for instrument...' : 'Mic Inactive'}
-            </div>
-          </div>
-          {detectedMicPitch && (
-            <div className="text-right font-mono text-xs">
-              <div className="text-emerald-400">MIDI #{detectedMicPitch.midi}</div>
-              <div className="text-slate-400">{detectedMicPitch.centsOff >= 0 ? `+${detectedMicPitch.centsOff}` : detectedMicPitch.centsOff} cents</div>
-            </div>
-          )}
-        </div>
-
-        <div className="text-[11px] text-slate-400 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>Privacy Guarantee: All microphone DSP runs 100% locally in your browser via WebAudio. Raw audio is never uploaded to the cloud.</span>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderAdaptiveTeacher = () => {
+  const renderAdaptiveCoach = () => {
     const avgOffset = sessionStats.timingOffsetsMs.length > 0
       ? Math.round(sessionStats.timingOffsetsMs.reduce((a, b) => a + b, 0) / sessionStats.timingOffsetsMs.length)
       : 0;
@@ -2437,51 +2373,55 @@ export default function App() {
       .sort((a, b) => b[1] - a[1])[0]?.[0] || 2;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Award className="w-5 h-5 text-indigo-400" />
-                Adaptive Teacher & Diagnostic Prescription
-              </h3>
-              <p className="text-xs text-slate-400">
-                Deterministic error classification & personalized practice loop generator
-              </p>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className={`lg:col-span-8 rounded-2xl border p-5 sm:p-6 space-y-5 ${
+          darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+        }`}>
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
+              Personalized Diagnostic Engine
+            </span>
+            <h2 className="text-xl font-serif font-bold mt-0.5">
+              Adaptive Practice Coach
+            </h2>
+            <p className="text-xs sm:text-sm text-stone-500">
+              Transparent, deterministic performance metrics based on your live note accuracy and rhythm stability.
+            </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-              <div className="text-xs text-slate-400">Pitch Accuracy</div>
-              <div className="text-2xl font-bold text-emerald-400 mt-1">
-                {sessionStats.hits + sessionStats.misses > 0
-                  ? `${Math.round((sessionStats.hits / (sessionStats.hits + sessionStats.misses)) * 100)}%`
-                  : '96%'}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`p-4 rounded-2xl border ${darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-200'}`}>
+              <div className="text-xs text-stone-500">Note Accuracy</div>
+              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                {Math.round((sessionStats.hits / Math.max(1, sessionStats.hits + sessionStats.misses)) * 100)}%
               </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-              <div className="text-xs text-slate-400">Mean Timing Tendency</div>
-              <div className="text-2xl font-bold text-indigo-400 mt-1">
+            <div className={`p-4 rounded-2xl border ${darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-200'}`}>
+              <div className="text-xs text-stone-500">Rhythm Tendency</div>
+              <div className="text-2xl font-bold mt-1">
                 {avgOffset >= 0 ? `+${avgOffset} ms` : `${avgOffset} ms`}
               </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-              <div className="text-xs text-slate-400">Focus Measure</div>
-              <div className="text-2xl font-bold text-amber-400 mt-1">
+            <div className={`p-4 rounded-2xl border ${darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-200'}`}>
+              <div className="text-xs text-stone-500">Recommended Focus</div>
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">
                 Measure {hardestMeasure}
               </div>
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-indigo-950/30 border border-indigo-500/30 flex flex-wrap items-center justify-between gap-3">
+          <div className={`p-4 sm:p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 ${
+            darkMode ? 'bg-orange-950/20 border-orange-500/30' : 'bg-orange-50/70 border-orange-200'
+          }`}>
             <div className="space-y-1 max-w-lg">
-              <div className="text-xs font-bold text-indigo-300 uppercase">Recommended Targeted Exercise</div>
-              <div className="text-sm font-semibold text-white">
-                Isolate Measure {hardestMeasure} at 75% Tempo with Right-Hand Focus
+              <div className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
+                Suggested 2-Minute Drill
               </div>
-              <p className="text-xs text-slate-300">
-                Why this passage was selected: You had the highest concentration of pitch or rhythm hesitations entering Measure {hardestMeasure}. Let&apos;s lock in the fingering slowly before restoring full tempo.
+              <div className="text-base font-bold">
+                Loop Measure {hardestMeasure} at 75% Tempo (Right Hand Only)
+              </div>
+              <p className="text-xs text-stone-600 dark:text-stone-300">
+                We noticed pitch or rhythm hesitations entering Measure {hardestMeasure}. Isolating the right-hand melody slowly locks in finger memory before combining hands.
               </p>
             </div>
             <button
@@ -2493,30 +2433,55 @@ export default function App() {
                 setCurrentBeat((m - 1) * beatsPerMeasure);
                 setActiveTab('practice');
               }}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg"
+              className="px-4 py-2.5 rounded-xl bg-orange-700 hover:bg-orange-600 text-white text-xs font-bold shadow-sm"
             >
-              Launch Targeted Drill →
+              Start Targeted Drill →
             </button>
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
-          <h4 className="text-sm font-bold text-white">Multi-Instrument Roadmap</h4>
-          <p className="text-xs text-slate-400">
-            Because Maestro AI stores music in the instrument-agnostic Maestro Music Graph, switching instrument adapters updates tuning, transposition, and visual guidance automatically:
+        <div className={`lg:col-span-4 rounded-2xl border p-5 space-y-4 ${
+          darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90 shadow-sm'
+        }`}>
+          <h3 className="text-base font-serif font-bold">Instrument & MIDI Setup</h3>
+          <p className="text-xs text-stone-500">
+            Connect a USB/Bluetooth MIDI keyboard or enable the acoustic microphone to play with a real instrument.
           </p>
-          <div className="space-y-2 text-xs">
-            <div className="p-2.5 rounded-lg bg-slate-950 border border-indigo-500/40 flex items-center justify-between">
-              <span className="font-semibold text-white">Acoustic & Digital Piano (88-Key)</span>
-              <span className="text-emerald-400 font-bold">Active</span>
+
+          <div className="space-y-2.5 text-xs">
+            <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
+              darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-200'
+            }`}>
+              <div>
+                <div className="font-bold">USB / BLE MIDI</div>
+                <div className="text-stone-500">
+                  {midiDevices.length > 0 ? midiDevices[0].name : midiSupported ? 'Ready (Plug & Play)' : 'Browser Restricted'}
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                midiDevices.length > 0 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-stone-200 dark:bg-stone-800 text-stone-500'
+              }`}>
+                {midiDevices.length > 0 ? 'Connected' : 'Standby'}
+              </span>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <span className="text-slate-300">6-String Guitar (EADGBE Tab Adapter)</span>
-              <span className="text-indigo-400">Ready in MMG</span>
-            </div>
-            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <span className="text-slate-300">Violin / Flute Monophonic Mic Adapter</span>
-              <span className="text-emerald-400">Mic DSP Active</span>
+
+            <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
+              darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-200'
+            }`}>
+              <div>
+                <div className="font-bold">Acoustic Microphone</div>
+                <div className="text-stone-500">
+                  {detectedMicPitch ? `Hearing: ${detectedMicPitch.name} (${detectedMicPitch.freq} Hz)` : micActive ? 'Listening...' : 'Off (Local Browser DSP)'}
+                </div>
+              </div>
+              <button
+                onClick={toggleMicrophone}
+                className={`px-3 py-1.5 rounded-lg font-bold text-white ${
+                  micActive ? 'bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
+              >
+                {micActive ? 'Stop Mic' : 'Enable Mic'}
+              </button>
             </div>
           </div>
         </div>
@@ -2524,77 +2489,133 @@ export default function App() {
     );
   };
 
+  // ============================================================================
+  // 17. SHELL LAYOUT: DESKTOP HEADER + MOBILE BOTTOM TAB BAR
+  // ============================================================================
+
+  const navItems = [
+    { id: 'practice', label: 'Practice', icon: Play },
+    { id: 'repertoire', label: 'Library & Import', icon: Compass },
+    { id: 'cleanup', label: 'Score Cleanup', badge: uncertainEventsCount, icon: Wrench },
+    { id: 'coach', label: 'Coach & MIDI', icon: Award }
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center shadow-md">
-            <Music className="w-5 h-5 text-white" />
+    <div className={`min-h-screen flex flex-col font-sans pb-16 md:pb-0 transition-colors ${
+      darkMode ? 'bg-stone-950 text-stone-100' : 'bg-[#f6f3ec] text-stone-900'
+    }`}>
+      {/* Clean Conservatory Header */}
+      <header className={`sticky top-0 z-30 border-b px-4 py-2.5 backdrop-blur-md flex items-center justify-between gap-3 ${
+        darkMode ? 'bg-stone-900/90 border-stone-800' : 'bg-[#fcfaf5]/90 border-stone-200/90'
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-orange-700 flex items-center justify-center text-white shadow-sm">
+            <Music className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base tracking-tight text-white">MAESTRO AI</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Universal Music Intelligence
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Canonical Music Graph · OMR Cleanup Studio · Real-Time MIDI & Acoustic Listening
-            </p>
+            <span className="font-serif font-bold text-base tracking-tight">Maestro AI</span>
+            <span className="hidden sm:inline-block ml-2 text-[11px] text-stone-500">
+              Interactive Sheet Music & Performance Studio
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Active Piece:</span>
-          <select
-            value={currentSong.id}
-            onChange={(e) => handleSelectSong(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
-          >
-            {songs.map(s => (
-              <option key={s.id} value={s.id}>
-                {s.title} — {s.composer} [{s.sourceFormat}]
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <nav className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-          {[
-            { id: 'home', label: 'Home & Library', icon: Compass },
-            { id: 'practice', label: 'Interactive Practice', icon: Play },
-            { id: 'cleanup', label: `Cleanup Studio (${uncertainEventsCount})`, icon: Wrench },
-            { id: 'import', label: 'Import Music', icon: Upload },
-            { id: 'connections', label: 'Instrument Input', icon: Radio },
-            { id: 'teacher', label: 'Adaptive Teacher', icon: Award }
-          ].map(tab => {
-            const Icon = tab.icon;
+        {/* Desktop Center Navigation */}
+        <nav className={`hidden md:flex items-center gap-1 p-1 rounded-xl border text-xs font-semibold ${
+          darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-200/60 border-stone-300/60'
+        }`}>
+          {navItems.map(item => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
             return (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition ${
-                  activeTab === tab.id
-                    ? 'bg-indigo-600 text-white shadow'
-                    : 'text-slate-400 hover:text-slate-200'
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                  isActive
+                    ? (darkMode ? 'bg-orange-700 text-white shadow-sm' : 'bg-white text-stone-900 shadow-sm')
+                    : (darkMode ? 'text-stone-400 hover:text-stone-200' : 'text-stone-600 hover:text-stone-900')
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
+                <span>{item.label}</span>
+                {item.badge > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-300 font-bold">
+                    {item.badge}
+                  </span>
+                )}
               </button>
             );
           })}
         </nav>
+
+        {/* Right Quick Controls: Mic Pill + Theme Toggle */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleMicrophone}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition ${
+              micActive
+                ? 'bg-emerald-600 text-white border-emerald-500'
+                : (darkMode ? 'bg-stone-950 border-stone-800 text-stone-300' : 'bg-white border-stone-200 text-stone-700')
+            }`}
+            title="Toggle Live Acoustic Microphone Listening"
+          >
+            {micActive ? <Mic className="w-3.5 h-3.5 animate-pulse" /> : <MicOff className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">
+              {detectedMicPitch ? detectedMicPitch.name : micActive ? 'Listening' : 'Mic Off'}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setDarkMode(d => !d)}
+            className={`p-2 rounded-xl border transition ${
+              darkMode ? 'bg-stone-950 border-stone-800 text-amber-400' : 'bg-white border-stone-200 text-stone-700'
+            }`}
+            title="Switch Sheet Paper / Night Studio Theme"
+          >
+            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+        </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4">
-        {activeTab === 'home' && renderHomeDashboard()}
+      {/* Main Content Container */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-5 py-4">
         {activeTab === 'practice' && renderPracticeView()}
+        {activeTab === 'repertoire' && renderRepertoireAndImport()}
         {activeTab === 'cleanup' && renderCleanupStudio()}
-        {activeTab === 'import' && renderImportStudio()}
-        {activeTab === 'connections' && renderConnectionsCenter()}
-        {activeTab === 'teacher' && renderAdaptiveTeacher()}
+        {activeTab === 'coach' && renderAdaptiveCoach()}
       </main>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t px-2 py-1.5 grid grid-cols-4 gap-1 backdrop-blur-md ${
+        darkMode ? 'bg-stone-900/95 border-stone-800' : 'bg-[#fcfaf5]/95 border-stone-200'
+      }`}>
+        {navItems.map(item => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${
+                isActive
+                  ? 'text-orange-700 dark:text-orange-400'
+                  : 'text-stone-500'
+              }`}
+            >
+              <div className="relative">
+                <Icon className="w-4 h-4" />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1 -right-2.5 w-3.5 h-3.5 rounded-full bg-amber-500 text-stone-950 text-[9px] font-bold flex items-center justify-center">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
+              <span className="truncate max-w-full">{item.label.split(' ')[0]}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }
