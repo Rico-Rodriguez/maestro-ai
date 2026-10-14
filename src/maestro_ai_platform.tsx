@@ -67,22 +67,79 @@ const KEYBOARD_TO_MIDI = {
 };
 
 // ============================================================================
-// 2. CANONICAL SAMPLE LIBRARY (MAESTRO MUSIC GRAPH FORMAT)
+// 2. CANONICAL SAMPLE LIBRARY (FULL 16-TO-24 MEASURE ARRANGEMENTS)
 // ============================================================================
+
+const PITCH_STR_REGEX = /^([A-G])(#|b)?(\d)$/;
+const SEMITONE_MAP = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+function noteStrToMidi(str) {
+  if (typeof str === 'number') return str;
+  const m = PITCH_STR_REGEX.exec(str.trim());
+  if (!m) return 60;
+  const [, step, acc, octStr] = m;
+  const oct = parseInt(octStr, 10);
+  const alter = acc === '#' ? 1 : acc === 'b' ? -1 : 0;
+  return (oct + 1) * 12 + SEMITONE_MAP[step] + alter;
+}
+
+// Helper to compile compact measure-by-measure right-hand & left-hand scores into full MMG events
+function compileCompactScore(measuresList, beatsPerMeasure = 4) {
+  const rawNotes = [];
+  measuresList.forEach((m, mIdx) => {
+    const measureStartBeat = mIdx * beatsPerMeasure;
+    const harmony = m.chord || 'C';
+
+    const processVoice = (tokens, hand) => {
+      let cursor = 0;
+      tokens.forEach((tok) => {
+        // Format: "E4:1:3" (Pitch : DurationBeats : Finger) or "R:1" (Rest)
+        const parts = tok.split(':');
+        const pitchPart = parts[0];
+        const dur = parseFloat(parts[1] || '1');
+        const finger = parts[2] ? parseInt(parts[2], 10) : undefined;
+        const conf = parts[3] ? parseFloat(parts[3]) : 0.98;
+
+        if (pitchPart !== 'R') {
+          // Support chord tokens like "C4+E4+G4"
+          const pitches = pitchPart.split('+');
+          pitches.forEach((pStr, pIdx) => {
+            const midi = noteStrToMidi(pStr);
+            rawNotes.push({
+              pitch: midi,
+              onset: Math.round((measureStartBeat + cursor) * 100) / 100,
+              duration: dur,
+              hand,
+              finger: finger || (hand === 'R' ? ((pIdx * 2) % 5) + 1 : 5 - (pIdx * 2)),
+              confidence: conf,
+              harmony
+            });
+          });
+        }
+        cursor += dur;
+      });
+    };
+
+    if (m.rh) processVoice(m.rh, 'R');
+    if (m.lh) processVoice(m.lh, 'L');
+  });
+  return rawNotes;
+}
 
 function buildSongFromEvents({
   id, title, composer, genre, difficulty, tempo, timeSignature, keySignature, sourceFormat, license, rawNotes
 }) {
   const beatsPerMeasure = timeSignature[0] * (4 / timeSignature[1]);
+  const totalMeasures = Math.max(
+    1,
+    Math.ceil(Math.max(...rawNotes.map(r => r.onset + r.duration)) / beatsPerMeasure)
+  );
   const events = rawNotes.map((n, idx) => {
     const measure = Math.floor(n.onset / beatsPerMeasure) + 1;
     const beatInMeasure = (n.onset % beatsPerMeasure) + 1;
     const spelling = getDiatonicSpelling(n.pitch);
-    const totalMeasures = Math.ceil(
-      Math.max(...rawNotes.map(r => r.onset + r.duration)) / beatsPerMeasure
-    );
-    const row = Math.floor((measure - 1) / 2);
-    const colProgress = ((n.onset % (beatsPerMeasure * 2)) / (beatsPerMeasure * 2));
+    const row = Math.floor((measure - 1) / 4);
+    const colProgress = ((n.onset % (beatsPerMeasure * 4)) / (beatsPerMeasure * 4));
     return {
       id: `${id}-ev-${idx}`,
       pitch: n.pitch,
@@ -96,7 +153,7 @@ function buildSongFromEvents({
       beat: Math.round(beatInMeasure * 100) / 100,
       hand: n.hand || (n.pitch >= 60 ? 'R' : 'L'),
       finger: n.finger || ((idx % 5) + 1),
-      velocity: n.velocity || 84,
+      velocity: n.velocity || (n.hand === 'L' ? 74 : 88),
       confidence: n.confidence ?? 0.98,
       alternatives: n.alternatives || [
         { pitch: n.pitch + 1, label: `${midiToPitchName(n.pitch + 1)} (Sharp Accidental)`, confidence: 0.22 },
@@ -105,10 +162,10 @@ function buildSongFromEvents({
       verified: (n.confidence ?? 0.98) >= 0.85,
       harmony: n.harmony || 'C',
       bbox: {
-        x: 0.10 + colProgress * 0.80,
-        y: 0.20 + row * 0.22 + (n.hand === 'L' ? 0.07 : 0.0),
-        w: 0.055,
-        h: 0.065
+        x: 0.08 + colProgress * 0.84,
+        y: 0.18 + (row % 3) * 0.24 + (n.hand === 'L' ? 0.06 : 0.0),
+        w: 0.045,
+        h: 0.055
       },
       totalMeasures
     };
@@ -126,62 +183,87 @@ function buildSongFromEvents({
     sourceFormat,
     license,
     mmgVersion: '1.0.0',
+    totalMeasures,
     events
   };
 }
 
 const INITIAL_SONGS = [
+  // 1. ODE TO JOY — FULL 16-MEASURE A-A'-B-A' CONCERT ARRANGEMENT
   buildSongFromEvents({
     id: 'ode-to-joy',
-    title: 'Ode to Joy',
+    title: 'Ode to Joy (Symphony No. 9, Complete Theme)',
     composer: 'Ludwig van Beethoven',
     genre: 'Classical',
     difficulty: 'Beginner',
-    tempo: 104,
+    tempo: 108,
     timeSignature: [4, 4],
     keySignature: 'C Major',
     sourceFormat: 'Scanned Score (OMR)',
     license: 'Public Domain',
-    rawNotes: [
-      { pitch: 64, onset: 0, duration: 1, hand: 'R', finger: 3, confidence: 0.99, harmony: 'C' },
-      { pitch: 48, onset: 0, duration: 2, hand: 'L', finger: 5, confidence: 0.97, harmony: 'C' },
-      { pitch: 64, onset: 1, duration: 1, hand: 'R', finger: 3, confidence: 0.99, harmony: 'C' },
-      { pitch: 65, onset: 2, duration: 1, hand: 'R', finger: 4, confidence: 0.96, harmony: 'C' },
-      { pitch: 55, onset: 2, duration: 2, hand: 'L', finger: 1, confidence: 0.95, harmony: 'C' },
-      { pitch: 67, onset: 3, duration: 1, hand: 'R', finger: 5, confidence: 0.98, harmony: 'C' },
-      { pitch: 67, onset: 4, duration: 1, hand: 'R', finger: 5, confidence: 0.99, harmony: 'G' },
-      { pitch: 55, onset: 4, duration: 2, hand: 'L', finger: 1, confidence: 0.94, harmony: 'G' },
-      { pitch: 65, onset: 5, duration: 1, hand: 'R', finger: 4, confidence: 0.72, harmony: 'G',
-        alternatives: [
-          { pitch: 65, label: 'F4 Natural (Diatonic Match)', confidence: 0.72 },
-          { pitch: 66, label: 'F#4 (Ink Smudge Near Notehead)', confidence: 0.28 }
-        ]
-      },
-      { pitch: 64, onset: 6, duration: 1, hand: 'R', finger: 3, confidence: 0.98, harmony: 'C' },
-      { pitch: 52, onset: 6, duration: 2, hand: 'L', finger: 3, confidence: 0.96, harmony: 'C' },
-      { pitch: 62, onset: 7, duration: 1, hand: 'R', finger: 2, confidence: 0.95, harmony: 'G' },
-      { pitch: 60, onset: 8, duration: 1, hand: 'R', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 48, onset: 8, duration: 2, hand: 'L', finger: 5, confidence: 0.98, harmony: 'C' },
-      { pitch: 60, onset: 9, duration: 1, hand: 'R', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 62, onset: 10, duration: 1, hand: 'R', finger: 2, confidence: 0.97, harmony: 'G' },
-      { pitch: 55, onset: 10, duration: 2, hand: 'L', finger: 1, confidence: 0.95, harmony: 'G' },
-      { pitch: 64, onset: 11, duration: 1, hand: 'R', finger: 3, confidence: 0.98, harmony: 'C' },
-      { pitch: 64, onset: 12, duration: 1.5, hand: 'R', finger: 3, confidence: 0.76, harmony: 'G',
-        alternatives: [
-          { pitch: 64, label: 'E4 Dotted Quarter (1.5 Beats)', confidence: 0.76 },
-          { pitch: 62, label: 'D4 Quarter Note', confidence: 0.24 }
-        ]
-      },
-      { pitch: 55, onset: 12, duration: 2, hand: 'L', finger: 1, confidence: 0.94, harmony: 'G' },
-      { pitch: 62, onset: 13.5, duration: 0.5, hand: 'R', finger: 2, confidence: 0.92, harmony: 'G' },
-      { pitch: 62, onset: 14, duration: 2, hand: 'R', finger: 2, confidence: 0.99, harmony: 'G' },
-      { pitch: 43, onset: 14, duration: 2, hand: 'L', finger: 5, confidence: 0.96, harmony: 'G' }
-    ]
+    rawNotes: compileCompactScore([
+      // Phrase A (Bars 1-4)
+      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
+      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4:0.74', 'E4:1:3', 'D4:1:2'], lh: ['B2+G3:2:5', 'D3+G3:2:2'] },
+      { chord: 'C', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
+      { chord: 'G', rh: ['E4:1.5:3', 'D4:0.5:2', 'D4:2:2'], lh: ['G2+D3:2:5', 'G2+B2:2:5'] },
+      // Phrase A' (Bars 5-8)
+      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
+      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4', 'E4:1:3', 'D4:1:2'], lh: ['B2+G3:2:5', 'D3+G3:2:2'] },
+      { chord: 'C/G', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3+E3:2:4', 'G2+D3:2:5'] },
+      { chord: 'C', rh: ['D4:1.5:2', 'C4:0.5:1', 'C4:2:1'], lh: ['G2+B2:2:5', 'C3+E3:2:3'] },
+      // Phrase B Bridge (Bars 9-12)
+      { chord: 'G', rh: ['D4:1:2', 'D4:1:2', 'E4:1:3', 'C4:1:1'], lh: ['G2+D3:2:5', 'G2+D3:2:5'] },
+      { chord: 'G', rh: ['D4:1:2', 'E4:0.5:3', 'F4:0.5:4', 'E4:1:3', 'C4:1:1'], lh: ['G2+D3:2:5', 'G2+D3:2:5'] },
+      { chord: 'D7/F#', rh: ['D4:1:2', 'E4:0.5:3', 'F4:0.5:4:0.78', 'E4:1:3', 'D4:1:2'], lh: ['A2+D3:2:4', 'F#2+D3:2:5'] },
+      { chord: 'G7', rh: ['C4:1:1', 'D4:1:2', 'G3:2:1'], lh: ['G2+D3:2:5', 'G2+F3:2:5'] },
+      // Phrase A'' Finale (Bars 13-16)
+      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
+      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4', 'E4:1:3', 'D4:1:2'], lh: ['B2+G3:2:5', 'D3+G3:2:2'] },
+      { chord: 'C/G', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3+E3:2:4', 'G2+D3:2:5'] },
+      { chord: 'C', rh: ['D4:1.5:2', 'C4:0.5:1', 'C4+E4+G4:2:1'], lh: ['G2+D3:2:5', 'C2+C3:2:5'] }
+    ], 4)
   }),
 
+  // 2. FÜR ELISE — BEETHOVEN (16-MEASURE COMPLETE A-SECTION IN 3/4)
+  buildSongFromEvents({
+    id: 'fur-elise',
+    title: 'Für Elise, WoO 59 (Complete A Section)',
+    composer: 'Ludwig van Beethoven',
+    genre: 'Classical',
+    difficulty: 'Intermediate',
+    tempo: 116,
+    timeSignature: [3, 4],
+    keySignature: 'A Minor',
+    sourceFormat: 'Scanned Score (OMR)',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'Am', rh: ['R:2', 'E5:0.5:5', 'D#5:0.5:4'], lh: ['R:3'] },
+      { chord: 'Am', rh: ['E5:0.5:5', 'D#5:0.5:4', 'E5:0.5:5', 'B4:0.5:2', 'D5:0.5:4', 'C5:0.5:3'], lh: ['R:3'] },
+      { chord: 'Am', rh: ['A4:1:1', 'R:0.5', 'C4:0.5:1', 'E4:0.5:2', 'A4:0.5:4'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
+      { chord: 'E7', rh: ['B4:1:5', 'R:0.5', 'E4:0.5:1', 'G#4:0.5:2:0.76', 'B4:0.5:4'], lh: ['E2:0.5:5', 'E3:0.5:2', 'G#3:1:1', 'R:1'] },
+      { chord: 'Am', rh: ['C5:1:5', 'R:0.5', 'E4:0.5:1', 'E5:0.5:5', 'D#5:0.5:4'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
+      { chord: 'Am', rh: ['E5:0.5:5', 'D#5:0.5:4', 'E5:0.5:5', 'B4:0.5:2', 'D5:0.5:4', 'C5:0.5:3'], lh: ['R:3'] },
+      { chord: 'Am', rh: ['A4:1:1', 'R:0.5', 'C4:0.5:1', 'E4:0.5:2', 'A4:0.5:4'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
+      { chord: 'E7', rh: ['B4:1:5', 'R:0.5', 'E4:0.5:1', 'C5:0.5:4', 'B4:0.5:3'], lh: ['E2:0.5:5', 'E3:0.5:2', 'G#3:1:1', 'R:1'] },
+      { chord: 'Am', rh: ['A4:2:2', 'B4:0.5:1', 'C5:0.5:2'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
+      // B Phrase (C Major / G Major contrast)
+      { chord: 'C', rh: ['D5:0.5:3', 'E5:1.5:5', 'G4:0.5:1', 'F5:0.5:5'], lh: ['C3:0.5:5', 'G3:0.5:2', 'C4:1:1', 'R:1'] },
+      { chord: 'G7', rh: ['E5:0.5:4', 'D5:1.5:3', 'F4:0.5:1', 'E5:0.5:5'], lh: ['G2:0.5:5', 'G3:0.5:2', 'B3:1:1', 'R:1'] },
+      { chord: 'Am', rh: ['D5:0.5:4', 'C5:1.5:3', 'E4:0.5:1', 'D5:0.5:5'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
+      { chord: 'E', rh: ['C5:0.5:4', 'B4:1.5:3', 'E4:0.5:1', 'E5:0.5:5'], lh: ['E2:0.5:5', 'E3:0.5:2', 'E4:1:1', 'R:1'] },
+      // Return of Motif
+      { chord: 'Am', rh: ['E5:0.5:5', 'D#5:0.5:4', 'E5:0.5:5', 'B4:0.5:2', 'D5:0.5:4', 'C5:0.5:3'], lh: ['R:3'] },
+      { chord: 'Am', rh: ['A4:1:1', 'R:0.5', 'C4:0.5:1', 'E4:0.5:2', 'A4:0.5:4'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
+      { chord: 'E7', rh: ['B4:1:5', 'R:0.5', 'E4:0.5:1', 'C5:0.5:4', 'B4:0.5:3'], lh: ['E2:0.5:5', 'E3:0.5:2', 'G#3:1:1', 'R:1'] },
+      { chord: 'Am', rh: ['A4+C5+E5:3:1'], lh: ['A2+E3+A3:3:5'] }
+    ], 3)
+  }),
+
+  // 3. MINUET IN G MAJOR, BWV ANH. 114 — FULL 16-MEASURE FIRST PART
   buildSongFromEvents({
     id: 'minuet-in-g',
-    title: 'Minuet in G Major',
+    title: 'Minuet in G Major, BWV Anh. 114',
     composer: 'Christian Petzold / J.S. Bach',
     genre: 'Baroque',
     difficulty: 'Intermediate',
@@ -190,98 +272,989 @@ const INITIAL_SONGS = [
     keySignature: 'G Major',
     sourceFormat: 'MusicXML 4.0',
     license: 'Public Domain',
-    rawNotes: [
-      { pitch: 74, onset: 0, duration: 1, hand: 'R', finger: 5, confidence: 0.99, harmony: 'G' },
-      { pitch: 55, onset: 0, duration: 2, hand: 'L', finger: 3, confidence: 0.98, harmony: 'G' },
-      { pitch: 67, onset: 1, duration: 0.5, hand: 'R', finger: 1, confidence: 0.98, harmony: 'G' },
-      { pitch: 69, onset: 1.5, duration: 0.5, hand: 'R', finger: 2, confidence: 0.98, harmony: 'G' },
-      { pitch: 71, onset: 2, duration: 0.5, hand: 'R', finger: 3, confidence: 0.97, harmony: 'G' },
-      { pitch: 57, onset: 2, duration: 1, hand: 'L', finger: 2, confidence: 0.96, harmony: 'G' },
-      { pitch: 72, onset: 2.5, duration: 0.5, hand: 'R', finger: 4, confidence: 0.97, harmony: 'G' },
-      { pitch: 74, onset: 3, duration: 1, hand: 'R', finger: 5, confidence: 0.99, harmony: 'G' },
-      { pitch: 59, onset: 3, duration: 3, hand: 'L', finger: 1, confidence: 0.98, harmony: 'G' },
-      { pitch: 67, onset: 4, duration: 1, hand: 'R', finger: 1, confidence: 0.99, harmony: 'G' },
-      { pitch: 67, onset: 5, duration: 1, hand: 'R', finger: 1, confidence: 0.99, harmony: 'G' },
-      { pitch: 76, onset: 6, duration: 1, hand: 'R', finger: 3, confidence: 0.98, harmony: 'C' },
-      { pitch: 60, onset: 6, duration: 3, hand: 'L', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 72, onset: 7, duration: 0.5, hand: 'R', finger: 1, confidence: 0.78, harmony: 'C',
-        alternatives: [
-          { pitch: 72, label: 'C5 Eighth Note', confidence: 0.78 },
-          { pitch: 73, label: 'C#5 Accidental', confidence: 0.22 }
-        ]
-      },
-      { pitch: 74, onset: 7.5, duration: 0.5, hand: 'R', finger: 2, confidence: 0.96, harmony: 'C' },
-      { pitch: 76, onset: 8, duration: 0.5, hand: 'R', finger: 3, confidence: 0.97, harmony: 'C' },
-      { pitch: 78, onset: 8.5, duration: 0.5, hand: 'R', finger: 4, confidence: 0.95, harmony: 'D7' },
-      { pitch: 79, onset: 9, duration: 1, hand: 'R', finger: 5, confidence: 0.99, harmony: 'G' },
-      { pitch: 59, onset: 9, duration: 3, hand: 'L', finger: 2, confidence: 0.98, harmony: 'G' },
-      { pitch: 67, onset: 10, duration: 1, hand: 'R', finger: 1, confidence: 0.99, harmony: 'G' },
-      { pitch: 67, onset: 11, duration: 1, hand: 'R', finger: 1, confidence: 0.99, harmony: 'G' }
-    ]
+    rawNotes: compileCompactScore([
+      // Bars 1-4
+      { chord: 'G', rh: ['D5:1:5', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'C5:0.5:4'], lh: ['G3+B3:2:3', 'A3:1:2'] },
+      { chord: 'G', rh: ['D5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['B3:3:1'] },
+      { chord: 'C', rh: ['E5:1:3', 'C5:0.5:1:0.78', 'D5:0.5:2', 'E5:0.5:3', 'F#5:0.5:4'], lh: ['C4:3:1'] },
+      { chord: 'G', rh: ['G5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['B3:3:2'] },
+      // Bars 5-8
+      { chord: 'Am/C', rh: ['C5:1:4', 'D5:0.5:5', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2'], lh: ['A3:3:3'] },
+      { chord: 'G/B', rh: ['B4:1:3', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2', 'G4:0.5:1'], lh: ['G3:3:4'] },
+      { chord: 'D7', rh: ['F#4:1:2', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'G4:0.5:1'], lh: ['D3:2:5', 'F#3:1:3'] },
+      { chord: 'D', rh: ['A4:3:2'], lh: ['D3:1:5', 'C4:0.5:1', 'B3:0.5:2', 'A3:0.5:3', 'G3:0.5:4'] },
+      // Bars 9-12
+      { chord: 'G', rh: ['D5:1:5', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'C5:0.5:4'], lh: ['B3:2:2', 'A3:1:3'] },
+      { chord: 'G', rh: ['D5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['G3:1:4', 'B3:1:2', 'G3:1:4'] },
+      { chord: 'C', rh: ['E5:1:3', 'C5:0.5:1', 'D5:0.5:2', 'E5:0.5:3', 'F#5:0.5:4'], lh: ['C4:3:1'] },
+      { chord: 'G', rh: ['G5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['B3:2:2', 'G3:1:4'] },
+      // Bars 13-16
+      { chord: 'Am', rh: ['C5:1:4', 'D5:0.5:5', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2'], lh: ['A3:2:3', 'F#3:1:4'] },
+      { chord: 'G', rh: ['B4:1:3', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2', 'G4:0.5:1'], lh: ['G3:2:4', 'B3:1:2'] },
+      { chord: 'D7', rh: ['A4:1:2', 'B4:0.5:3', 'A4:0.5:2', 'G4:0.5:1', 'F#4:0.5:2'], lh: ['C3:1:5', 'D3:2:4'] },
+      { chord: 'G', rh: ['G4:3:1'], lh: ['G2+G3:3:5'] }
+    ], 3)
   }),
 
+  // 4. PRELUDE IN C MAJOR, BWV 846 — J.S. BACH (16 MEASURES OF HARMONIC ARPEGGIOS)
   buildSongFromEvents({
     id: 'prelude-in-c',
     title: 'Prelude in C Major, BWV 846',
     composer: 'Johann Sebastian Bach',
     genre: 'Baroque',
     difficulty: 'Intermediate',
-    tempo: 92,
+    tempo: 88,
     timeSignature: [4, 4],
     keySignature: 'C Major',
     sourceFormat: 'Standard MIDI (.mid)',
     license: 'Public Domain',
-    rawNotes: [
-      { pitch: 48, onset: 0, duration: 2, hand: 'L', finger: 5, confidence: 0.99, harmony: 'C' },
-      { pitch: 52, onset: 0.5, duration: 1.5, hand: 'L', finger: 3, confidence: 0.99, harmony: 'C' },
-      { pitch: 55, onset: 1, duration: 0.5, hand: 'R', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 60, onset: 1.5, duration: 0.5, hand: 'R', finger: 3, confidence: 0.99, harmony: 'C' },
-      { pitch: 64, onset: 2, duration: 0.5, hand: 'R', finger: 5, confidence: 0.99, harmony: 'C' },
-      { pitch: 55, onset: 2.5, duration: 0.5, hand: 'R', finger: 1, confidence: 0.99, harmony: 'C' },
-      { pitch: 60, onset: 3, duration: 0.5, hand: 'R', finger: 3, confidence: 0.99, harmony: 'C' },
-      { pitch: 64, onset: 3.5, duration: 0.5, hand: 'R', finger: 5, confidence: 0.99, harmony: 'C' },
-      { pitch: 48, onset: 4, duration: 2, hand: 'L', finger: 5, confidence: 0.99, harmony: 'Dm7/C' },
-      { pitch: 50, onset: 4.5, duration: 1.5, hand: 'L', finger: 2, confidence: 0.99, harmony: 'Dm7/C' },
-      { pitch: 57, onset: 5, duration: 0.5, hand: 'R', finger: 1, confidence: 0.98, harmony: 'Dm7/C' },
-      { pitch: 62, onset: 5.5, duration: 0.5, hand: 'R', finger: 3, confidence: 0.98, harmony: 'Dm7/C' },
-      { pitch: 65, onset: 6, duration: 0.5, hand: 'R', finger: 5, confidence: 0.98, harmony: 'Dm7/C' },
-      { pitch: 57, onset: 6.5, duration: 0.5, hand: 'R', finger: 1, confidence: 0.98, harmony: 'Dm7/C' },
-      { pitch: 62, onset: 7, duration: 0.5, hand: 'R', finger: 3, confidence: 0.98, harmony: 'Dm7/C' },
-      { pitch: 65, onset: 7.5, duration: 0.5, hand: 'R', finger: 5, confidence: 0.98, harmony: 'Dm7/C' }
-    ]
+    rawNotes: (() => {
+      const chordProgression = [
+        { chord: 'C', notes: ['C3', 'E3', 'G3', 'C4', 'E4'] },
+        { chord: 'Dm7/C', notes: ['C3', 'D3', 'A3', 'D4', 'F4'] },
+        { chord: 'G7/B', notes: ['B2', 'D3', 'G3', 'D4', 'F4'] },
+        { chord: 'C', notes: ['C3', 'E3', 'G3', 'C4', 'E4'] },
+        { chord: 'Am/C', notes: ['C3', 'E3', 'A3', 'E4', 'A4'] },
+        { chord: 'D7/C', notes: ['C3', 'D3', 'F#3', 'A3', 'D4'] },
+        { chord: 'G/B', notes: ['B2', 'D3', 'G3', 'D4', 'G4'] },
+        { chord: 'Cmaj7/B', notes: ['B2', 'C3', 'E3', 'G3', 'C4'] },
+        { chord: 'Am7', notes: ['A2', 'C3', 'E3', 'G3', 'C4'] },
+        { chord: 'D7', notes: ['D2', 'A2', 'D3', 'F#3', 'C4'] },
+        { chord: 'G', notes: ['G2', 'B2', 'D3', 'G3', 'B3'] },
+        { chord: 'Gdim7', notes: ['G2', 'Bb2', 'E3', 'G3', 'C#4'] },
+        { chord: 'Dm/F', notes: ['F2', 'A2', 'D3', 'A3', 'D4'] },
+        { chord: 'Fm6', notes: ['F2', 'Ab2', 'D3', 'F3', 'B3'] },
+        { chord: 'C/E', notes: ['E2', 'G2', 'C3', 'G3', 'C4'] },
+        { chord: 'C', notes: ['C2', 'G2', 'C3', 'E3', 'C4'] }
+      ];
+      const measures = chordProgression.map(({ chord, notes }) => {
+        const [n1, n2, n3, n4, n5] = notes;
+        return {
+          chord,
+          lh: [`${n1}:0.5:5`, `${n2}:0.5:3`, 'R:1', `${n1}:0.5:5`, `${n2}:0.5:3`, 'R:1'],
+          rh: [
+            'R:1', `${n3}:0.25:1`, `${n4}:0.25:3`, `${n5}:0.25:5`, `${n3}:0.25:1`,
+            'R:1', `${n3}:0.25:1`, `${n4}:0.25:3`, `${n5}:0.25:5`, `${n3}:0.25:1`
+          ]
+        };
+      });
+      return compileCompactScore(measures, 4);
+    })()
   }),
 
+  // 5. CANON IN D MAJOR — JOHANN PACHELBEL (16-MEASURE COMPLETE VARIATION ARC)
+  buildSongFromEvents({
+    id: 'canon-in-d',
+    title: 'Canon in D Major (Concert Piano Arrangement)',
+    composer: 'Johann Pachelbel',
+    genre: 'Baroque',
+    difficulty: 'Beginner',
+    tempo: 78,
+    timeSignature: [4, 4],
+    keySignature: 'D Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      // Cycle 1: Warm Choral Theme (Bars 1-4)
+      { chord: 'D', rh: ['F#4:2:3', 'E4:2:2'], lh: ['D3:1:5', 'A3:1:2', 'A2:1:5', 'E3:1:2'] },
+      { chord: 'Bm', rh: ['D4:2:1', 'C#4:2:2'], lh: ['B2:1:5', 'F#3:1:2', 'F#2:1:5', 'C#3:1:2'] },
+      { chord: 'G', rh: ['B3:2:1', 'A3:2:1'], lh: ['G2:1:5', 'D3:1:2', 'D2:1:5', 'A2:1:2'] },
+      { chord: 'G/A', rh: ['B3:2:2', 'C#4:2:3'], lh: ['G2:1:5', 'D3:1:2', 'A2:1:5', 'E3:1:2'] },
+      // Cycle 2: Higher Octave Lyricism (Bars 5-8)
+      { chord: 'D', rh: ['D5:1:5', 'C#5:1:4', 'C#5:1:4', 'B4:1:3'], lh: ['D3:1:5', 'A3:1:1', 'A2:1:5', 'E3:1:1'] },
+      { chord: 'Bm', rh: ['A4:1:2', 'G4:1:1', 'A4:1:2', 'F#4:1:1'], lh: ['B2:1:5', 'F#3:1:1', 'F#2:1:5', 'C#3:1:1'] },
+      { chord: 'G', rh: ['G4:1:2', 'B4:1:4', 'A4:1:3', 'F#4:1:1'], lh: ['G2:1:5', 'D3:1:1', 'D2:1:5', 'A2:1:1'] },
+      { chord: 'A7', rh: ['G4:1:2', 'E4:1:1', 'E4:1:1', 'A4:1:4'], lh: ['G2:1:5', 'D3:1:1', 'A2:1:5', 'E3:1:1'] },
+      // Cycle 3: Flowing Eighth-Note Variation (Bars 9-12)
+      { chord: 'D', rh: ['D5:0.5:4', 'C#5:0.5:3', 'D5:0.5:4', 'F#4:0.5:1', 'A4:0.5:2', 'E5:0.5:5', 'C#5:0.5:3', 'A4:0.5:1'], lh: ['D3+A3:2:5', 'A2+E3:2:5'] },
+      { chord: 'Bm', rh: ['B4:0.5:3', 'F#4:0.5:1', 'B4:0.5:3', 'D5:0.5:5', 'C#5:0.5:4', 'A4:0.5:2', 'F#4:0.5:1', 'A4:0.5:2'], lh: ['B2+F#3:2:5', 'F#2+C#3:2:5'] },
+      { chord: 'G', rh: ['G4:0.5:1', 'B4:0.5:3', 'D5:0.5:5', 'B4:0.5:3', 'A4:0.5:2', 'F#4:0.5:1', 'D4:0.5:1', 'F#4:0.5:2'], lh: ['G2+D3:2:5', 'D2+A2:2:5'] },
+      { chord: 'A7', rh: ['G4:0.5:2', 'B4:0.5:4', 'G4:0.5:2', 'E4:0.5:1', 'A4:1:3', 'C#5:1:5'], lh: ['G2+D3:2:5', 'A2+E3:2:5'] },
+      // Cycle 4: Grand Resolution (Bars 13-16)
+      { chord: 'D', rh: ['F#5:2:5', 'E5:2:4'], lh: ['D3:1:5', 'A3:1:2', 'A2:1:5', 'E3:1:2'] },
+      { chord: 'Bm', rh: ['D5:2:3', 'C#5:2:2'], lh: ['B2:1:5', 'F#3:1:2', 'F#2:1:5', 'C#3:1:2'] },
+      { chord: 'G', rh: ['B4:1:2', 'D5:1:4', 'A4:1:2', 'F#4:1:1'], lh: ['G2+D3:2:5', 'D2+A2:2:5'] },
+      { chord: 'D', rh: ['G4:1:2', 'E4:1:1', 'D4+F#4+A4+D5:2:1'], lh: ['A2+E3:2:5', 'D2+A2+D3:2:5'] }
+    ], 4)
+  }),
+
+  // 6. GYMNOPÉDIE NO. 1 — ERIK SATIE (16-MEASURE IMPRESSIONIST SCORE)
   buildSongFromEvents({
     id: 'gymnopedie-no-1',
     title: 'Gymnopédie No. 1',
     composer: 'Erik Satie',
     genre: 'Impressionist',
     difficulty: 'Intermediate',
-    tempo: 76,
+    tempo: 74,
     timeSignature: [3, 4],
     keySignature: 'D Major',
     sourceFormat: 'Audio Transcription',
     license: 'Public Domain',
-    rawNotes: [
-      { pitch: 43, onset: 0, duration: 3, hand: 'L', finger: 5, confidence: 0.95, harmony: 'Gmaj7' },
-      { pitch: 59, onset: 1, duration: 2, hand: 'L', finger: 2, confidence: 0.91, harmony: 'Gmaj7' },
-      { pitch: 66, onset: 1, duration: 2, hand: 'R', finger: 1, confidence: 0.89, harmony: 'Gmaj7' },
-      { pitch: 38, onset: 3, duration: 3, hand: 'L', finger: 5, confidence: 0.96, harmony: 'Dmaj7' },
-      { pitch: 57, onset: 4, duration: 2, hand: 'L', finger: 2, confidence: 0.92, harmony: 'Dmaj7' },
-      { pitch: 61, onset: 4, duration: 2, hand: 'R', finger: 1, confidence: 0.79, harmony: 'Dmaj7',
-        alternatives: [
-          { pitch: 61, label: 'C#4 (Major 7th Voicing)', confidence: 0.79 },
-          { pitch: 62, label: 'D4 (Root Octave Overtone)', confidence: 0.21 }
-        ]
-      },
-      { pitch: 43, onset: 6, duration: 3, hand: 'L', finger: 5, confidence: 0.96, harmony: 'Gmaj7' },
-      { pitch: 66, onset: 7, duration: 1, hand: 'R', finger: 2, confidence: 0.95, harmony: 'Gmaj7' },
-      { pitch: 69, onset: 8, duration: 1, hand: 'R', finger: 4, confidence: 0.97, harmony: 'Gmaj7' },
-      { pitch: 38, onset: 9, duration: 3, hand: 'L', finger: 5, confidence: 0.97, harmony: 'Dmaj7' },
-      { pitch: 67, onset: 9, duration: 1, hand: 'R', finger: 3, confidence: 0.96, harmony: 'Dmaj7' },
-      { pitch: 66, onset: 10, duration: 1, hand: 'R', finger: 2, confidence: 0.96, harmony: 'Dmaj7' },
-      { pitch: 61, onset: 11, duration: 1, hand: 'R', finger: 1, confidence: 0.94, harmony: 'Dmaj7' }
-    ]
+    rawNotes: compileCompactScore([
+      // Intro Vamp (Bars 1-4)
+      { chord: 'Gmaj7', rh: ['R:1', 'B3+D4+F#4:2:1'], lh: ['G2:3:5'] },
+      { chord: 'Dmaj7', rh: ['R:1', 'A3+C#4+F#4:2:1:0.79'], lh: ['D2:3:5'] },
+      { chord: 'Gmaj7', rh: ['R:1', 'B3+D4+F#4:2:1'], lh: ['G2:3:5'] },
+      { chord: 'Dmaj7', rh: ['R:1', 'A3+C#4+F#4:2:1'], lh: ['D2:3:5'] },
+      // Main Floating Melody (Bars 5-12)
+      { chord: 'Gmaj7', rh: ['R:1', 'F#5:1:2', 'A5:1:4'], lh: ['G2:1:5', 'B3+D4:2:1'] },
+      { chord: 'Dmaj7', rh: ['G5:1:3', 'F#5:1:2', 'C#5:1:1'], lh: ['D2:1:5', 'A3+C#4:2:1'] },
+      { chord: 'Gmaj7', rh: ['B4:1:1', 'C#5:1:2', 'D5:1:3'], lh: ['G2:1:5', 'B3+D4:2:1'] },
+      { chord: 'Dmaj7', rh: ['A4:3:1'], lh: ['D2:1:5', 'A3+C#4:2:1'] },
+      { chord: 'Gmaj7', rh: ['F#4:3:2'], lh: ['G2:1:5', 'B3+D4:2:1'] },
+      { chord: 'Dmaj7', rh: ['R:1', 'F#5:1:2', 'A5:1:4'], lh: ['D2:1:5', 'A3+C#4:2:1'] },
+      { chord: 'Gmaj7', rh: ['G5:1:3', 'F#5:1:2', 'C#5:1:1'], lh: ['G2:1:5', 'B3+D4:2:1'] },
+      { chord: 'Dmaj7', rh: ['B4:1:1', 'C#5:1:2', 'D5:1:3'], lh: ['D2:1:5', 'A3+C#4:2:1'] },
+      // Modal Cadence (Bars 13-16)
+      { chord: 'F#m7', rh: ['A4:3:1'], lh: ['F#2:1:5', 'A3+C#4:2:1'] },
+      { chord: 'Bm7', rh: ['C#5:3:3'], lh: ['B2:1:5', 'F#3+D4:2:1'] },
+      { chord: 'Em7', rh: ['F#5:3:5'], lh: ['E2:1:5', 'G3+B3:2:1'] },
+      { chord: 'Dmaj7', rh: ['E4+A4+D5:3:1'], lh: ['D2+A2:3:5'] }
+    ], 3)
+  }),
+
+  // 7. CLAIR DE LUNE (OPENING THEME IN 9/8 MAPPED TO EXPRESSIVE 3/4) — CLAUDE DEBUSSY
+  buildSongFromEvents({
+    id: 'clair-de-lune',
+    title: 'Clair de Lune (Suite Bergamasque, L. 75)',
+    composer: 'Claude Debussy',
+    genre: 'Impressionist',
+    difficulty: 'Advanced',
+    tempo: 68,
+    timeSignature: [3, 4],
+    keySignature: 'C Major (Arr.)',
+    sourceFormat: 'Scanned Score (OMR)',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'C', rh: ['R:1', 'E5+G5:1:3', 'C5+E5:1:1'], lh: ['C3+G3:3:5'] },
+      { chord: 'C', rh: ['D5:0.5:2', 'E5:0.5:3', 'D5:2:2'], lh: ['E3+G3:3:3'] },
+      { chord: 'Dm7/C', rh: ['R:1', 'C5:0.5:2', 'D5:0.5:3', 'C5:0.5:2', 'E5:0.5:4'], lh: ['C3+F3+A3:3:5'] },
+      { chord: 'G7/B', rh: ['C5:1:2', 'B4:2:1'], lh: ['B2+F3+G3:3:5'] },
+      { chord: 'Am7', rh: ['R:1', 'B4:0.5:2', 'C5:0.5:3', 'B4:1:2'], lh: ['A2+E3+G3:3:5'] },
+      { chord: 'Dm7', rh: ['A4:0.5:1', 'B4:0.5:2', 'A4:1:1', 'G4:1:1'], lh: ['D3+F3+A3:3:5'] },
+      { chord: 'G7', rh: ['G4:0.5:2', 'A4:0.5:3', 'G4:1:2', 'F4:1:1'], lh: ['G2+D3+F3:3:5'] },
+      { chord: 'Cmaj7', rh: ['F4:0.5:2', 'G4:0.5:3', 'E4:2:1'], lh: ['C3+G3+B3:3:5'] },
+      { chord: 'C', rh: ['R:1', 'E5+G5:1:3', 'C5+E5:1:1'], lh: ['C3+G3:3:5'] },
+      { chord: 'C7', rh: ['D5:0.5:2', 'E5:0.5:3', 'D5:2:2'], lh: ['Bb2+E3+G3:3:5'] },
+      { chord: 'Fmaj7', rh: ['R:1', 'C5:0.5:1', 'D5:0.5:2', 'E5:0.5:3', 'A5:0.5:5'], lh: ['F2+C3+A3:3:5'] },
+      { chord: 'Fm6', rh: ['G5:1:4', 'F5:1:3', 'D5:1:2'], lh: ['F2+C3+Ab3:3:5'] },
+      { chord: 'C/G', rh: ['E5:1:3', 'C5:1:1', 'G4:1:1'], lh: ['G2+E3:3:5'] },
+      { chord: 'G7', rh: ['A4:1:2', 'B4:1:3', 'D5:1:5'], lh: ['G2+F3:3:5'] },
+      { chord: 'C', rh: ['C5:3:3'], lh: ['C2+G2+E3:3:5'] },
+      { chord: 'C', rh: ['E4+G4+C5+E5:3:1'], lh: ['C2+G2+C3:3:5'] }
+    ], 3)
+  }),
+
+  // 8. MOONLIGHT SONATA (OP. 27 NO. 2, 1ST MOV.) — BEETHOVEN (16 MEASURES)
+  buildSongFromEvents({
+    id: 'moonlight-sonata',
+    title: 'Moonlight Sonata, Op. 27 No. 2 (1st Mov.)',
+    composer: 'Ludwig van Beethoven',
+    genre: 'Classical',
+    difficulty: 'Intermediate',
+    tempo: 66,
+    timeSignature: [3, 4],
+    keySignature: 'C# Minor',
+    sourceFormat: 'Standard MIDI (.mid)',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'C#m', rh: ['G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4', 'G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4'], lh: ['C#2+C#3:3:5'] },
+      { chord: 'C#m/B', rh: ['G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4', 'G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4'], lh: ['B1+B2:3:5'] },
+      { chord: 'A', rh: ['A3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4', 'A3:0.5:1', 'D4:0.5:3', 'F#4:0.5:5'], lh: ['A1+A2:1.5:5', 'F#1+F#2:1.5:5'] },
+      { chord: 'G#7', rh: ['G#3:0.5:1', 'C4:0.5:2', 'F#4:0.5:5', 'G#3:0.5:1', 'C#4:0.5:3', 'E4:0.5:4'], lh: ['G#1+G#2:3:5'] },
+      // Famous Dotted Melody Enters in Measure 5
+      { chord: 'C#m', rh: ['G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:3', 'G#4:1:5', 'G#4:0.5:5'], lh: ['C#2+G#2:3:5'] },
+      { chord: 'C#m', rh: ['G#4:2:5', 'G#4:0.75:5', 'G#4:0.25:5'], lh: ['C#2+G#2:3:5'] },
+      { chord: 'G#7', rh: ['G#4:3:5'], lh: ['B1+G#2:3:5'] },
+      { chord: 'C#m', rh: ['G#4:1.5:5', 'A4:1.5:5'], lh: ['C#2+A2:3:5'] },
+      { chord: 'F#m', rh: ['G#4:1:4', 'F#4:1:3', 'B4:1:5'], lh: ['D#2+A2:3:5'] },
+      { chord: 'E', rh: ['E4:1.5:3', 'R:1.5'], lh: ['E2+G#2:3:5'] },
+      { chord: 'E', rh: ['R:2', 'G#4:0.75:5', 'G#4:0.25:5'], lh: ['E2+B2:3:5'] },
+      { chord: 'B7', rh: ['G#4:2:5', 'G#4:0.75:5', 'G#4:0.25:5'], lh: ['D#2+B2:3:5'] },
+      { chord: 'E', rh: ['G#4:1.5:5', 'G4:1.5:4'], lh: ['E2+B2:3:5'] },
+      { chord: 'Em', rh: ['G4:2:4', 'F#4:1:3'], lh: ['E2+B2:3:5'] },
+      { chord: 'F#7', rh: ['F#4:2:3', 'F4:1:2'], lh: ['C#2+A#2:3:5'] },
+      { chord: 'B', rh: ['F#4:3:4'], lh: ['B1+F#2+B2:3:5'] }
+    ], 3)
+  }),
+
+  // 9. TALE AS OLD AS TIME (BEAUTY AND THE BEAST THEME)
+  buildSongFromEvents({
+    id: 'beauty-and-the-beast',
+    title: 'Tale as Old as Time (Beauty and the Beast)',
+    composer: 'Alan Menken (Arr. Piano)',
+    genre: 'Cinema & Animation',
+    difficulty: 'Beginner',
+    tempo: 82,
+    timeSignature: [4, 4],
+    keySignature: 'F Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'F', rh: ['F4:1:1', 'G4:1:2', 'A4:1:3', 'C5:1:5'], lh: ['F2+C3:2:5', 'A3:2:1'] },
+      { chord: 'Bb/F', rh: ['D5:2:5', 'C5:2:4'], lh: ['F2+D3:2:5', 'Bb3:2:1'] },
+      { chord: 'F', rh: ['F4:1:1', 'G4:1:2', 'A4:1:3', 'C5:1:5'], lh: ['F2+C3:2:5', 'A3:2:1'] },
+      { chord: 'C7', rh: ['D5:1:5', 'C5:1:4', 'A4:1:2', 'G4:1:1'], lh: ['C2+G2:2:5', 'E3:2:2'] },
+      { chord: 'Dm7', rh: ['A4:1:2', 'G4:1:1', 'F4:2:1'], lh: ['D2+A2:2:5', 'F3:2:1'] },
+      { chord: 'Bb', rh: ['F4:1:1', 'G4:1:2', 'A4:1:3', 'Bb4:1:4'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
+      { chord: 'C7sus4', rh: ['A4:2:3', 'G4:2:2'], lh: ['C2+G2:2:5', 'C3:2:1'] },
+      { chord: 'F', rh: ['F4:4:1'], lh: ['F2+C3+A3:4:5'] },
+      { chord: 'F', rh: ['A4:1:1', 'C5:1:2', 'D5:1:3', 'F5:1:5'], lh: ['F2+C3:2:5', 'A3:2:1'] },
+      { chord: 'Bbmaj7', rh: ['E5:2:4', 'D5:2:3'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
+      { chord: 'Gm7', rh: ['C5:1:2', 'Bb4:1:1', 'A4:1:2', 'G4:1:1'], lh: ['G2+D3:2:5', 'F3:2:1'] },
+      { chord: 'C7', rh: ['C5:4:4'], lh: ['C2+G2:2:5', 'E3:2:1'] },
+      { chord: 'F', rh: ['F4:1:1', 'G4:1:2', 'A4:1:3', 'C5:1:5'], lh: ['F2+C3:2:5', 'A3:2:1'] },
+      { chord: 'Gm7', rh: ['D5:2:5', 'G4:2:1'], lh: ['G2+D3:2:5', 'Bb3:2:1'] },
+      { chord: 'C7', rh: ['A4:2:3', 'G4:2:2'], lh: ['C2+G2:2:5', 'E3:2:1'] },
+      { chord: 'F', rh: ['F4+A4+C5+F5:4:1'], lh: ['F2+C3+F3:4:5'] }
+    ], 4)
+  }),
+
+  // 10. LET IT GO (FROZEN — ICONIC PIANO INTRO & CHORUS)
+  buildSongFromEvents({
+    id: 'let-it-go-frozen',
+    title: 'Let It Go (Frozen Concert Theme)',
+    composer: 'Kristen Anderson-Lopez & Robert Lopez',
+    genre: 'Cinema & Animation',
+    difficulty: 'Intermediate',
+    tempo: 132,
+    timeSignature: [4, 4],
+    keySignature: 'A Minor / C Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      // Crystalline Intro Arpeggios (Bars 1-4)
+      { chord: 'Am', rh: ['E5:1:4', 'C5:1:2', 'D5:1:3', 'E5:1:4'], lh: ['A2+E3:4:5'] },
+      { chord: 'F', rh: ['E5:1:4', 'C5:1:2', 'B4:2:1'], lh: ['F2+C3:4:5'] },
+      { chord: 'G', rh: ['D5:1:4', 'B4:1:2', 'C5:1:3', 'D5:1:4'], lh: ['G2+D3:4:5'] },
+      { chord: 'Em', rh: ['C5:1.5:3', 'B4:0.5:2', 'G4:2:1'], lh: ['E2+B2:4:5'] },
+      // Soaring Chorus ("Let it go, let it go!") (Bars 5-16)
+      { chord: 'C', rh: ['G4:1:1', 'A4:1:2', 'C5:2:3'], lh: ['C2+G2+C3:2:5', 'E3+G3:2:1'] },
+      { chord: 'G', rh: ['G4:1:1', 'D5:1.5:5', 'D5:0.5:5', 'C5:1:4'], lh: ['G2+D3:2:5', 'B2+G3:2:1'] },
+      { chord: 'Am', rh: ['A4:1:1', 'A4:1:1', 'A4:1:1', 'B4:0.5:2', 'C5:0.5:3'], lh: ['A2+E3:2:5', 'C3+A3:2:1'] },
+      { chord: 'F', rh: ['C5:2:3', 'A4:2:1'], lh: ['F2+C3:2:5', 'F3+A3:2:1'] },
+      { chord: 'C', rh: ['G4:1:1', 'A4:1:2', 'C5:2:3'], lh: ['C2+G2+C3:2:5', 'E3+G3:2:1'] },
+      { chord: 'G', rh: ['G4:1:1', 'E5:1.5:5', 'E5:0.5:5', 'D5:1:4'], lh: ['G2+D3:2:5', 'B2+G3:2:1'] },
+      { chord: 'Am', rh: ['C5:1:2', 'D5:1:3', 'E5:1:4', 'E5:1:4'], lh: ['A2+E3:2:5', 'C3+A3:2:1'] },
+      { chord: 'F', rh: ['F5:1.5:5', 'E5:0.5:4', 'C5:2:2'], lh: ['F2+C3:2:5', 'A2+F3:2:1'] },
+      { chord: 'C/G', rh: ['E5:2:4', 'D5:1:3', 'C5:1:2'], lh: ['G2+E3:2:5', 'G2+D3:2:5'] },
+      { chord: 'Fm6', rh: ['C5:1.5:3', 'Ab4:0.5:1', 'C5:2:3'], lh: ['F2+C3+Ab3:4:5'] },
+      { chord: 'C', rh: ['G4:1:1', 'A4:1:2', 'C5:2:4'], lh: ['C2+G2:2:5', 'C3+E3:2:1'] },
+      { chord: 'C', rh: ['E4+G4+C5+E5:4:1'], lh: ['C2+G2+C3:4:5'] }
+    ], 4)
+  }),
+
+  // 11. HOW FAR I'LL GO (MOANA — ISLAND ANTHEM)
+  buildSongFromEvents({
+    id: 'how-far-ill-go-moana',
+    title: "How Far I'll Go (Moana Theme)",
+    composer: 'Lin-Manuel Miranda',
+    genre: 'Cinema & Animation',
+    difficulty: 'Intermediate',
+    tempo: 124,
+    timeSignature: [4, 4],
+    keySignature: 'E Major (Arr. C Major)',
+    sourceFormat: 'Standard MIDI (.mid)',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'C', rh: ['E4:1:1', 'G4:1:2', 'C5:1:4', 'C5:0.5:4', 'D5:0.5:5'], lh: ['C3+G3:2:5', 'C3+G3:2:5'] },
+      { chord: 'G', rh: ['B4:1.5:3', 'G4:0.5:1', 'G4:2:1'], lh: ['G2+D3:2:5', 'G2+D3:2:5'] },
+      { chord: 'Am', rh: ['E4:1:1', 'A4:1:2', 'C5:1:4', 'C5:0.5:4', 'D5:0.5:5'], lh: ['A2+E3:2:5', 'A2+E3:2:5'] },
+      { chord: 'F', rh: ['A4:2:2', 'F4:2:1'], lh: ['F2+C3:2:5', 'F2+C3:2:5'] },
+      { chord: 'C', rh: ['E4:1:1', 'G4:1:2', 'C5:1:4', 'E5:1:5'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
+      { chord: 'G', rh: ['D5:1.5:4', 'B4:0.5:2', 'G4:2:1'], lh: ['G2+D3:2:5', 'B2+G3:2:3'] },
+      { chord: 'Am', rh: ['C5:1:3', 'C5:1:3', 'D5:1:4', 'E5:1:5'], lh: ['A2+E3:2:5', 'C3+A3:2:1'] },
+      { chord: 'Fm', rh: ['F5:1.5:5', 'C5:0.5:2', 'Ab4:2:1'], lh: ['F2+C3+Ab3:4:5'] },
+      // Chorus Lift ("See the line where the sky meets the sea")
+      { chord: 'C', rh: ['E5:1:4', 'F5:0.5:5', 'E5:0.5:4', 'C5:1:2', 'G4:1:1'], lh: ['C2+G2:2:5', 'C3+E3:2:1'] },
+      { chord: 'G', rh: ['D5:1:3', 'E5:0.5:4', 'D5:0.5:3', 'B4:1:2', 'G4:1:1'], lh: ['G2+D3:2:5', 'B2+G3:2:1'] },
+      { chord: 'Am', rh: ['C5:1:2', 'D5:0.5:3', 'C5:0.5:2', 'A4:1:1', 'C5:1:2'], lh: ['A2+E3:2:5', 'C3+A3:2:1'] },
+      { chord: 'F', rh: ['D5:2:4', 'C5:2:3'], lh: ['F2+C3:2:5', 'A2+F3:2:1'] },
+      { chord: 'C', rh: ['E5:1:4', 'F5:0.5:5', 'E5:0.5:4', 'C5:1:2', 'G4:1:1'], lh: ['C2+G2:2:5', 'C3+E3:2:1'] },
+      { chord: 'G', rh: ['D5:1.5:3', 'E5:0.5:4', 'G5:2:5'], lh: ['G2+D3:2:5', 'B2+G3:2:1'] },
+      { chord: 'Fm6', rh: ['F5:1:4', 'D5:1:2', 'C5:2:1'], lh: ['F2+C3+Ab3:4:5'] },
+      { chord: 'C', rh: ['E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+    ], 4)
+  }),
+
+  // 12. A WHOLE NEW WORLD (ALADDIN)
+  buildSongFromEvents({
+    id: 'a-whole-new-world',
+    title: 'A Whole New World (Aladdin)',
+    composer: 'Alan Menken',
+    genre: 'Cinema & Animation',
+    difficulty: 'Beginner',
+    tempo: 96,
+    timeSignature: [4, 4],
+    keySignature: 'D Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'D', rh: ['F#4:1:3', 'G4:0.5:4', 'A4:1.5:5', 'F#4:1:3'], lh: ['D3+A3:4:5'] },
+      { chord: 'G/D', rh: ['E4:1.5:2', 'D4:2.5:1'], lh: ['D3+G3+B3:4:5'] },
+      { chord: 'D', rh: ['F#4:1:3', 'G4:0.5:4', 'A4:1:5', 'F#4:0.5:3', 'A4:1:5'], lh: ['D3+A3:4:5'] },
+      { chord: 'Bm7', rh: ['G4:1.5:4', 'F#4:2.5:3'], lh: ['B2+F#3+A3:4:5'] },
+      { chord: 'G', rh: ['F#4:1:2', 'G4:0.5:3', 'B4:1.5:5', 'A4:1:4'], lh: ['G2+D3+G3:4:5'] },
+      { chord: 'D/F#', rh: ['F#4:1:2', 'G4:0.5:3', 'A4:1.5:5', 'F#4:1:2'], lh: ['F#2+D3+A3:4:5'] },
+      { chord: 'Em7', rh: ['E4:1:1', 'F#4:0.5:2', 'G4:1.5:3', 'E4:1:1'], lh: ['E2+B2+G3:4:5'] },
+      { chord: 'A7', rh: ['F#4:1:3', 'E4:3:2'], lh: ['A2+E3+G3:4:5'] },
+      // Chorus ("A whole new world!")
+      { chord: 'D', rh: ['A4:1:2', 'B4:1:3', 'D5:2:5'], lh: ['D2+A2+D3:4:5'] },
+      { chord: 'G/D', rh: ['C#5:1:4', 'A4:1:2', 'B4:2:3'], lh: ['D2+G2+B2:4:5'] },
+      { chord: 'G', rh: ['B4:1:3', 'C#5:0.5:4', 'D5:1.5:5', 'B4:1:3'], lh: ['G2+D3+G3:4:5'] },
+      { chord: 'D/F#', rh: ['A4:2:2', 'F#4:2:1'], lh: ['F#2+D3+A3:4:5'] },
+      { chord: 'Em7', rh: ['G4:1:1', 'A4:0.5:2', 'B4:1.5:4', 'G4:1:1'], lh: ['E2+B2+G3:4:5'] },
+      { chord: 'Bm7', rh: ['F#4:1.5:2', 'D5:0.5:5', 'C#5:2:4'], lh: ['B2+F#3+A3:4:5'] },
+      { chord: 'G/A', rh: ['B4:1:4', 'A4:1:3', 'F#4:1:1', 'E4:1:1'], lh: ['A2+E3+G3:4:5'] },
+      { chord: 'D', rh: ['D4+F#4+A4+D5:4:1'], lh: ['D2+A2+D3:4:5'] }
+    ], 4)
+  }),
+
+  // 13. MARRIED LIFE (UP — PIXAR WALTZ)
+  buildSongFromEvents({
+    id: 'married-life-up',
+    title: 'Married Life (Up — Jazz Waltz)',
+    composer: 'Michael Giacchino',
+    genre: 'Cinema & Animation',
+    difficulty: 'Intermediate',
+    tempo: 138,
+    timeSignature: [3, 4],
+    keySignature: 'F Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'Fmaj7', rh: ['F4:0.5:1', 'A4:0.5:2', 'C5:0.5:4', 'A4:1.5:2'], lh: ['F2:1:5', 'A3+C4+E4:2:1'] },
+      { chord: 'Bb6', rh: ['F4:0.5:1', 'A4:0.5:2', 'C5:0.5:4', 'A4:1.5:2'], lh: ['Bb2:1:5', 'G3+Bb3+D4:2:1'] },
+      { chord: 'Fmaj7', rh: ['F4:0.5:1', 'A4:0.5:2', 'C5:0.5:4', 'F5:1:5', 'E5:0.5:4'], lh: ['F2:1:5', 'A3+C4+E4:2:1'] },
+      { chord: 'C7', rh: ['D5:1.5:3', 'C5:1.5:2'], lh: ['C2:1:5', 'G3+Bb3+E4:2:1'] },
+      { chord: 'Gm7', rh: ['E4:0.5:1', 'G4:0.5:2', 'Bb4:0.5:4', 'G4:1.5:2'], lh: ['G2:1:5', 'F3+Bb3+D4:2:1'] },
+      { chord: 'C7', rh: ['E4:0.5:1', 'G4:0.5:2', 'Bb4:0.5:4', 'G4:1.5:2'], lh: ['C2:1:5', 'E3+Bb3+C4:2:1'] },
+      { chord: 'Fmaj7', rh: ['E4:0.5:1', 'G4:0.5:2', 'Bb4:0.5:4', 'E5:1:5', 'D5:0.5:4'], lh: ['F2:1:5', 'A3+C4+E4:2:1'] },
+      { chord: 'Dm7', rh: ['C5:1.5:3', 'A4:1.5:1'], lh: ['D2:1:5', 'F3+A3+C4:2:1'] },
+      { chord: 'Fmaj7', rh: ['F4:0.5:1', 'A4:0.5:2', 'C5:0.5:4', 'A4:1.5:2'], lh: ['F2:1:5', 'A3+C4+E4:2:1'] },
+      { chord: 'F7', rh: ['F4:0.5:1', 'A4:0.5:2', 'C5:0.5:3', 'F5:1.5:5'], lh: ['F2:1:5', 'A3+C4+Eb4:2:1'] },
+      { chord: 'Bbmaj7', rh: ['E5:1:4', 'D5:1:3', 'C5:1:2'], lh: ['Bb2:1:5', 'F3+Bb3+D4:2:1'] },
+      { chord: 'Bbm6', rh: ['D5:1:4', 'C5:1:3', 'Bb4:1:2'], lh: ['Bb2:1:5', 'F3+G3+Db4:2:1'] },
+      { chord: 'F/C', rh: ['A4:1:2', 'C5:1:4', 'G4:1:1'], lh: ['C3:1:5', 'F3+A3:2:1'] },
+      { chord: 'C7', rh: ['A4:1:3', 'G4:1:2', 'E4:1:1'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
+      { chord: 'F6', rh: ['F4:3:1'], lh: ['F2:1:5', 'A3+C4+D4:2:1'] },
+      { chord: 'F6', rh: ['F4+A4+C5+F5:3:1'], lh: ['F2+C3+F3:3:5'] }
+    ], 3)
+  }),
+
+  // 14. HE'S A PIRATE (PIRATES OF THE CARIBBEAN)
+  buildSongFromEvents({
+    id: 'hes-a-pirate',
+    title: "He's a Pirate (Pirates of the Caribbean)",
+    composer: 'Klaus Badelt & Hans Zimmer',
+    genre: 'Cinema & Animation',
+    difficulty: 'Intermediate',
+    tempo: 148,
+    timeSignature: [3, 4],
+    keySignature: 'D Minor',
+    sourceFormat: 'Standard MIDI (.mid)',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'Dm', rh: ['A3:0.5:1', 'C4:0.5:2', 'D4:1:3', 'D4:1:3'], lh: ['D2+A2+D3:2:5', 'D2+A2:1:5'] },
+      { chord: 'Bb', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:1:3', 'F4:1:3'], lh: ['Bb1+F2+Bb2:2:5', 'Bb1+F2:1:5'] },
+      { chord: 'C', rh: ['F4:0.5:3', 'G4:0.5:4', 'E4:1:2', 'E4:1:2'], lh: ['C2+G2+C3:2:5', 'C2+G2:1:5'] },
+      { chord: 'Dm', rh: ['D4:0.5:2', 'C4:0.5:1', 'C4:0.5:1', 'D4:1.5:2'], lh: ['D2+A2+D3:3:5'] },
+      { chord: 'Dm', rh: ['A3:0.5:1', 'C4:0.5:2', 'D4:1:3', 'D4:1:3'], lh: ['D2+A2+D3:2:5', 'D2+A2:1:5'] },
+      { chord: 'Bb', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:1:3', 'F4:1:3'], lh: ['Bb1+F2+Bb2:2:5', 'Bb1+F2:1:5'] },
+      { chord: 'C', rh: ['F4:0.5:3', 'G4:0.5:4', 'E4:1:2', 'E4:1:2'], lh: ['C2+G2+C3:2:5', 'C2+G2:1:5'] },
+      { chord: 'Dm', rh: ['D4:0.5:2', 'C4:0.5:1', 'D4:2:2'], lh: ['D2+A2+D3:3:5'] },
+      // Second Heroic Phrase
+      { chord: 'Dm', rh: ['A3:0.5:1', 'C4:0.5:2', 'D4:1:3', 'D4:1:3'], lh: ['D2+A2+D3:3:5'] },
+      { chord: 'Gm', rh: ['D4:0.5:1', 'F4:0.5:2', 'G4:1:3', 'G4:1:3'], lh: ['G2+D3+G3:3:5'] },
+      { chord: 'Bb', rh: ['G4:0.5:3', 'A4:0.5:4', 'Bb4:1:5', 'Bb4:1:5'], lh: ['Bb1+F2+Bb2:3:5'] },
+      { chord: 'A7', rh: ['A4:0.5:4', 'G4:0.5:3', 'A4:0.5:4', 'D4:1.5:1'], lh: ['A1+E2+A2:3:5'] },
+      { chord: 'Dm', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:1:3', 'F4:1:3'], lh: ['D2+A2+D3:3:5'] },
+      { chord: 'C', rh: ['G4:1:4', 'A4:0.5:5', 'D4:1.5:1'], lh: ['C2+G2+C3:3:5'] },
+      { chord: 'A7', rh: ['D4:0.5:1', 'F4:0.5:3', 'E4:1:2', 'E4:1:2'], lh: ['A1+E2+A2:3:5'] },
+      { chord: 'Dm', rh: ['F4:0.5:3', 'D4:0.5:1', 'D4+F4+A4+D5:2:1'], lh: ['D2+A2+D3:3:5'] }
+    ], 3)
+  }),
+
+  // 15. COLORS OF THE WIND (POCAHONTAS)
+  buildSongFromEvents({
+    id: 'colors-of-the-wind',
+    title: 'Colors of the Wind (Pocahontas)',
+    composer: 'Alan Menken',
+    genre: 'Cinema & Animation',
+    difficulty: 'Beginner',
+    tempo: 88,
+    timeSignature: [4, 4],
+    keySignature: 'F Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'F', rh: ['C4:1:1', 'D4:1:2', 'F4:1:3', 'F4:1:3'], lh: ['F2+C3:2:5', 'A3:2:1'] },
+      { chord: 'Dm7', rh: ['C5:1.5:5', 'A4:0.5:4', 'G4:1:3', 'F4:1:2'], lh: ['D2+A2:2:5', 'F3:2:1'] },
+      { chord: 'Bb', rh: ['D4:1:1', 'F4:1:2', 'G4:1:3', 'A4:1:4'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
+      { chord: 'C7', rh: ['G4:4:3'], lh: ['C2+G2:2:5', 'E3:2:1'] },
+      { chord: 'F', rh: ['C4:1:1', 'D4:1:2', 'F4:1:3', 'F4:1:3'], lh: ['F2+C3:2:5', 'A3:2:1'] },
+      { chord: 'Am7', rh: ['C5:1.5:5', 'D5:0.5:5', 'C5:1:4', 'A4:1:2'], lh: ['A2+E3:2:5', 'G3:2:1'] },
+      { chord: 'Gm7', rh: ['G4:1:2', 'F4:1:1', 'G4:1:2', 'A4:1:3'], lh: ['G2+D3:2:5', 'F3:2:1'] },
+      { chord: 'C7', rh: ['D5:2:5', 'C5:2:4'], lh: ['C2+G2:2:5', 'E3:2:1'] },
+      { chord: 'Dm', rh: ['D5:1:4', 'C5:1:3', 'A4:1:2', 'F4:1:1'], lh: ['D2+A2:2:5', 'D3:2:1'] },
+      { chord: 'Am7', rh: ['G4:1.5:2', 'A4:0.5:3', 'C5:2:5'], lh: ['A2+E3:2:5', 'C3:2:1'] },
+      { chord: 'Bbmaj7', rh: ['D5:1:5', 'C5:1:4', 'A4:1:2', 'F4:1:1'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
+      { chord: 'C7', rh: ['G4:2:2', 'A4:2:3'], lh: ['C2+G2:2:5', 'E3:2:1'] },
+      { chord: 'Dm7', rh: ['C4:1:1', 'D4:1:2', 'F4:1:3', 'G4:1:4'], lh: ['D2+A2:2:5', 'F3:2:1'] },
+      { chord: 'Gm7', rh: ['A4:2:5', 'G4:1:4', 'F4:1:3'], lh: ['G2+D3:2:5', 'Bb3:2:1'] },
+      { chord: 'C7', rh: ['G4:2:3', 'F4:2:2'], lh: ['C2+G2:2:5', 'E3:2:1'] },
+      { chord: 'F', rh: ['F4+A4+C5:4:1'], lh: ['F2+C3+F3:4:5'] }
+    ], 4)
+  }),
+
+  // 16. CAN YOU FEEL THE LOVE TONIGHT (THE LION KING)
+  buildSongFromEvents({
+    id: 'can-you-feel-the-love-tonight',
+    title: 'Can You Feel the Love Tonight (The Lion King)',
+    composer: 'Elton John',
+    genre: 'Cinema & Animation',
+    difficulty: 'Beginner',
+    tempo: 76,
+    timeSignature: [4, 4],
+    keySignature: 'Bb Major (Arr. C Major)',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'C', rh: ['E4:1:2', 'G4:1:4', 'E4:1:2', 'D4:0.5:1', 'E4:0.5:2'], lh: ['C3+G3:4:5'] },
+      { chord: 'G/B', rh: ['G4:2:4', 'D4:2:1'], lh: ['B2+G3:4:5'] },
+      { chord: 'Am7', rh: ['C4:1:1', 'E4:1:2', 'G4:1:4', 'C5:1:5'], lh: ['A2+E3:4:5'] },
+      { chord: 'F', rh: ['B4:1:4', 'A4:1:3', 'G4:2:2'], lh: ['F2+C3+F3:4:5'] },
+      { chord: 'C/E', rh: ['E4:1:2', 'G4:1:4', 'E4:1:2', 'C4:1:1'], lh: ['E2+C3:4:5'] },
+      { chord: 'F', rh: ['A4:2:4', 'F4:2:2'], lh: ['F2+C3:4:5'] },
+      { chord: 'Dm7', rh: ['F4:1:2', 'E4:1:1', 'D4:1:1', 'C4:1:1'], lh: ['D2+A2:4:5'] },
+      { chord: 'G', rh: ['D4:4:2'], lh: ['G2+D3+G3:4:5'] },
+      // Chorus ("And can you feel the love tonight")
+      { chord: 'C', rh: ['C5:1.5:4', 'G4:0.5:1', 'E5:1:5', 'C5:1:3'], lh: ['C2+G2+C3:4:5'] },
+      { chord: 'G/B', rh: ['B4:1.5:3', 'G4:0.5:1', 'D4:2:1'], lh: ['B1+G2+D3:4:5'] },
+      { chord: 'Am', rh: ['A4:1:2', 'B4:1:3', 'C5:1:4', 'D5:1:5'], lh: ['A2+E3+A3:4:5'] },
+      { chord: 'F', rh: ['C5:2:4', 'B4:2:3'], lh: ['F2+C3+A3:4:5'] },
+      { chord: 'C/E', rh: ['A4:1:3', 'G4:1:2', 'E4:1:1', 'C5:1:5'], lh: ['E2+C3+G3:4:5'] },
+      { chord: 'Dm7', rh: ['A4:2:4', 'F4:2:2'], lh: ['D2+A2+F3:4:5'] },
+      { chord: 'G7', rh: ['E4:1:2', 'D4:1:1', 'C4:1:1', 'B3:1:1'], lh: ['G2+D3+F3:4:5'] },
+      { chord: 'C', rh: ['C4+E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+    ], 4)
+  }),
+
+  // 17. REMEMBER ME (COCO — LULLABY)
+  buildSongFromEvents({
+    id: 'remember-me-coco',
+    title: 'Remember Me (Coco Lullaby)',
+    composer: 'Kristen Anderson-Lopez & Robert Lopez',
+    genre: 'Cinema & Animation',
+    difficulty: 'Intermediate',
+    tempo: 80,
+    timeSignature: [4, 4],
+    keySignature: 'C Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'C', rh: ['G4:1:2', 'A4:0.5:3', 'G4:0.5:2', 'E5:2:5'], lh: ['C3+G3+E4:4:5'] },
+      { chord: 'Cmaj7', rh: ['G4:1:2', 'A4:0.5:3', 'G4:0.5:2', 'B4:2:4'], lh: ['B2+G3+D4:4:5'] },
+      { chord: 'C7', rh: ['G4:1:1', 'A4:0.5:2', 'G4:0.5:1', 'C5:1:4', 'B4:1:3'], lh: ['Bb2+E3+C4:4:5'] },
+      { chord: 'Fmaj7', rh: ['A4:4:2'], lh: ['F2+C3+A3:4:5'] },
+      { chord: 'Fm6', rh: ['A4:1:2', 'B4:0.5:3', 'A4:0.5:2', 'D5:2:5'], lh: ['F2+C3+Ab3:4:5'] },
+      { chord: 'C/E', rh: ['G4:1:1', 'A4:0.5:2', 'G4:0.5:1', 'C5:2:4'], lh: ['E2+C3+G3:4:5'] },
+      { chord: 'D7', rh: ['F#4:1:2', 'G4:0.5:3', 'A4:1.5:4', 'B4:1:5'], lh: ['D2+A2+F#3:4:5'] },
+      { chord: 'G7', rh: ['G4:4:2'], lh: ['G2+D3+F3:4:5'] },
+      { chord: 'C', rh: ['G4:1:2', 'A4:0.5:3', 'G4:0.5:2', 'E5:2:5'], lh: ['C3+G3+E4:4:5'] },
+      { chord: 'E7', rh: ['E5:1:5', 'D5:1:4', 'C5:1:3', 'B4:1:2'], lh: ['E2+B2+G#3:4:5'] },
+      { chord: 'Am', rh: ['C5:1:3', 'D5:1:4', 'E5:2:5'], lh: ['A2+E3+C4:4:5'] },
+      { chord: 'Gm7', rh: ['D5:1:4', 'C5:1:3', 'Bb4:2:2'], lh: ['G2+D3+Bb3:4:5'] },
+      { chord: 'Fmaj7', rh: ['A4:1:1', 'C5:1:2', 'E5:1:4', 'G5:1:5'], lh: ['F2+C3+A3:4:5'] },
+      { chord: 'Fm6', rh: ['F5:2:5', 'D5:2:3'], lh: ['F2+C3+Ab3:4:5'] },
+      { chord: 'C/G', rh: ['E5:2:4', 'D5:2:3'], lh: ['G2+E3:2:5', 'G2+F3:2:5'] },
+      { chord: 'C', rh: ['C5:4:1'], lh: ['C2+G2+E3:4:5'] }
+    ], 4)
+  }),
+
+  // 18. YOU'VE GOT A FRIEND IN ME (TOY STORY)
+  buildSongFromEvents({
+    id: 'youve-got-a-friend-in-me',
+    title: "You've Got a Friend in Me (Toy Story)",
+    composer: 'Randy Newman',
+    genre: 'Cinema & Animation',
+    difficulty: 'Intermediate',
+    tempo: 112,
+    timeSignature: [4, 4],
+    keySignature: 'C Major',
+    sourceFormat: 'Standard MIDI (.mid)',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'C', rh: ['G4:1:3', 'E4:0.5:1', 'G4:0.5:3', 'A4:1:4', 'G4:1:3'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'C7', rh: ['E4:1:2', 'C4:1:1', 'D4:1:2', 'Eb4:1:3'], lh: ['C3:1:5', 'Bb3:1:1', 'G3:1:2', 'E3:1:4'] },
+      { chord: 'F7', rh: ['E4:1:2', 'G4:1:4', 'A4:1:5', 'G4:1:4'], lh: ['F2:1:5', 'C3:1:2', 'Eb3:1:1', 'C3:1:2'] },
+      { chord: 'C', rh: ['E4:2:2', 'C4:2:1'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'C3:1:5'] },
+      { chord: 'G7', rh: ['B4:1:4', 'D5:1:5', 'B4:1:4', 'G4:1:2'], lh: ['G2:1:5', 'D3:1:2', 'F3:1:1', 'D3:1:2'] },
+      { chord: 'C', rh: ['A4:1:3', 'G4:1:2', 'E4:2:1'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'A7', rh: ['G4:1:3', 'A4:1:4', 'B4:1:5', 'A4:1:4'], lh: ['A2:1:5', 'E3:1:2', 'G3:1:1', 'E3:1:2'] },
+      { chord: 'D7', rh: ['F#4:2:2', 'G4:2:3'], lh: ['D2:1:5', 'A2:1:2', 'G2:1:5', 'D3:1:1'] },
+      { chord: 'C', rh: ['G4:1:3', 'E4:0.5:1', 'G4:0.5:3', 'A4:1:4', 'G4:1:3'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'E7', rh: ['B4:1:3', 'C5:1:4', 'D5:1:5', 'B4:1:3'], lh: ['E2:1:5', 'B2:1:2', 'G#3:1:1', 'E3:1:3'] },
+      { chord: 'Am', rh: ['C5:1.5:4', 'A4:0.5:2', 'E4:2:1'], lh: ['A2:1:5', 'E3:1:2', 'A3:1:1', 'G3:1:2'] },
+      { chord: 'D7', rh: ['F#4:1:2', 'G4:1:3', 'A4:1:4', 'C5:1:5'], lh: ['D2:1:5', 'A2:1:2', 'F#3:1:1', 'D3:1:2'] },
+      { chord: 'C/G', rh: ['G4:1:3', 'E4:1:1', 'G4:1:3', 'A4:1:4'], lh: ['G2:2:5', 'E3:2:1'] },
+      { chord: 'G7', rh: ['G4:1:3', 'E4:1:2', 'D4:2:1'], lh: ['G2:2:5', 'F3:2:1'] },
+      { chord: 'C', rh: ['C4:2:1', 'E4+G4:2:2'], lh: ['C2:2:5', 'G2:2:2'] },
+      { chord: 'C6', rh: ['C4+E4+A4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+    ], 4)
+  }),
+
+  // 19. PART OF YOUR WORLD (THE LITTLE MERMAID)
+  buildSongFromEvents({
+    id: 'part-of-your-world',
+    title: 'Part of Your World (The Little Mermaid)',
+    composer: 'Alan Menken',
+    genre: 'Cinema & Animation',
+    difficulty: 'Beginner',
+    tempo: 102,
+    timeSignature: [4, 4],
+    keySignature: 'F Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'Gm7', rh: ['C4:1:1', 'D4:1:2', 'F4:2:4'], lh: ['G2+D3+F3:4:5'] },
+      { chord: 'C7', rh: ['C4:1:1', 'D4:1:2', 'F4:2:4'], lh: ['C2+G2+E3:4:5'] },
+      { chord: 'Fmaj7', rh: ['D4:1:1', 'F4:1:2', 'G4:1:3', 'A4:1:4'], lh: ['F2+C3+A3:4:5'] },
+      { chord: 'Dm7', rh: ['A4:2:4', 'G4:2:3'], lh: ['D2+A2+F3:4:5'] },
+      { chord: 'Gm7', rh: ['D4:1:1', 'F4:1:2', 'G4:1:3', 'A4:1:4'], lh: ['G2+D3+F3:4:5'] },
+      { chord: 'C7', rh: ['A4:1.5:4', 'G4:0.5:3', 'F4:2:2'], lh: ['C2+G2+E3:4:5'] },
+      { chord: 'F', rh: ['F4:1:1', 'G4:1:2', 'A4:1:3', 'C5:1:5'], lh: ['F2+C3+A3:4:5'] },
+      { chord: 'Am7', rh: ['C5:4:5'], lh: ['A2+E3+G3:4:5'] },
+      { chord: 'Bbmaj7', rh: ['A4:1:2', 'Bb4:1:3', 'C5:2:4'], lh: ['Bb1+F2+D3:4:5'] },
+      { chord: 'Am7', rh: ['G4:1:1', 'A4:1:2', 'C5:2:4'], lh: ['A1+E2+C3:4:5'] },
+      { chord: 'Gm7', rh: ['F4:1:1', 'G4:1:2', 'A4:1:3', 'Bb4:1:4'], lh: ['G2+D3+F3:4:5'] },
+      { chord: 'C7', rh: ['A4:2:3', 'G4:2:2'], lh: ['C2+G2+E3:4:5'] },
+      { chord: 'Gm7', rh: ['F4:1:1', 'G4:1:2', 'A4:2:3'], lh: ['G2+D3+Bb3:4:5'] },
+      { chord: 'C7', rh: ['G4:1:2', 'A4:1:3', 'C5:2:5'], lh: ['C2+G2+E3:4:5'] },
+      { chord: 'F', rh: ['A4:2:3', 'F4:2:1'], lh: ['F2+C3:2:5', 'Bbmaj7:2:1'] },
+      { chord: 'F', rh: ['F4+A4+C5:4:1'], lh: ['F2+C3+F3:4:5'] }
+    ], 4)
+  }),
+
+  // 20. SOMEDAY MY PRINCE WILL COME (SNOW WHITE — JAZZ WALTZ)
+  buildSongFromEvents({
+    id: 'someday-my-prince-will-come',
+    title: 'Someday My Prince Will Come (Snow White)',
+    composer: 'Frank Churchill',
+    genre: 'Cinema & Animation',
+    difficulty: 'Intermediate',
+    tempo: 108,
+    timeSignature: [3, 4],
+    keySignature: 'Bb Major (Arr. F Major)',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'Fmaj7', rh: ['C4:2:1', 'F4:1:2'], lh: ['F2:1:5', 'A3+E4:2:1'] },
+      { chord: 'A7#5', rh: ['G4:1.5:3', 'F4:0.5:2', 'E4:1:1'], lh: ['A2:1:5', 'G3+C#4:2:1'] },
+      { chord: 'Bbmaj7', rh: ['F4:2:2', 'D4:1:1'], lh: ['Bb2:1:5', 'F3+A3:2:1'] },
+      { chord: 'D7', rh: ['A4:2:4', 'F#4:1:2'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
+      { chord: 'Gm7', rh: ['G4:2:3', 'Bb4:1:4'], lh: ['G2:1:5', 'F3+Bb3:2:1'] },
+      { chord: 'C7', rh: ['A4:1:3', 'G4:1:2', 'E4:1:1'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
+      { chord: 'Am7', rh: ['C5:3:5'], lh: ['A2:1:5', 'E3+G3:2:1'] },
+      { chord: 'D7', rh: ['A4:3:3'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
+      { chord: 'Gm7', rh: ['D4:2:1', 'G4:1:2'], lh: ['G2:1:5', 'F3+Bb3:2:1'] },
+      { chord: 'Bbm6', rh: ['A4:1.5:3', 'G4:0.5:2', 'F4:1:1'], lh: ['Bb2:1:5', 'F3+Db4:2:1'] },
+      { chord: 'F/C', rh: ['C4:2:1', 'F4:1:2'], lh: ['C3:1:5', 'F3+A3:2:1'] },
+      { chord: 'D7', rh: ['A4:2:3', 'C5:1:4'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
+      { chord: 'Gm7', rh: ['D5:2:5', 'Bb4:1:3'], lh: ['G2:1:5', 'F3+Bb3:2:1'] },
+      { chord: 'C7', rh: ['A4:2:3', 'G4:1:2'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
+      { chord: 'F6', rh: ['F4:3:1'], lh: ['F2:1:5', 'A3+D4:2:1'] },
+      { chord: 'F6', rh: ['F4+A4+C5+F5:3:1'], lh: ['F2+C3+F3:3:5'] }
+    ], 3)
+  }),
+
+  // 21. WHEN YOU WISH UPON A STAR (PINOCCHIO)
+  buildSongFromEvents({
+    id: 'when-you-wish-upon-a-star',
+    title: 'When You Wish Upon a Star (Pinocchio)',
+    composer: 'Leigh Harline',
+    genre: 'Cinema & Animation',
+    difficulty: 'Intermediate',
+    tempo: 78,
+    timeSignature: [4, 4],
+    keySignature: 'C Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Educational Arrangement',
+    rawNotes: compileCompactScore([
+      { chord: 'C', rh: ['G3:1:1', 'G4:1:5', 'F4:1:4', 'E4:1:3'], lh: ['C2+G2:2:5', 'E3:2:1'] },
+      { chord: 'A7', rh: ['C#4:1:2', 'D4:1:1', 'A4:2:5'], lh: ['A1+E2:2:5', 'G3:2:1'] },
+      { chord: 'Dm', rh: ['B3:1:1', 'B4:1:5', 'A4:1:4', 'G4:1:3'], lh: ['D2+A2:2:5', 'F3:2:1'] },
+      { chord: 'G7', rh: ['F#4:1:2', 'G4:1:3', 'D5:2:5'], lh: ['G2+D3:2:5', 'F3:2:1'] },
+      { chord: 'C/E', rh: ['E5:1:5', 'D5:1:4', 'C5:1:3', 'B4:1:2'], lh: ['E2+C3:2:5', 'G3:2:1'] },
+      { chord: 'F', rh: ['A4:1:2', 'G4:1:1', 'C5:1:4', 'A4:1:2'], lh: ['F2+C3:2:5', 'A3:2:1'] },
+      { chord: 'C/G', rh: ['G4:2:2', 'E4:2:1'], lh: ['G2+E3:2:5', 'G2+D3:2:5'] },
+      { chord: 'G7', rh: ['D4:4:1'], lh: ['G2+D3+F3:4:5'] },
+      { chord: 'C', rh: ['G3:1:1', 'G4:1:5', 'F4:1:4', 'E4:1:3'], lh: ['C2+G2:2:5', 'E3:2:1'] },
+      { chord: 'A7', rh: ['C#4:1:2', 'D4:1:1', 'A4:2:5'], lh: ['A1+E2:2:5', 'G3:2:1'] },
+      { chord: 'Dm', rh: ['B3:1:1', 'B4:1:5', 'A4:1:4', 'G4:1:3'], lh: ['D2+A2:2:5', 'F3:2:1'] },
+      { chord: 'G7', rh: ['F#4:1:2', 'G4:1:3', 'D5:2:5'], lh: ['G2+D3:2:5', 'F3:2:1'] },
+      { chord: 'C/E', rh: ['E5:1:5', 'D5:1:4', 'C5:1:3', 'B4:1:2'], lh: ['E2+C3:2:5', 'G3:2:1'] },
+      { chord: 'F', rh: ['A4:1:1', 'C5:1:2', 'E5:1:4', 'D5:1:3'], lh: ['F2+C3:2:5', 'Ab3:2:1'] },
+      { chord: 'C/G', rh: ['C5:2:3', 'B4:2:2'], lh: ['G2+E3:2:5', 'G2+F3:2:5'] },
+      { chord: 'C', rh: ['E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+    ], 4)
+  }),
+
+  // 22. ONCE UPON A DREAM (SLEEPING BEAUTY / TCHAIKOVSKY WALTZ)
+  buildSongFromEvents({
+    id: 'once-upon-a-dream',
+    title: 'Once Upon a Dream (Sleeping Beauty Waltz)',
+    composer: 'Pyotr Ilyich Tchaikovsky',
+    genre: 'Cinema & Animation',
+    difficulty: 'Beginner',
+    tempo: 126,
+    timeSignature: [3, 4],
+    keySignature: 'F Major',
+    sourceFormat: 'Public Domain Score',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'F', rh: ['A4:2:3', 'G4:1:2'], lh: ['F2:1:5', 'A3+C4:2:1'] },
+      { chord: 'C7/F', rh: ['A4:2:3', 'F4:1:1'], lh: ['F2:1:5', 'Bb3+C4:2:1'] },
+      { chord: 'F', rh: ['G4:1:2', 'A4:1:3', 'Bb4:1:4'], lh: ['F2:1:5', 'A3+C4:2:1'] },
+      { chord: 'F', rh: ['A4:3:3'], lh: ['F2:1:5', 'A3+C4:2:1'] },
+      { chord: 'Bbmaj7', rh: ['G4:2:2', 'A4:1:3'], lh: ['Bb2:1:5', 'F3+D4:2:1'] },
+      { chord: 'Edim7', rh: ['Bb4:2:4', 'A4:1:3'], lh: ['E2:1:5', 'G3+C#4:2:1'] },
+      { chord: 'F', rh: ['G4:1:1', 'A4:1:2', 'C5:1:4'], lh: ['F2:1:5', 'A3+C4:2:1'] },
+      { chord: 'C7', rh: ['G4:3:2'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
+      { chord: 'F', rh: ['A4:2:3', 'G4:1:2'], lh: ['F2:1:5', 'A3+C4:2:1'] },
+      { chord: 'D7', rh: ['A4:2:2', 'D5:1:5'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
+      { chord: 'Gm', rh: ['C5:2:4', 'Bb4:1:3'], lh: ['G2:1:5', 'G3+Bb3:2:1'] },
+      { chord: 'Bbm6', rh: ['A4:2:2', 'G4:1:1'], lh: ['Bb2:1:5', 'F3+Db4:2:1'] },
+      { chord: 'F/C', rh: ['A4:2:3', 'F4:1:1'], lh: ['C3:1:5', 'F3+A3:2:1'] },
+      { chord: 'C7', rh: ['G4:2:2', 'A4:1:3'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
+      { chord: 'F', rh: ['F4:3:1'], lh: ['F2:1:5', 'A3+C4:2:1'] },
+      { chord: 'F', rh: ['F4+A4+C5+F5:3:1'], lh: ['F2+C3+F3:3:5'] }
+    ], 3)
+  }),
+
+  // 23. THE ENTERTAINER — SCOTT JOPLIN (16-BAR RAGTIME CLASSIC)
+  buildSongFromEvents({
+    id: 'the-entertainer',
+    title: 'The Entertainer (Classic Piano Rag)',
+    composer: 'Scott Joplin',
+    genre: 'Jazz & Ragtime',
+    difficulty: 'Intermediate',
+    tempo: 116,
+    timeSignature: [4, 4],
+    keySignature: 'C Major',
+    sourceFormat: 'Standard MIDI (.mid)',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      // Famous Octave Intro (Bars 1-4)
+      { chord: 'C', rh: ['D5:0.5:2', 'E5:0.5:3', 'C5:0.5:1', 'A4:1:2', 'B4:0.5:3', 'G4:1:1'], lh: ['R:4'] },
+      { chord: 'C', rh: ['D4:0.5:2', 'E4:0.5:3', 'C4:0.5:1', 'A3:1:2', 'B3:0.5:3', 'G3:1:1'], lh: ['R:4'] },
+      { chord: 'G7', rh: ['D4:0.5:2', 'E4:0.5:3', 'C4:0.5:1', 'A3:1:2', 'B3:0.5:3', 'A3:0.5:2', 'Ab3:0.5:1'], lh: ['R:4'] },
+      { chord: 'G7', rh: ['G3:2:1', 'R:1', 'D4:0.5:1', 'D#4:0.5:2'], lh: ['G2:2:5', 'G2+B2+F3:2:5'] },
+      // Syncopated Main Theme (Bars 5-16)
+      { chord: 'C', rh: ['E4:0.5:3', 'C5:1:5', 'E4:0.5:1', 'C5:1:5', 'E4:0.5:1', 'C5:0.5:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
+      { chord: 'C', rh: ['C5:2.5:3', 'C5:0.5:3', 'D5:0.5:4', 'D#5:0.5:4'], lh: ['C3:1:5', 'E3+G3:1:1', 'E3:1:3', 'F3:1:2'] },
+      { chord: 'C', rh: ['E5:0.5:5', 'C5:0.5:3', 'D5:0.5:4', 'E5:1:5', 'B4:0.5:2', 'D5:1:4'], lh: ['G3:1:1', 'E3+G3:1:1', 'G2:1:5', 'F3+G3:1:1'] },
+      { chord: 'C', rh: ['C5:3:3', 'D4:0.5:1', 'D#4:0.5:2'], lh: ['C3:1:5', 'E3+G3:1:1', 'C3:2:5'] },
+      { chord: 'C', rh: ['E4:0.5:3', 'C5:1:5', 'E4:0.5:1', 'C5:1:5', 'E4:0.5:1', 'C5:0.5:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
+      { chord: 'A7', rh: ['C5:2.5:4', 'A4:0.5:2', 'G4:0.5:1', 'F#4:0.5:2'], lh: ['C3:1:5', 'E3+G3:1:1', 'A2:2:5'] },
+      { chord: 'D7', rh: ['A4:0.5:3', 'C5:0.5:5', 'E5:1:5', 'D5:0.5:4', 'C5:0.5:3', 'A4:0.5:1', 'D5:0.5:5'], lh: ['D3:1:5', 'F#3+A3:1:1', 'D3:2:5'] },
+      { chord: 'G7', rh: ['G4:3:2', 'D4:0.5:1', 'D#4:0.5:2'], lh: ['G2:1:5', 'D3+F3:1:1', 'G2:2:5'] },
+      { chord: 'C', rh: ['E4:0.5:3', 'C5:1:5', 'E4:0.5:1', 'C5:1:5', 'E4:0.5:1', 'C5:0.5:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
+      { chord: 'F', rh: ['C5:2:3', 'C5:0.5:2', 'D5:0.5:3', 'E5:0.5:4', 'F5:0.5:5'], lh: ['F2:1:5', 'A2+C3:1:1', 'F2:2:5'] },
+      { chord: 'C/G', rh: ['E5:0.5:5', 'C5:0.5:3', 'D5:0.5:4', 'E5:1:5', 'B4:0.5:2', 'D5:1:4'], lh: ['G2:2:5', 'G2+F3:2:5'] },
+      { chord: 'C', rh: ['C4+E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+    ], 4)
+  }),
+
+  // 24. RONDO ALLA TURCA (TURKISH MARCH, K. 331) — W.A. MOZART
+  buildSongFromEvents({
+    id: 'turkish-march-mozart',
+    title: 'Rondo Alla Turca (Turkish March, K. 331)',
+    composer: 'Wolfgang Amadeus Mozart',
+    genre: 'Classical',
+    difficulty: 'Advanced',
+    tempo: 124,
+    timeSignature: [4, 4],
+    keySignature: 'A Minor',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'Am', rh: ['B4:0.5:3', 'A4:0.5:2', 'G#4:0.5:1', 'A4:0.5:2', 'C5:2:4'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5', 'C3+E3:1:1'] },
+      { chord: 'Am', rh: ['D5:0.5:3', 'C5:0.5:2', 'B4:0.5:1', 'C5:0.5:2', 'E5:2:5'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5', 'C3+E3:1:1'] },
+      { chord: 'Am', rh: ['F5:0.5:4', 'E5:0.5:3', 'D#5:0.5:2', 'E5:0.5:3', 'B5:0.5:5', 'A5:0.5:4', 'G#5:0.5:3', 'A5:0.5:4'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:2:5'] },
+      { chord: 'Am', rh: ['B5:0.5:5', 'A5:0.5:4', 'G#5:0.5:3', 'A5:0.5:4', 'C6:2:5'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5', 'C3+E3:1:1'] },
+      { chord: 'F', rh: ['A5:1:3', 'B5:1:4', 'C6:1:5', 'B5:1:4'], lh: ['F2:1:5', 'A2+C3:1:1', 'D3:1:4', 'F3+A3:1:1'] },
+      { chord: 'E7', rh: ['A5:1:3', 'G#5:1:2', 'A5:1:3', 'E5:1:1'], lh: ['E2:1:5', 'B2+E3:1:1', 'E2:2:5'] },
+      { chord: 'Am', rh: ['F5:1:4', 'D5:1:2', 'C5:1:1', 'B4:0.5:2', 'A4:0.5:1'], lh: ['D2:2:5', 'E2:2:5'] },
+      { chord: 'Am', rh: ['A4:4:1'], lh: ['A2+E3+A3:4:5'] },
+      // B Section Contrasting Motif
+      { chord: 'C', rh: ['E5:1:3', 'F5:1:4', 'G5:1:5', 'G5:1:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'C3:1:5', 'E3+G3:1:1'] },
+      { chord: 'G', rh: ['A5:0.5:5', 'G5:0.5:4', 'F5:0.5:3', 'E5:0.5:2', 'D5:2:1'], lh: ['G2:1:5', 'B2+D3:1:1', 'G2:2:5'] },
+      { chord: 'C', rh: ['E5:1:3', 'F5:1:4', 'G5:1:5', 'G5:1:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'C3:1:5', 'E3+G3:1:1'] },
+      { chord: 'G', rh: ['A5:0.5:5', 'G5:0.5:4', 'F5:0.5:3', 'E5:0.5:2', 'D5:2:1'], lh: ['G2:1:5', 'B2+D3:1:1', 'G2:2:5'] },
+      { chord: 'Am', rh: ['C5:1:2', 'D5:1:3', 'E5:1:4', 'E5:1:4'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5', 'C3+E3:1:1'] },
+      { chord: 'E7', rh: ['F5:0.5:5', 'E5:0.5:4', 'D5:0.5:3', 'C5:0.5:2', 'B4:2:1'], lh: ['E2:1:5', 'G#2+B2:1:1', 'E2:2:5'] },
+      { chord: 'Am', rh: ['C5:1:3', 'B4:1:2', 'A4:1:1', 'G#4:1:2'], lh: ['A2:2:5', 'E2:2:5'] },
+      { chord: 'Am', rh: ['A4+C5+E5+A5:4:1'], lh: ['A1+E2+A2:4:5'] }
+    ], 4)
+  }),
+
+  // 25. NOCTURNE IN E-FLAT MAJOR, OP. 9 NO. 2 — FRÉDÉRIC CHOPIN
+  buildSongFromEvents({
+    id: 'chopin-nocturne-op9-no2',
+    title: 'Nocturne in E-flat Major, Op. 9 No. 2',
+    composer: 'Frédéric Chopin',
+    genre: 'Classical',
+    difficulty: 'Advanced',
+    tempo: 66,
+    timeSignature: [3, 4],
+    keySignature: 'C Major (Arr.)',
+    sourceFormat: 'Scanned Score (OMR)',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'C', rh: ['G4:0.5:1', 'E5:2:5', 'D5:0.5:4'], lh: ['C3:1:5', 'G3+E4:1:1', 'G3+E4:1:1'] },
+      { chord: 'G7/C', rh: ['C5:1.5:3', 'B4:0.5:2', 'A4:1:1'], lh: ['C3:1:5', 'F3+D4:1:1', 'G3+F4:1:1'] },
+      { chord: 'C', rh: ['G4:1.5:2', 'E4:0.5:1', 'C5:0.5:5', 'A4:0.5:3'], lh: ['C3:1:5', 'G3+E4:1:1', 'A2:1:5'] },
+      { chord: 'G', rh: ['G4:2:3', 'F#4:0.5:2', 'G4:0.5:3'], lh: ['G2:1:5', 'D3+B3:1:1', 'G2:1:5'] },
+      { chord: 'Dm7', rh: ['A4:1.5:3', 'G4:0.5:2', 'F4:1:1'], lh: ['D3:1:5', 'A3+C4:1:1', 'G2:1:5'] },
+      { chord: 'C', rh: ['E4:1.5:1', 'G4:0.5:2', 'C5:1:5'], lh: ['C3:1:5', 'G3+E4:1:1', 'C3:1:5'] },
+      { chord: 'D7', rh: ['D5:1:4', 'C5:1:3', 'B4:0.5:2', 'A4:0.5:1'], lh: ['D3:1:5', 'F#3+C4:1:1', 'D3:1:5'] },
+      { chord: 'G7', rh: ['B4:2:3', 'G4:1:1'], lh: ['G2:1:5', 'G3+F4:2:1'] },
+      { chord: 'C', rh: ['G4:0.5:1', 'E5:2:5', 'D5:0.5:4'], lh: ['C3:1:5', 'G3+E4:1:1', 'G3+E4:1:1'] },
+      { chord: 'C7', rh: ['E5:1:4', 'F5:0.5:5', 'E5:0.5:4', 'Bb4:1:2'], lh: ['C3:1:5', 'G3+E4:1:1', 'C3:1:5'] },
+      { chord: 'F', rh: ['A4:1.5:1', 'C5:0.5:2', 'F5:1:5'], lh: ['F2:1:5', 'C3+A3:1:1', 'F2:1:5'] },
+      { chord: 'Fm6', rh: ['E5:1:4', 'D5:1:3', 'C5:1:2'], lh: ['F2:1:5', 'C3+Ab3:2:1'] },
+      { chord: 'C/G', rh: ['G5:1.5:5', 'E5:0.5:4', 'C5:1:2'], lh: ['G2:1:5', 'E3+C4:2:1'] },
+      { chord: 'G7', rh: ['D5:1.5:4', 'B4:0.5:2', 'G4:1:1'], lh: ['G2:1:5', 'F3+B3:2:1'] },
+      { chord: 'C', rh: ['C5:3:3'], lh: ['C2:1:5', 'G2+E3:2:1'] },
+      { chord: 'C', rh: ['E4+G4+C5+E5:3:1'], lh: ['C2+G2+C3:3:5'] }
+    ], 3)
+  }),
+
+  // 26. THE SWAN (LE CYGNE) — CAMILLE SAINT-SAËNS
+  buildSongFromEvents({
+    id: 'the-swan-saint-saens',
+    title: 'The Swan (Carnival of the Animals)',
+    composer: 'Camille Saint-Saëns',
+    genre: 'Classical',
+    difficulty: 'Intermediate',
+    tempo: 72,
+    timeSignature: [3, 4],
+    keySignature: 'G Major',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'G', rh: ['G4:1.5:3', 'F#4:0.5:2', 'B4:1:5'], lh: ['G2:1:5', 'B3+D4:1:1', 'G3+D4:1:1'] },
+      { chord: 'Em', rh: ['E4:1.5:1', 'D4:0.5:1', 'G4:1:4'], lh: ['G2:1:5', 'B3+E4:1:1', 'G3+E4:1:1'] },
+      { chord: 'Am/G', rh: ['C4:2:1', 'B3:0.5:1', 'C4:0.5:2'], lh: ['G2:1:5', 'A3+E4:2:1'] },
+      { chord: 'G', rh: ['D4:3:3'], lh: ['G2:1:5', 'B3+D4:2:1'] },
+      { chord: 'Bm7', rh: ['F#4:1.5:2', 'G4:0.5:3', 'A4:1:4'], lh: ['F#2:1:5', 'B3+D4:2:1'] },
+      { chord: 'Em', rh: ['B4:2:5', 'E4:1:1'], lh: ['E2:1:5', 'G3+B3:2:1'] },
+      { chord: 'A7', rh: ['F#4:1:2', 'G4:1:3', 'A4:1:4'], lh: ['A2:1:5', 'G3+C#4:2:1'] },
+      { chord: 'D7', rh: ['B4:2:5', 'A4:1:4'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
+      { chord: 'G', rh: ['G4:1.5:3', 'F#4:0.5:2', 'B4:1:5'], lh: ['G2:1:5', 'B3+D4:2:1'] },
+      { chord: 'B7', rh: ['D#4:1.5:1', 'F#4:0.5:2', 'B4:1:5'], lh: ['B2:1:5', 'A3+B3:2:1'] },
+      { chord: 'C', rh: ['E4:1.5:1', 'G4:0.5:2', 'C5:1:5'], lh: ['C3:1:5', 'G3+C4:2:1'] },
+      { chord: 'Cm6', rh: ['A4:2:3', 'D5:1:5'], lh: ['C3:1:5', 'Eb3+A3:2:1'] },
+      { chord: 'G/D', rh: ['B4:2:4', 'G4:1:2'], lh: ['D3:1:5', 'G3+B3:2:1'] },
+      { chord: 'D7', rh: ['A4:1.5:3', 'F#4:0.5:2', 'G4:1:3'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
+      { chord: 'G', rh: ['G4:3:1'], lh: ['G2:1:5', 'B3+D4:2:1'] },
+      { chord: 'G', rh: ['G4+B4+D5+G5:3:1'], lh: ['G2+D3+G3:3:5'] }
+    ], 3)
+  }),
+
+  // 27. BLUE DANUBE WALTZ — JOHANN STRAUSS II
+  buildSongFromEvents({
+    id: 'blue-danube-waltz',
+    title: 'The Blue Danube Waltz, Op. 314',
+    composer: 'Johann Strauss II',
+    genre: 'Classical',
+    difficulty: 'Beginner',
+    tempo: 138,
+    timeSignature: [3, 4],
+    keySignature: 'D Major',
+    sourceFormat: 'Public Domain Score',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'D', rh: ['D4:1:1', 'F#4:1:2', 'A4:1:3'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['A4:2:3', 'D5:1:5'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['D5:2:5', 'B4:1:4'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['A4:3:3'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'A7', rh: ['D4:1:1', 'F#4:1:2', 'A4:1:3'], lh: ['A2:1:5', 'E3+G3:1:1', 'E3+G3:1:1'] },
+      { chord: 'A7', rh: ['A4:2:3', 'E5:1:5'], lh: ['A2:1:5', 'E3+G3:1:1', 'E3+G3:1:1'] },
+      { chord: 'A7', rh: ['E5:2:5', 'C#5:1:4'], lh: ['A2:1:5', 'E3+G3:1:1', 'E3+G3:1:1'] },
+      { chord: 'D', rh: ['B4:2:3', 'A4:1:2'], lh: ['D2:1:5', 'F#3+A3:2:1'] },
+      { chord: 'D', rh: ['D4:1:1', 'F#4:1:2', 'A4:1:3'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D7', rh: ['A4:2:2', 'F#5:1:5'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
+      { chord: 'G', rh: ['F#5:2:5', 'D5:1:3'], lh: ['G2:1:5', 'G3+B3:2:1'] },
+      { chord: 'G', rh: ['B4:3:2'], lh: ['G2:1:5', 'G3+B3:2:1'] },
+      { chord: 'D/A', rh: ['A4:1:1', 'D5:1:3', 'F#5:1:5'], lh: ['A2:1:5', 'F#3+A3:2:1'] },
+      { chord: 'A7', rh: ['E5:2:4', 'C#5:1:2'], lh: ['A2:1:5', 'E3+G3:2:1'] },
+      { chord: 'D', rh: ['D5:3:3'], lh: ['D2:1:5', 'F#3+A3:2:1'] },
+      { chord: 'D', rh: ['D4+F#4+A4+D5:3:1'], lh: ['D2+A2+D3:3:5'] }
+    ], 3)
+  }),
+
+  // 28. DANCE OF THE SUGAR PLUM FAIRY (THE NUTCRACKER) — TCHAIKOVSKY
+  buildSongFromEvents({
+    id: 'sugar-plum-fairy',
+    title: 'Dance of the Sugar Plum Fairy (Nutcracker)',
+    composer: 'Pyotr Ilyich Tchaikovsky',
+    genre: 'Classical',
+    difficulty: 'Intermediate',
+    tempo: 100,
+    timeSignature: [4, 4],
+    keySignature: 'E Minor',
+    sourceFormat: 'MusicXML 4.0',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'Em', rh: ['R:1', 'G5:0.5:5', 'F#5:0.5:4', 'G5:1:5', 'E5:1:3'], lh: ['E3:1:5', 'G3+B3:1:1', 'E3:1:5', 'G3+B3:1:1'] },
+      { chord: 'B7', rh: ['D#5:1:2', 'E5:0.5:3', 'F#5:0.5:4', 'D#5:1:2', 'B4:1:1'], lh: ['B2:1:5', 'F#3+A3:1:1', 'B2:1:5', 'F#3+A3:1:1'] },
+      { chord: 'Em', rh: ['E5:0.5:3', 'D#5:0.5:2', 'E5:0.5:3', 'F#5:0.5:4', 'G5:0.5:5', 'F#5:0.5:4', 'G5:0.5:5', 'E5:0.5:3'], lh: ['E3:1:5', 'G3+B3:1:1', 'C3:1:5', 'E3+A3:1:1'] },
+      { chord: 'B7', rh: ['F#5:2:4', 'B4:2:1'], lh: ['B2:1:5', 'D#3+A3:1:1', 'B2:2:5'] },
+      { chord: 'Em', rh: ['R:1', 'G5:0.5:5', 'F#5:0.5:4', 'G5:1:5', 'E5:1:3'], lh: ['E3:1:5', 'G3+B3:1:1', 'E3:1:5', 'G3+B3:1:1'] },
+      { chord: 'D7', rh: ['F#5:1:3', 'G5:0.5:4', 'A5:0.5:5', 'F#5:1:3', 'D5:1:1'], lh: ['D3:1:5', 'F#3+C4:1:1', 'D3:1:5', 'F#3+C4:1:1'] },
+      { chord: 'G', rh: ['G5:0.5:4', 'F#5:0.5:3', 'G5:0.5:4', 'A5:0.5:5', 'B5:1:5', 'G5:1:3'], lh: ['G2:1:5', 'D3+B3:1:1', 'G2:2:5'] },
+      { chord: 'B7', rh: ['F#5:2:4', 'B4:2:1'], lh: ['B2:1:5', 'F#3+A3:1:1', 'B2:2:5'] },
+      { chord: 'Am', rh: ['C5:1:2', 'B4:0.5:1', 'C5:0.5:2', 'E5:1:4', 'C5:1:2'], lh: ['A2:1:5', 'E3+A3:1:1', 'A2:2:5'] },
+      { chord: 'Em', rh: ['B4:1:2', 'A#4:0.5:1', 'B4:0.5:2', 'E5:1:5', 'B4:1:2'], lh: ['E2:1:5', 'E3+G3:1:1', 'E2:2:5'] },
+      { chord: 'F#7', rh: ['A#4:1:2', 'B4:1:3', 'C#5:1:4', 'E5:1:5'], lh: ['F#2:2:5', 'F#3+A#3:2:1'] },
+      { chord: 'B7', rh: ['D#5:2:4', 'B4:2:1'], lh: ['B2:2:5', 'F#3+A3:2:1'] },
+      { chord: 'Em', rh: ['G5:0.5:5', 'F#5:0.5:4', 'G5:1:5', 'E5:1:3', 'B4:1:1'], lh: ['E3:2:5', 'G3+B3:2:1'] },
+      { chord: 'Am6', rh: ['C5:1:2', 'A4:1:1', 'F#5:2:5'], lh: ['A2:2:5', 'E3+F#3:2:1'] },
+      { chord: 'B7', rh: ['E5:1:4', 'D#5:1:3', 'B4:2:1'], lh: ['B2:2:5', 'F#3+A3:2:1'] },
+      { chord: 'Em', rh: ['E4+G4+B4+E5:4:1'], lh: ['E2+B2+E3:4:5'] }
+    ], 4)
+  }),
+
+  // 29. IN THE HALL OF THE MOUNTAIN KING — EDVARD GRIEG
+  buildSongFromEvents({
+    id: 'mountain-king-grieg',
+    title: 'In the Hall of the Mountain King (Peer Gynt)',
+    composer: 'Edvard Grieg',
+    genre: 'Classical',
+    difficulty: 'Beginner',
+    tempo: 122,
+    timeSignature: [4, 4],
+    keySignature: 'A Minor',
+    sourceFormat: 'Standard MIDI (.mid)',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'Am', rh: ['A3:0.5:1', 'B3:0.5:2', 'C4:0.5:3', 'D4:0.5:4', 'E4:0.5:5', 'C4:0.5:3', 'E4:1:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
+      { chord: 'Am', rh: ['D#4:0.5:4', 'B3:0.5:2', 'D#4:1:4', 'D4:0.5:4', 'Bb3:0.5:2', 'D4:1:4'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
+      { chord: 'Am', rh: ['A3:0.5:1', 'B3:0.5:2', 'C4:0.5:3', 'D4:0.5:4', 'E4:0.5:5', 'C4:0.5:3', 'E4:0.5:5', 'A4:0.5:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
+      { chord: 'C', rh: ['G4:0.5:4', 'E4:0.5:2', 'C4:0.5:1', 'E4:0.5:2', 'G4:2:4'], lh: ['C2:1:5', 'G2:1:1', 'C3:2:1'] },
+      { chord: 'Am', rh: ['A4:0.5:1', 'B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'C5:0.5:3', 'E5:1:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
+      { chord: 'Am', rh: ['D#5:0.5:4', 'B4:0.5:2', 'D#5:1:4', 'D5:0.5:4', 'Bb4:0.5:2', 'D5:1:4'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
+      { chord: 'Am', rh: ['A4:0.5:1', 'B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'C5:0.5:3', 'E5:0.5:5', 'A5:0.5:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
+      { chord: 'C', rh: ['G5:0.5:4', 'E5:0.5:2', 'C5:0.5:1', 'E5:0.5:2', 'G5:2:4'], lh: ['C3:1:5', 'G3:1:1', 'C4:2:1'] },
+      // B Section (E Major Dominant Tension)
+      { chord: 'E', rh: ['E4:0.5:1', 'F#4:0.5:2', 'G#4:0.5:3', 'A4:0.5:4', 'B4:0.5:5', 'G#4:0.5:3', 'B4:1:5'], lh: ['E2:1:5', 'B2:1:1', 'E2:1:5', 'B2:1:1'] },
+      { chord: 'E', rh: ['C5:0.5:5', 'G#4:0.5:3', 'C5:1:5', 'B4:0.5:5', 'G#4:0.5:3', 'B4:1:5'], lh: ['E2:1:5', 'B2:1:1', 'E2:1:5', 'B2:1:1'] },
+      { chord: 'E', rh: ['E4:0.5:1', 'F#4:0.5:2', 'G#4:0.5:3', 'A4:0.5:4', 'B4:0.5:5', 'G#4:0.5:3', 'B4:1:5'], lh: ['E2:1:5', 'B2:1:1', 'E2:1:5', 'B2:1:1'] },
+      { chord: 'E7', rh: ['C5:0.5:4', 'G#4:0.5:2', 'C5:1:4', 'B4:2:3'], lh: ['E2:2:5', 'E3:2:1'] },
+      { chord: 'Am', rh: ['A4:0.5:1', 'B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'C5:0.5:3', 'E5:1:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
+      { chord: 'E7', rh: ['D#5:0.5:4', 'B4:0.5:2', 'D#5:1:4', 'E5:1:5', 'G#4:1:2'], lh: ['E2:2:5', 'E3:2:1'] },
+      { chord: 'Am', rh: ['A4:1:1', 'C5:1:2', 'E5:1:4', 'A5:1:5'], lh: ['A2:2:5', 'E3:2:1'] },
+      { chord: 'Am', rh: ['A4+C5+E5+A5:4:1'], lh: ['A1+E2+A2:4:5'] }
+    ], 4)
+  }),
+
+  // 30. GREENSLEEVES (WHAT CHILD IS THIS) — TRADITIONAL RENAISSANCE BALLAD
+  buildSongFromEvents({
+    id: 'greensleeves',
+    title: 'Greensleeves (Traditional Ballad)',
+    composer: 'Traditional English',
+    genre: 'Traditional & Folk',
+    difficulty: 'Beginner',
+    tempo: 96,
+    timeSignature: [3, 4],
+    keySignature: 'A Minor',
+    sourceFormat: 'Public Domain Score',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'Am', rh: ['A4:1:1', 'C5:2:3'], lh: ['A2:1:5', 'E3+A3:2:1'] },
+      { chord: 'G', rh: ['D5:1.5:4', 'E5:0.5:5', 'D5:1:4'], lh: ['G2:1:5', 'D3+G3:2:1'] },
+      { chord: 'F', rh: ['C5:2:3', 'A4:1:2'], lh: ['F2:1:5', 'C3+F3:2:1'] },
+      { chord: 'E', rh: ['F4:1.5:1', 'G4:0.5:2', 'A4:1:3'], lh: ['E2:1:5', 'B2+E3:2:1'] },
+      { chord: 'Am', rh: ['B4:2:4', 'G#4:1:2'], lh: ['E2:1:5', 'B2+E3:2:1'] },
+      { chord: 'Am', rh: ['E4:2:1', 'A4:1:2'], lh: ['A2:1:5', 'E3+A3:2:1'] },
+      { chord: 'Am', rh: ['C5:2:3', 'D5:1:4'], lh: ['A2:1:5', 'E3+A3:2:1'] },
+      { chord: 'G', rh: ['E5:1.5:5', 'D5:0.5:4', 'C5:1:3'], lh: ['G2:1:5', 'D3+G3:2:1'] },
+      // High Chorus ("Greensleeves was all my joy")
+      { chord: 'C', rh: ['G5:3:5'], lh: ['C3:1:5', 'G3+C4:2:1'] },
+      { chord: 'G', rh: ['G5:1.5:5', 'F#5:0.5:4', 'E5:1:3'], lh: ['G2:1:5', 'D3+B3:2:1'] },
+      { chord: 'Am', rh: ['D5:2:3', 'B4:1:1'], lh: ['G2:1:5', 'D3+G3:2:1'] },
+      { chord: 'E7', rh: ['G#4:1.5:1', 'A4:0.5:2', 'B4:1:3'], lh: ['E2:1:5', 'B2+E3:2:1'] },
+      { chord: 'C', rh: ['G5:3:5'], lh: ['C3:1:5', 'G3+C4:2:1'] },
+      { chord: 'G', rh: ['G5:1.5:5', 'F#5:0.5:4', 'E5:1:3'], lh: ['G2:1:5', 'D3+B3:2:1'] },
+      { chord: 'E7', rh: ['D5:1:4', 'C5:1:3', 'B4:1:2'], lh: ['E2:1:5', 'B2+G#3:2:1'] },
+      { chord: 'Am', rh: ['A4+C5+E5:3:1'], lh: ['A2+E3+A3:3:5'] }
+    ], 3)
+  }),
+
+  // 31. AMAZING GRACE — GOSPEL PIANO HYMN
+  buildSongFromEvents({
+    id: 'amazing-grace',
+    title: 'Amazing Grace (Gospel Piano Arrangement)',
+    composer: 'John Newton (Traditional)',
+    genre: 'Traditional & Folk',
+    difficulty: 'Beginner',
+    tempo: 84,
+    timeSignature: [3, 4],
+    keySignature: 'G Major',
+    sourceFormat: 'Public Domain Score',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'G', rh: ['D4:1:1', 'G4:2:2'], lh: ['G2+D3:3:5'] },
+      { chord: 'G7', rh: ['B4:0.5:4', 'G4:0.5:2', 'B4:2:4'], lh: ['G2+F3:3:5'] },
+      { chord: 'C', rh: ['A4:1:3', 'G4:2:2'], lh: ['C3+E3:3:5'] },
+      { chord: 'G', rh: ['E4:1:1', 'D4:2:1'], lh: ['G2+B2:3:5'] },
+      { chord: 'G', rh: ['D4:1:1', 'G4:2:2'], lh: ['G2+D3:3:5'] },
+      { chord: 'Em', rh: ['B4:0.5:4', 'G4:0.5:2', 'B4:2:4'], lh: ['E2+B2:3:5'] },
+      { chord: 'A7', rh: ['A4:1:3', 'D5:2:5'], lh: ['A2+G3:3:5'] },
+      { chord: 'D7', rh: ['D5:2:5', 'B4:1:3'], lh: ['D2+F#3:3:5'] },
+      { chord: 'G', rh: ['D5:1.5:5', 'B4:0.5:3', 'D5:1:5'], lh: ['G2+D3:3:5'] },
+      { chord: 'G7', rh: ['B4:0.5:4', 'G4:0.5:2', 'D4:2:1'], lh: ['G2+F3:3:5'] },
+      { chord: 'C', rh: ['E4:1:2', 'G4:1.5:4', 'E4:0.5:2'], lh: ['C3+G3:3:5'] },
+      { chord: 'G/D', rh: ['D4:2:1', 'D4:1:1'], lh: ['D3+G3:3:5'] },
+      { chord: 'Em', rh: ['G4:2:2', 'B4:0.5:4', 'G4:0.5:2'], lh: ['E2+B2:3:5'] },
+      { chord: 'D7', rh: ['B4:2:4', 'A4:1:3'], lh: ['D2+F#3+C4:3:5'] },
+      { chord: 'G', rh: ['G4:3:2'], lh: ['G2+C3:2:5', 'G2+B2:1:5'] },
+      { chord: 'G', rh: ['D4+G4+B4+G5:3:1'], lh: ['G2+D3+G3:3:5'] }
+    ], 3)
+  }),
+
+  // 32. MAPLE LEAF RAG — SCOTT JOPLIN
+  buildSongFromEvents({
+    id: 'maple-leaf-rag',
+    title: 'Maple Leaf Rag (Opening Stride Theme)',
+    composer: 'Scott Joplin',
+    genre: 'Jazz & Ragtime',
+    difficulty: 'Advanced',
+    tempo: 120,
+    timeSignature: [4, 4],
+    keySignature: 'C Major (Arr.)',
+    sourceFormat: 'Standard MIDI (.mid)',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'C', rh: ['G4:0.5:1', 'C5:0.5:3', 'E5:1:5', 'C5:0.5:3', 'E5:1:5', 'G4:0.5:1'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
+      { chord: 'G7', rh: ['A4:0.5:2', 'D5:0.5:4', 'F5:1:5', 'D5:0.5:4', 'F5:1.5:5'], lh: ['G2:1:5', 'F3+G3:1:1', 'G2:1:5', 'F3+G3:1:1'] },
+      { chord: 'C', rh: ['G4:0.5:1', 'C5:0.5:3', 'E5:1:5', 'C5:0.5:3', 'E5:1:5', 'D#5:0.5:4'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
+      { chord: 'E7', rh: ['E5:2:5', 'B4:1:2', 'E5:1:5'], lh: ['E2:1:5', 'G#2+D3:1:1', 'E2:2:5'] },
+      { chord: 'Am', rh: ['C5:1:3', 'A4:1:1', 'C5:1:3', 'A4:1:1'], lh: ['A2:1:5', 'E3+A3:1:1', 'A2:2:5'] },
+      { chord: 'Fm6', rh: ['Ab4:0.5:1', 'C5:0.5:2', 'D5:1:3', 'F5:1:5', 'D5:1:3'], lh: ['F2:1:5', 'C3+Ab3:1:1', 'F2:2:5'] },
+      { chord: 'C/G', rh: ['E5:1:5', 'C5:1:3', 'G4:1:1', 'A4:1:2'], lh: ['G2:2:5', 'E3+G3:2:1'] },
+      { chord: 'G7', rh: ['B4:1:3', 'D5:1:5', 'G4:2:1'], lh: ['G2:2:5', 'F3+G3:2:1'] },
+      { chord: 'C', rh: ['G4:0.5:1', 'C5:0.5:3', 'E5:1:5', 'C5:0.5:3', 'E5:1:5', 'G4:0.5:1'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
+      { chord: 'G7', rh: ['A4:0.5:2', 'D5:0.5:4', 'F5:1:5', 'D5:0.5:4', 'F5:1.5:5'], lh: ['G2:1:5', 'F3+G3:1:1', 'G2:1:5', 'F3+G3:1:1'] },
+      { chord: 'C7', rh: ['G4:0.5:1', 'C5:0.5:2', 'E5:1:4', 'G5:1:5', 'E5:1:4'], lh: ['C3:1:5', 'E3+Bb3:1:1', 'C3:2:5'] },
+      { chord: 'F', rh: ['F5:2:5', 'C5:1:2', 'A4:1:1'], lh: ['F2:1:5', 'C3+A3:1:1', 'F2:2:5'] },
+      { chord: 'Fm6', rh: ['D5:1:4', 'C5:1:3', 'Ab4:1:1', 'C5:1:3'], lh: ['F2:2:5', 'C3+Ab3:2:1'] },
+      { chord: 'C/G', rh: ['E5:1:5', 'C5:1:3', 'G4:1:1', 'E4:1:1'], lh: ['G2:2:5', 'E3+G3:2:1'] },
+      { chord: 'G7', rh: ['D4:1:1', 'F4:1:2', 'B4:1:4', 'D5:1:5'], lh: ['G2:2:5', 'F3+G3:2:1'] },
+      { chord: 'C', rh: ['C4+E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+    ], 4)
   })
 ];
 
@@ -519,16 +1492,39 @@ class MaestroAudioEngine {
   constructor() {
     this.ctx = null;
     this.instrument = 'grand-piano';
-    this.volume = 0.8;
+    this.volume = 0.85;
     this.micStream = null;
     this.analyser = null;
     this.micRaf = null;
+    this.compressor = null;
+    this.reverbNode = null;
+    this.hammerBuffer = null;
   }
 
   init() {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioCtx();
+
+      // Master Dynamics Compressor + Warm Soundboard Convolution Reverb
+      this.compressor = this.ctx.createDynamicsCompressor();
+      this.compressor.threshold.value = -16;
+      this.compressor.knee.value = 18;
+      this.compressor.ratio.value = 3.5;
+      this.compressor.attack.value = 0.003;
+      this.compressor.release.value = 0.22;
+
+      this.reverbNode = this.createSoundboardReverb(this.ctx);
+      const reverbGain = this.ctx.createGain();
+      reverbGain.gain.value = 0.22;
+
+      this.compressor.connect(this.ctx.destination);
+      this.compressor.connect(this.reverbNode);
+      this.reverbNode.connect(reverbGain);
+      reverbGain.connect(this.ctx.destination);
+
+      // Pre-compute felt-hammer strike impulse buffer
+      this.hammerBuffer = this.createHammerNoiseBuffer(this.ctx);
     }
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
@@ -536,59 +1532,152 @@ class MaestroAudioEngine {
     return this.ctx;
   }
 
-  playNote(midi, durationSec = 0.45, velocity = 85) {
+  createSoundboardReverb(ctx) {
+    const length = Math.floor(ctx.sampleRate * 1.45);
+    const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        const decay = Math.exp(-i / (ctx.sampleRate * 0.38));
+        data[i] = (Math.random() * 2 - 1) * decay * 0.5;
+      }
+    }
+    const convolver = ctx.createConvolver();
+    convolver.buffer = impulse;
+    return convolver;
+  }
+
+  createHammerNoiseBuffer(ctx) {
+    const length = Math.floor(ctx.sampleRate * 0.045);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      const env = Math.exp(-i / (ctx.sampleRate * 0.008));
+      data[i] = (Math.random() * 2 - 1) * env;
+    }
+    return buffer;
+  }
+
+  playNote(midi, durationSec = 0.55, velocity = 88) {
     const ctx = this.init();
     const now = ctx.currentTime;
     const freq = midiToFrequency(midi);
-    const velGain = (velocity / 127) * this.volume * 0.35;
+    const normVel = Math.max(0.15, Math.min(1.0, velocity / 127));
+    const peakGain = normVel * this.volume * 0.42;
 
-    const masterGain = ctx.createGain();
-    masterGain.connect(ctx.destination);
+    // Pitch-dependent acoustic decay (low bass strings ring longer than high treble strings)
+    const registerDecayScale = Math.max(0.45, Math.min(1.9, (88 - midi) / 36));
+    const effectiveSustain = Math.max(durationSec, 0.38) * registerDecayScale;
 
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
+    const noteBus = ctx.createGain();
+    noteBus.connect(this.compressor);
+
+    // Dynamic lowpass filter simulating piano string brightness decaying after hammer attack
+    const bodyFilter = ctx.createBiquadFilter();
+    bodyFilter.type = 'lowpass';
+    const initialCutoff = Math.min(14000, freq * (4.5 + normVel * 5.5));
+    const tailCutoff = Math.max(320, freq * 1.65);
+    bodyFilter.frequency.setValueAtTime(initialCutoff, now);
+    bodyFilter.frequency.exponentialRampToValueAtTime(tailCutoff, now + Math.min(0.9, effectiveSustain * 0.75));
+    bodyFilter.Q.value = 0.7;
+    bodyFilter.connect(noteBus);
+
+    // Warm Wooden Soundboard Resonance EQ around 220Hz
+    const warmthEq = ctx.createBiquadFilter();
+    warmthEq.type = 'peaking';
+    warmthEq.frequency.value = 240;
+    warmthEq.Q.value = 1.1;
+    warmthEq.gain.value = 3.5;
+    warmthEq.connect(bodyFilter);
 
     if (this.instrument === 'grand-piano') {
-      osc1.type = 'triangle';
-      osc2.type = 'sine';
-      osc2.detune.value = 3;
-      filter.frequency.setValueAtTime(freq * 5.5, now);
-      filter.frequency.exponentialRampToValueAtTime(freq * 1.6, now + durationSec);
+      // Multi-partial harmonic series with piano string inharmonicity + unison string detuning
+      const partials = [
+        { ratio: 1.0, amp: 1.0, type: 'triangle', detune: -1.8 },
+        { ratio: 1.0, amp: 0.75, type: 'sine', detune: 1.8 },
+        { ratio: 2.0006, amp: 0.36, type: 'sine', detune: 0.5 },
+        { ratio: 3.0018, amp: 0.16, type: 'sine', detune: -1.0 },
+        { ratio: 4.004, amp: 0.07, type: 'sine', detune: 2.2 }
+      ];
+
+      partials.forEach((p, idx) => {
+        const partialFreq = freq * p.ratio;
+        if (partialFreq > ctx.sampleRate * 0.45) return;
+        const osc = ctx.createOscillator();
+        const pGain = ctx.createGain();
+        osc.type = p.type;
+        osc.frequency.setValueAtTime(partialFreq, now);
+        osc.detune.setValueAtTime(p.detune, now);
+
+        // Higher overtones decay faster than the fundamental
+        const partialDecay = effectiveSustain / (1 + idx * 0.45);
+        pGain.gain.setValueAtTime(p.amp, now);
+        pGain.gain.exponentialRampToValueAtTime(0.001, now + partialDecay + 0.25);
+
+        osc.connect(pGain);
+        pGain.connect(warmthEq);
+        osc.start(now);
+        osc.stop(now + partialDecay + 0.28);
+      });
+
+      // Felt Hammer Strike Mechanical Thump (Crucial for real piano realism)
+      if (this.hammerBuffer) {
+        const hammerSrc = ctx.createBufferSource();
+        hammerSrc.buffer = this.hammerBuffer;
+        const hammerFilter = ctx.createBiquadFilter();
+        hammerFilter.type = 'bandpass';
+        hammerFilter.frequency.value = Math.min(3200, Math.max(400, freq * 2.2));
+        hammerFilter.Q.value = 1.4;
+        const hammerGain = ctx.createGain();
+        hammerGain.gain.setValueAtTime(peakGain * 0.32, now);
+        hammerGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+
+        hammerSrc.connect(hammerFilter);
+        hammerFilter.connect(hammerGain);
+        hammerGain.connect(noteBus);
+        hammerSrc.start(now);
+      }
     } else if (this.instrument === 'electric-rhodes') {
-      osc1.type = 'sine';
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(freq * 2, now);
-      filter.frequency.setValueAtTime(freq * 4, now);
+      // Tine + Tonebar Bell FM-inspired Rhodes synthesis
+      const fund = ctx.createOscillator();
+      const tine = ctx.createOscillator();
+      const tineGain = ctx.createGain();
+      fund.type = 'sine';
+      tine.type = 'sine';
+      fund.frequency.setValueAtTime(freq, now);
+      tine.frequency.setValueAtTime(freq * 7, now);
+      tineGain.gain.setValueAtTime(0.18 * normVel, now);
+      tineGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      fund.connect(warmthEq);
+      tine.connect(tineGain);
+      tineGain.connect(warmthEq);
+      fund.start(now);
+      tine.start(now);
+      fund.stop(now + effectiveSustain + 0.3);
+      tine.stop(now + 0.22);
     } else {
-      osc1.type = 'sawtooth';
-      osc2.type = 'triangle';
-      filter.frequency.setValueAtTime(freq * 3.2, now);
+      // Chamber Strings Ensemble
+      [-6, 0, 6].forEach((det) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.detune.setValueAtTime(det, now);
+        g.gain.value = 0.26;
+        osc.connect(g);
+        g.connect(warmthEq);
+        osc.start(now);
+        osc.stop(now + effectiveSustain + 0.35);
+      });
     }
 
-    osc1.frequency.setValueAtTime(freq, now);
-    if (this.instrument !== 'electric-rhodes') {
-      osc2.frequency.setValueAtTime(freq, now);
-    }
-
-    const subGain = ctx.createGain();
-    subGain.gain.value = 0.35;
-
-    osc1.connect(filter);
-    osc2.connect(subGain);
-    subGain.connect(filter);
-    filter.connect(masterGain);
-
-    masterGain.gain.setValueAtTime(0.0001, now);
-    masterGain.gain.linearRampToValueAtTime(velGain, now + 0.012);
-    masterGain.gain.exponentialRampToValueAtTime(velGain * 0.45, now + Math.min(0.25, durationSec * 0.5));
-    masterGain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec + 0.15);
-
-    osc1.start(now);
-    osc2.start(now);
-    osc1.stop(now + durationSec + 0.18);
-    osc2.stop(now + durationSec + 0.18);
+    // Dual-Stage Piano Envelope: Immediate Hammer Attack -> Quick Initial Drop -> Long Singing Sustain
+    const attackSec = this.instrument === 'warm-strings' ? 0.065 : 0.006;
+    noteBus.gain.setValueAtTime(0.0001, now);
+    noteBus.gain.linearRampToValueAtTime(peakGain, now + attackSec);
+    noteBus.gain.exponentialRampToValueAtTime(peakGain * 0.58, now + attackSec + 0.09);
+    noteBus.gain.exponentialRampToValueAtTime(0.0001, now + effectiveSustain + 0.32);
   }
 
   playMetronomeClick(isDownbeat = false) {
@@ -692,6 +1781,7 @@ export default function App() {
   const [songs, setSongs] = useState(INITIAL_SONGS);
   const [selectedSongId, setSelectedSongId] = useState(INITIAL_SONGS[0].id);
   const [libraryFilter, setLibraryFilter] = useState('ALL');
+  const [genreFilter, setGenreFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Responsive Keyboard Range (2 Octaves on Mobile for fat-finger playability, 4 Octaves on Desktop)
@@ -1688,7 +2778,7 @@ export default function App() {
             >
               {songs.map(s => (
                 <option key={s.id} value={s.id}>
-                  {s.title} ({s.difficulty})
+                  {s.title} ({s.totalMeasures || Math.ceil(s.events.length / 4)} Bars · {s.difficulty})
                 </option>
               ))}
             </select>
@@ -1919,8 +3009,10 @@ export default function App() {
   // ============================================================================
 
   const renderRepertoireAndImport = () => {
+    const genres = ['ALL', 'Cinema & Animation', 'Classical', 'Baroque', 'Impressionist', 'Jazz & Ragtime', 'Traditional & Folk'];
     const filteredSongs = songs.filter(s => {
       if (libraryFilter !== 'ALL' && s.difficulty.toUpperCase() !== libraryFilter) return false;
+      if (genreFilter !== 'ALL' && s.genre !== genreFilter) return false;
       if (searchQuery && !s.title.toLowerCase().includes(searchQuery.toLowerCase()) && !s.composer.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
@@ -2023,14 +3115,16 @@ export default function App() {
         }`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-serif font-bold">Repertoire Library</h3>
+              <h3 className="text-lg font-serif font-bold">
+                Repertoire Library ({filteredSongs.length} of {songs.length} Pieces)
+              </h3>
               <p className="text-xs text-stone-500">Tap any piece to open the interactive score or inspect OMR detections</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
-                placeholder="Search pieces..."
+                placeholder="Search 32+ songs (e.g. Frozen, Moana)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`rounded-xl px-3 py-1.5 text-xs border focus:outline-none ${
@@ -2040,7 +3134,7 @@ export default function App() {
               <div className={`flex rounded-xl p-0.5 text-xs border ${
                 darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-100 border-stone-200'
               }`}>
-                {['ALL', 'BEGINNER', 'INTERMEDIATE'].map(lvl => (
+                {['ALL', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'].map(lvl => (
                   <button
                     key={lvl}
                     onClick={() => setLibraryFilter(lvl)}
@@ -2050,11 +3144,28 @@ export default function App() {
                         : 'text-stone-500'
                     }`}
                   >
-                    {lvl === 'ALL' ? 'All' : lvl.charAt(0) + lvl.slice(1).toLowerCase()}
+                    {lvl === 'ALL' ? 'All Levels' : lvl.charAt(0) + lvl.slice(1).toLowerCase()}
                   </button>
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Genre Category Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {genres.map(g => (
+              <button
+                key={g}
+                onClick={() => setGenreFilter(g)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border transition ${
+                  genreFilter === g
+                    ? 'bg-orange-700 text-white border-orange-700 shadow-sm'
+                    : (darkMode ? 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200' : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100')
+                }`}
+              >
+                {g === 'ALL' ? `All Genres (${songs.length})` : g}
+              </button>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -2081,7 +3192,9 @@ export default function App() {
                           {song.difficulty}
                         </span>
                       </div>
-                      <p className="text-xs text-stone-500 mt-0.5">{song.composer} · {song.keySignature}</p>
+                      <p className="text-xs text-stone-500 mt-0.5">
+                        {song.composer} · {song.keySignature} · {song.totalMeasures} Measures ({song.events.length} Notes)
+                      </p>
                     </div>
                     <span className="text-xs font-mono text-stone-500">{song.tempo} BPM</span>
                   </div>
