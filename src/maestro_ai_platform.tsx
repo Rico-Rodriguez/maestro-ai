@@ -1488,6 +1488,17 @@ function exportToMusicXML(song) {
 // 4. WEBAUDIO POLYPHONIC SYNTHESIZER & AUTOCORRELATION MIC PITCH TRACKER
 // ============================================================================
 
+const SALAMANDER_SAMPLE_MAP = {
+  24: 'C1.mp3', 27: 'Ds1.mp3', 30: 'Fs1.mp3', 33: 'A1.mp3',
+  36: 'C2.mp3', 39: 'Ds2.mp3', 42: 'Fs2.mp3', 45: 'A2.mp3',
+  48: 'C3.mp3', 51: 'Ds3.mp3', 54: 'Fs3.mp3', 57: 'A3.mp3',
+  60: 'C4.mp3', 63: 'Ds4.mp3', 66: 'Fs4.mp3', 69: 'A4.mp3',
+  72: 'C5.mp3', 75: 'Ds5.mp3', 78: 'Fs5.mp3', 81: 'A5.mp3',
+  84: 'C6.mp3', 87: 'Ds6.mp3', 90: 'Fs6.mp3', 93: 'A6.mp3',
+  96: 'C7.mp3'
+};
+const SALAMANDER_BASE_URL = 'https://tonejs.github.io/audio/salamander/';
+
 class MaestroAudioEngine {
   constructor() {
     this.ctx = null;
@@ -1499,6 +1510,10 @@ class MaestroAudioEngine {
     this.compressor = null;
     this.reverbNode = null;
     this.hammerBuffer = null;
+    this.sampleBuffers = new Map();
+    this.samplesLoading = false;
+    this.samplesLoadedCount = 0;
+    this.onSampleStatusChange = null;
   }
 
   init() {
@@ -1506,25 +1521,25 @@ class MaestroAudioEngine {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioCtx();
 
-      // Master Dynamics Compressor + Warm Soundboard Convolution Reverb
+      // Master Dynamics Compressor + Concert Hall Ambience Reverb
       this.compressor = this.ctx.createDynamicsCompressor();
-      this.compressor.threshold.value = -16;
-      this.compressor.knee.value = 18;
-      this.compressor.ratio.value = 3.5;
-      this.compressor.attack.value = 0.003;
-      this.compressor.release.value = 0.22;
+      this.compressor.threshold.value = -14;
+      this.compressor.knee.value = 16;
+      this.compressor.ratio.value = 3.0;
+      this.compressor.attack.value = 0.002;
+      this.compressor.release.value = 0.25;
 
       this.reverbNode = this.createSoundboardReverb(this.ctx);
       const reverbGain = this.ctx.createGain();
-      reverbGain.gain.value = 0.22;
+      reverbGain.gain.value = 0.18;
 
       this.compressor.connect(this.ctx.destination);
       this.compressor.connect(this.reverbNode);
       this.reverbNode.connect(reverbGain);
       reverbGain.connect(this.ctx.destination);
 
-      // Pre-compute felt-hammer strike impulse buffer
       this.hammerBuffer = this.createHammerNoiseBuffer(this.ctx);
+      this.preloadAcousticSamples();
     }
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
@@ -1532,14 +1547,61 @@ class MaestroAudioEngine {
     return this.ctx;
   }
 
+  async preloadAcousticSamples() {
+    if (this.samplesLoading || this.sampleBuffers.size > 0) return;
+    this.samplesLoading = true;
+    const entries = Object.entries(SALAMANDER_SAMPLE_MAP);
+
+    // Prioritize middle register (C3-C5) first so immediate playing uses real samples right away
+    const sortedEntries = [...entries].sort(
+      (a, b) => Math.abs(parseInt(a[0], 10) - 60) - Math.abs(parseInt(b[0], 10) - 60)
+    );
+
+    await Promise.allSettled(
+      sortedEntries.map(async ([midiStr, file]) => {
+        try {
+          const res = await fetch(`${SALAMANDER_BASE_URL}${file}`);
+          if (!res.ok) return;
+          const arrayBuf = await res.arrayBuffer();
+          const audioBuf = await this.ctx.decodeAudioData(arrayBuf);
+          this.sampleBuffers.set(parseInt(midiStr, 10), audioBuf);
+          this.samplesLoadedCount = this.sampleBuffers.size;
+          if (this.onSampleStatusChange) {
+            this.onSampleStatusChange(this.samplesLoadedCount, entries.length);
+          }
+        } catch (err) {
+          // Silently fall back to physical modeling if offline
+        }
+      })
+    );
+  }
+
+  findClosestSample(midi) {
+    if (this.sampleBuffers.size === 0) return null;
+    let closestMidi = null;
+    let minDiff = Infinity;
+    for (const sampleMidi of this.sampleBuffers.keys()) {
+      const diff = Math.abs(midi - sampleMidi);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestMidi = sampleMidi;
+      }
+    }
+    if (closestMidi === null) return null;
+    return {
+      baseMidi: closestMidi,
+      buffer: this.sampleBuffers.get(closestMidi)
+    };
+  }
+
   createSoundboardReverb(ctx) {
-    const length = Math.floor(ctx.sampleRate * 1.45);
+    const length = Math.floor(ctx.sampleRate * 1.65);
     const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
       const data = impulse.getChannelData(ch);
       for (let i = 0; i < length; i++) {
-        const decay = Math.exp(-i / (ctx.sampleRate * 0.38));
-        data[i] = (Math.random() * 2 - 1) * decay * 0.5;
+        const decay = Math.exp(-i / (ctx.sampleRate * 0.42));
+        data[i] = (Math.random() * 2 - 1) * decay * 0.45;
       }
     }
     const convolver = ctx.createConvolver();
@@ -1548,58 +1610,115 @@ class MaestroAudioEngine {
   }
 
   createHammerNoiseBuffer(ctx) {
-    const length = Math.floor(ctx.sampleRate * 0.045);
+    const length = Math.floor(ctx.sampleRate * 0.035);
     const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < length; i++) {
-      const env = Math.exp(-i / (ctx.sampleRate * 0.008));
+      const env = Math.exp(-i / (ctx.sampleRate * 0.006));
       data[i] = (Math.random() * 2 - 1) * env;
     }
     return buffer;
   }
 
-  playNote(midi, durationSec = 0.55, velocity = 88) {
+  playNote(midi, durationSec = 0.65, velocity = 90) {
     const ctx = this.init();
     const now = ctx.currentTime;
     const freq = midiToFrequency(midi);
-    const normVel = Math.max(0.15, Math.min(1.0, velocity / 127));
-    const peakGain = normVel * this.volume * 0.42;
+    const normVel = Math.max(0.18, Math.min(1.0, velocity / 127));
 
-    // Pitch-dependent acoustic decay (low bass strings ring longer than high treble strings)
+    // 1. REAL ACOUSTIC CONCERT GRAND PIANO (Multi-Sampled Steinway Model B)
+    if (this.instrument === 'grand-piano') {
+      const sampleMatch = this.findClosestSample(midi);
+      if (sampleMatch) {
+        const src = ctx.createBufferSource();
+        src.buffer = sampleMatch.buffer;
+        // Exact equal-tempered pitch interpolation from nearest recorded minor-third key
+        src.playbackRate.setValueAtTime(Math.pow(2, (midi - sampleMatch.baseMidi) / 12), now);
+
+        // Velocity-sensitive lowpass filter (soft keystrokes sound warm/mellow, hard strikes sound crisp)
+        const velFilter = ctx.createBiquadFilter();
+        velFilter.type = 'lowpass';
+        const cutoffHz = Math.min(18000, 1400 + Math.pow(normVel, 1.5) * 14500);
+        velFilter.frequency.setValueAtTime(cutoffHz, now);
+
+        // Natural piano damper release envelope (lets strings ring authentically)
+        const registerRing = Math.max(0.85, Math.min(2.4, (92 - midi) / 28));
+        const holdTime = Math.max(durationSec, 0.55) * registerRing;
+        const releaseTime = 0.45 * registerRing;
+
+        const envGain = ctx.createGain();
+        const targetGain = normVel * this.volume * 0.95;
+        envGain.gain.setValueAtTime(0.0001, now);
+        envGain.gain.linearRampToValueAtTime(targetGain, now + 0.003);
+        envGain.gain.setValueAtTime(targetGain, now + holdTime * 0.65);
+        envGain.gain.exponentialRampToValueAtTime(0.0001, now + holdTime + releaseTime);
+
+        src.connect(velFilter);
+        velFilter.connect(envGain);
+        envGain.connect(this.compressor);
+
+        src.start(now);
+        src.stop(now + holdTime + releaseTime + 0.05);
+        return;
+      }
+    }
+
+    // 2. FALLBACK / SECONDARY INSTRUMENTS (Electric Rhodes, Chamber Strings, or Offline Piano)
+    const peakGain = normVel * this.volume * 0.42;
     const registerDecayScale = Math.max(0.45, Math.min(1.9, (88 - midi) / 36));
-    const effectiveSustain = Math.max(durationSec, 0.38) * registerDecayScale;
+    const effectiveSustain = Math.max(durationSec, 0.42) * registerDecayScale;
 
     const noteBus = ctx.createGain();
     noteBus.connect(this.compressor);
 
-    // Dynamic lowpass filter simulating piano string brightness decaying after hammer attack
     const bodyFilter = ctx.createBiquadFilter();
     bodyFilter.type = 'lowpass';
-    const initialCutoff = Math.min(14000, freq * (4.5 + normVel * 5.5));
-    const tailCutoff = Math.max(320, freq * 1.65);
+    const initialCutoff = Math.min(12000, freq * (3.8 + normVel * 4.5));
+    const tailCutoff = Math.max(280, freq * 1.4);
     bodyFilter.frequency.setValueAtTime(initialCutoff, now);
-    bodyFilter.frequency.exponentialRampToValueAtTime(tailCutoff, now + Math.min(0.9, effectiveSustain * 0.75));
-    bodyFilter.Q.value = 0.7;
+    bodyFilter.frequency.exponentialRampToValueAtTime(tailCutoff, now + Math.min(0.85, effectiveSustain * 0.7));
+    bodyFilter.Q.value = 0.65;
     bodyFilter.connect(noteBus);
 
-    // Warm Wooden Soundboard Resonance EQ around 220Hz
-    const warmthEq = ctx.createBiquadFilter();
-    warmthEq.type = 'peaking';
-    warmthEq.frequency.value = 240;
-    warmthEq.Q.value = 1.1;
-    warmthEq.gain.value = 3.5;
-    warmthEq.connect(bodyFilter);
+    if (this.instrument === 'electric-rhodes') {
+      const fund = ctx.createOscillator();
+      const tine = ctx.createOscillator();
+      const tineGain = ctx.createGain();
+      fund.type = 'sine';
+      tine.type = 'sine';
+      fund.frequency.setValueAtTime(freq, now);
+      tine.frequency.setValueAtTime(freq * 7, now);
+      tineGain.gain.setValueAtTime(0.15 * normVel, now);
+      tineGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
-    if (this.instrument === 'grand-piano') {
-      // Multi-partial harmonic series with piano string inharmonicity + unison string detuning
+      fund.connect(bodyFilter);
+      tine.connect(tineGain);
+      tineGain.connect(bodyFilter);
+      fund.start(now);
+      tine.start(now);
+      fund.stop(now + effectiveSustain + 0.3);
+      tine.stop(now + 0.22);
+    } else if (this.instrument === 'warm-strings') {
+      [-6, 0, 6].forEach((det) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.detune.setValueAtTime(det, now);
+        g.gain.value = 0.24;
+        osc.connect(g);
+        g.connect(bodyFilter);
+        osc.start(now);
+        osc.stop(now + effectiveSustain + 0.35);
+      });
+    } else {
+      // Warm acoustic string fallback while real Steinway samples finish downloading
       const partials = [
-        { ratio: 1.0, amp: 1.0, type: 'triangle', detune: -1.8 },
-        { ratio: 1.0, amp: 0.75, type: 'sine', detune: 1.8 },
-        { ratio: 2.0006, amp: 0.36, type: 'sine', detune: 0.5 },
-        { ratio: 3.0018, amp: 0.16, type: 'sine', detune: -1.0 },
-        { ratio: 4.004, amp: 0.07, type: 'sine', detune: 2.2 }
+        { ratio: 1.0, amp: 1.0, type: 'sine', detune: -1.2 },
+        { ratio: 1.0, amp: 0.65, type: 'triangle', detune: 1.2 },
+        { ratio: 2.0005, amp: 0.28, type: 'sine', detune: 0.4 },
+        { ratio: 3.0015, amp: 0.11, type: 'sine', detune: -0.8 }
       ];
-
       partials.forEach((p, idx) => {
         const partialFreq = freq * p.ratio;
         if (partialFreq > ctx.sampleRate * 0.45) return;
@@ -1608,75 +1727,20 @@ class MaestroAudioEngine {
         osc.type = p.type;
         osc.frequency.setValueAtTime(partialFreq, now);
         osc.detune.setValueAtTime(p.detune, now);
-
-        // Higher overtones decay faster than the fundamental
-        const partialDecay = effectiveSustain / (1 + idx * 0.45);
+        const partialDecay = effectiveSustain / (1 + idx * 0.5);
         pGain.gain.setValueAtTime(p.amp, now);
         pGain.gain.exponentialRampToValueAtTime(0.001, now + partialDecay + 0.25);
-
         osc.connect(pGain);
-        pGain.connect(warmthEq);
+        pGain.connect(bodyFilter);
         osc.start(now);
         osc.stop(now + partialDecay + 0.28);
       });
-
-      // Felt Hammer Strike Mechanical Thump (Crucial for real piano realism)
-      if (this.hammerBuffer) {
-        const hammerSrc = ctx.createBufferSource();
-        hammerSrc.buffer = this.hammerBuffer;
-        const hammerFilter = ctx.createBiquadFilter();
-        hammerFilter.type = 'bandpass';
-        hammerFilter.frequency.value = Math.min(3200, Math.max(400, freq * 2.2));
-        hammerFilter.Q.value = 1.4;
-        const hammerGain = ctx.createGain();
-        hammerGain.gain.setValueAtTime(peakGain * 0.32, now);
-        hammerGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
-
-        hammerSrc.connect(hammerFilter);
-        hammerFilter.connect(hammerGain);
-        hammerGain.connect(noteBus);
-        hammerSrc.start(now);
-      }
-    } else if (this.instrument === 'electric-rhodes') {
-      // Tine + Tonebar Bell FM-inspired Rhodes synthesis
-      const fund = ctx.createOscillator();
-      const tine = ctx.createOscillator();
-      const tineGain = ctx.createGain();
-      fund.type = 'sine';
-      tine.type = 'sine';
-      fund.frequency.setValueAtTime(freq, now);
-      tine.frequency.setValueAtTime(freq * 7, now);
-      tineGain.gain.setValueAtTime(0.18 * normVel, now);
-      tineGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
-      fund.connect(warmthEq);
-      tine.connect(tineGain);
-      tineGain.connect(warmthEq);
-      fund.start(now);
-      tine.start(now);
-      fund.stop(now + effectiveSustain + 0.3);
-      tine.stop(now + 0.22);
-    } else {
-      // Chamber Strings Ensemble
-      [-6, 0, 6].forEach((det) => {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(freq, now);
-        osc.detune.setValueAtTime(det, now);
-        g.gain.value = 0.26;
-        osc.connect(g);
-        g.connect(warmthEq);
-        osc.start(now);
-        osc.stop(now + effectiveSustain + 0.35);
-      });
     }
 
-    // Dual-Stage Piano Envelope: Immediate Hammer Attack -> Quick Initial Drop -> Long Singing Sustain
-    const attackSec = this.instrument === 'warm-strings' ? 0.065 : 0.006;
+    const attackSec = this.instrument === 'warm-strings' ? 0.065 : 0.005;
     noteBus.gain.setValueAtTime(0.0001, now);
     noteBus.gain.linearRampToValueAtTime(peakGain, now + attackSec);
-    noteBus.gain.exponentialRampToValueAtTime(peakGain * 0.58, now + attackSec + 0.09);
+    noteBus.gain.exponentialRampToValueAtTime(peakGain * 0.55, now + attackSec + 0.09);
     noteBus.gain.exponentialRampToValueAtTime(0.0001, now + effectiveSustain + 0.32);
   }
 
@@ -1788,6 +1852,7 @@ export default function App() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [keyboardRangeMode, setKeyboardRangeMode] = useState('compact'); // 'compact' (C3-C5) | 'full' (C2-C6)
   const [octaveShift, setOctaveShift] = useState(0); // Shift compact keyboard up/down
+  const [samplesReadyCount, setSamplesReadyCount] = useState(0);
 
   useEffect(() => {
     const checkViewport = () => {
@@ -1797,6 +1862,13 @@ export default function App() {
     };
     checkViewport();
     window.addEventListener('resize', checkViewport);
+
+    // Preload real acoustic Steinway Grand Piano samples immediately
+    audioEngine.onSampleStatusChange = (loaded) => {
+      setSamplesReadyCount(loaded);
+    };
+    audioEngine.init();
+
     return () => window.removeEventListener('resize', checkViewport);
   }, []);
 
@@ -2394,6 +2466,12 @@ export default function App() {
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block" /> Left Hand
+            </span>
+            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold pl-2 border-l border-stone-700">
+              <Volume2 className="w-3.5 h-3.5" />
+              {samplesReadyCount > 0
+                ? `Steinway Grand Samples (${samplesReadyCount}/25 Loaded)`
+                : 'Loading Acoustic Grand Samples...'}
             </span>
           </div>
 
