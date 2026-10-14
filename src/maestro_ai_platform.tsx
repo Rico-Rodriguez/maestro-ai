@@ -220,7 +220,7 @@ function buildSongFromEvents({
 }
 
 const INITIAL_SONGS = [
-  // 1. ODE TO JOY — FULL 16-MEASURE A-A'-B-A' CONCERT ARRANGEMENT
+  // 1. ODE TO JOY — LUDWIG VAN BEETHOVEN (SYMPHONY NO. 9)
   buildSongFromEvents({
     id: 'ode-to-joy',
     title: 'Ode to Joy (Symphony No. 9, Complete Theme)',
@@ -230,60 +230,60 @@ const INITIAL_SONGS = [
     tempo: 108,
     timeSignature: [4, 4],
     keySignature: 'C Major',
-    sourceFormat: 'Scanned Score (OMR)',
+    sourceFormat: 'Concert Score',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
       // Phrase A (Bars 1-4)
-      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
-      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4:0.74', 'E4:1:3', 'D4:1:2'], lh: ['B2+G3:2:5', 'D3+G3:2:2'] },
-      { chord: 'C', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
-      { chord: 'G', rh: ['E4:1.5:3', 'D4:0.5:2', 'D4:2:2'], lh: ['G2+D3:2:5', 'G2+B2:2:5'] },
+      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4', 'E4:1:3', 'D4:1:2'], lh: ['B2:1:5', 'G3:1:1', 'D3:1:3', 'G3:1:1'] },
+      { chord: 'C', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'G', rh: ['E4:1.5:3', 'D4:0.5:2', 'D4:2:2'], lh: ['G2:1:5', 'D3:1:2', 'B2:1:3', 'G2:1:5'] },
       // Phrase A' (Bars 5-8)
-      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
-      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4', 'E4:1:3', 'D4:1:2'], lh: ['B2+G3:2:5', 'D3+G3:2:2'] },
-      { chord: 'C/G', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3+E3:2:4', 'G2+D3:2:5'] },
-      { chord: 'C', rh: ['D4:1.5:2', 'C4:0.5:1', 'C4:2:1'], lh: ['G2+B2:2:5', 'C3+E3:2:3'] },
+      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4', 'E4:1:3', 'D4:1:2'], lh: ['B2:1:5', 'G3:1:1', 'D3:1:3', 'G3:1:1'] },
+      { chord: 'C/G', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'C', rh: ['D4:1.5:2', 'C4:0.5:1', 'C4:2:1'], lh: ['G2:1:5', 'B2:1:3', 'C3:2:1'] },
       // Phrase B Bridge (Bars 9-12)
-      { chord: 'G', rh: ['D4:1:2', 'D4:1:2', 'E4:1:3', 'C4:1:1'], lh: ['G2+D3:2:5', 'G2+D3:2:5'] },
-      { chord: 'G', rh: ['D4:1:2', 'E4:0.5:3', 'F4:0.5:4', 'E4:1:3', 'C4:1:1'], lh: ['G2+D3:2:5', 'G2+D3:2:5'] },
-      { chord: 'D7/F#', rh: ['D4:1:2', 'E4:0.5:3', 'F4:0.5:4:0.78', 'E4:1:3', 'D4:1:2'], lh: ['A2+D3:2:4', 'F#2+D3:2:5'] },
-      { chord: 'G7', rh: ['C4:1:1', 'D4:1:2', 'G3:2:1'], lh: ['G2+D3:2:5', 'G2+F3:2:5'] },
+      { chord: 'G', rh: ['D4:1:2', 'D4:1:2', 'E4:1:3', 'C4:1:1'], lh: ['G2:1:5', 'D3:1:2', 'B2:1:3', 'G2:1:5'] },
+      { chord: 'G', rh: ['D4:1:2', 'E4:0.5:3', 'F4:0.5:4', 'E4:1:3', 'C4:1:1'], lh: ['G2:1:5', 'D3:1:2', 'B2:1:3', 'G2:1:5'] },
+      { chord: 'D7/F#', rh: ['D4:1:2', 'E4:0.5:3', 'F4:0.5:4', 'E4:1:3', 'D4:1:2'], lh: ['D3:1:5', 'F#3:1:3', 'A3:1:2', 'D3:1:5'] },
+      { chord: 'G7', rh: ['C4:1:1', 'D4:1:2', 'G3:2:1'], lh: ['G2:1:5', 'B2:1:3', 'D3:1:2', 'G2:1:5'] },
       // Phrase A'' Finale (Bars 13-16)
-      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3+G3:2:5', 'E3+G3:2:3'] },
-      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4', 'E4:1:3', 'D4:1:2'], lh: ['B2+G3:2:5', 'D3+G3:2:2'] },
-      { chord: 'C/G', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3+E3:2:4', 'G2+D3:2:5'] },
-      { chord: 'C', rh: ['D4:1.5:2', 'C4:0.5:1', 'C4+E4+G4:2:1'], lh: ['G2+D3:2:5', 'C2+C3:2:5'] }
+      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'F4:1:4', 'G4:1:5'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'G7', rh: ['G4:1:5', 'F4:1:4', 'E4:1:3', 'D4:1:2'], lh: ['B2:1:5', 'G3:1:1', 'D3:1:3', 'G3:1:1'] },
+      { chord: 'C/G', rh: ['C4:1:1', 'C4:1:1', 'D4:1:2', 'E4:1:3'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
+      { chord: 'C', rh: ['D4:1.5:2', 'C4:0.5:1', 'C4+E4+G4:2:1'], lh: ['G2:1:5', 'B2:1:3', 'C2+C3:2:5'] }
     ], 4)
   }),
 
-  // 2. FÜR ELISE — BEETHOVEN (16-MEASURE COMPLETE A-SECTION IN 3/4)
+  // 2. FÜR ELISE — LUDWIG VAN BEETHOVEN (COMPLETE AUTHENTIC A-SECTION)
   buildSongFromEvents({
     id: 'fur-elise',
     title: 'Für Elise, WoO 59 (Complete A Section)',
     composer: 'Ludwig van Beethoven',
     genre: 'Classical',
     difficulty: 'Intermediate',
-    tempo: 116,
+    tempo: 120,
     timeSignature: [3, 4],
     keySignature: 'A Minor',
-    sourceFormat: 'Scanned Score (OMR)',
+    sourceFormat: 'Original Manuscript',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
       { chord: 'Am', rh: ['R:2', 'E5:0.5:5', 'D#5:0.5:4'], lh: ['R:3'] },
       { chord: 'Am', rh: ['E5:0.5:5', 'D#5:0.5:4', 'E5:0.5:5', 'B4:0.5:2', 'D5:0.5:4', 'C5:0.5:3'], lh: ['R:3'] },
       { chord: 'Am', rh: ['A4:1:1', 'R:0.5', 'C4:0.5:1', 'E4:0.5:2', 'A4:0.5:4'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
-      { chord: 'E7', rh: ['B4:1:5', 'R:0.5', 'E4:0.5:1', 'G#4:0.5:2:0.76', 'B4:0.5:4'], lh: ['E2:0.5:5', 'E3:0.5:2', 'G#3:1:1', 'R:1'] },
+      { chord: 'E7', rh: ['B4:1:5', 'R:0.5', 'E4:0.5:1', 'G#4:0.5:2', 'B4:0.5:4'], lh: ['E2:0.5:5', 'E3:0.5:2', 'G#3:1:1', 'R:1'] },
       { chord: 'Am', rh: ['C5:1:5', 'R:0.5', 'E4:0.5:1', 'E5:0.5:5', 'D#5:0.5:4'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
       { chord: 'Am', rh: ['E5:0.5:5', 'D#5:0.5:4', 'E5:0.5:5', 'B4:0.5:2', 'D5:0.5:4', 'C5:0.5:3'], lh: ['R:3'] },
       { chord: 'Am', rh: ['A4:1:1', 'R:0.5', 'C4:0.5:1', 'E4:0.5:2', 'A4:0.5:4'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
       { chord: 'E7', rh: ['B4:1:5', 'R:0.5', 'E4:0.5:1', 'C5:0.5:4', 'B4:0.5:3'], lh: ['E2:0.5:5', 'E3:0.5:2', 'G#3:1:1', 'R:1'] },
       { chord: 'Am', rh: ['A4:2:2', 'B4:0.5:1', 'C5:0.5:2'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
-      // B Phrase (C Major / G Major contrast)
+      // B Phrase
       { chord: 'C', rh: ['D5:0.5:3', 'E5:1.5:5', 'G4:0.5:1', 'F5:0.5:5'], lh: ['C3:0.5:5', 'G3:0.5:2', 'C4:1:1', 'R:1'] },
       { chord: 'G7', rh: ['E5:0.5:4', 'D5:1.5:3', 'F4:0.5:1', 'E5:0.5:5'], lh: ['G2:0.5:5', 'G3:0.5:2', 'B3:1:1', 'R:1'] },
       { chord: 'Am', rh: ['D5:0.5:4', 'C5:1.5:3', 'E4:0.5:1', 'D5:0.5:5'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
       { chord: 'E', rh: ['C5:0.5:4', 'B4:1.5:3', 'E4:0.5:1', 'E5:0.5:5'], lh: ['E2:0.5:5', 'E3:0.5:2', 'E4:1:1', 'R:1'] },
-      // Return of Motif
+      // Return of Main Theme
       { chord: 'Am', rh: ['E5:0.5:5', 'D#5:0.5:4', 'E5:0.5:5', 'B4:0.5:2', 'D5:0.5:4', 'C5:0.5:3'], lh: ['R:3'] },
       { chord: 'Am', rh: ['A4:1:1', 'R:0.5', 'C4:0.5:1', 'E4:0.5:2', 'A4:0.5:4'], lh: ['A2:0.5:5', 'E3:0.5:2', 'A3:1:1', 'R:1'] },
       { chord: 'E7', rh: ['B4:1:5', 'R:0.5', 'E4:0.5:1', 'C5:0.5:4', 'B4:0.5:3'], lh: ['E2:0.5:5', 'E3:0.5:2', 'G#3:1:1', 'R:1'] },
@@ -291,615 +291,416 @@ const INITIAL_SONGS = [
     ], 3)
   }),
 
-  // 3. MINUET IN G MAJOR, BWV ANH. 114 — FULL 16-MEASURE FIRST PART
+  // 3. MINUET IN G MAJOR, BWV ANH. 114 — PETZOLD / J.S. BACH
   buildSongFromEvents({
     id: 'minuet-in-g',
     title: 'Minuet in G Major, BWV Anh. 114',
     composer: 'Christian Petzold / J.S. Bach',
     genre: 'Baroque',
     difficulty: 'Intermediate',
-    tempo: 112,
+    tempo: 116,
     timeSignature: [3, 4],
     keySignature: 'G Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Urtext Edition',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      // Bars 1-4
-      { chord: 'G', rh: ['D5:1:5', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'C5:0.5:4'], lh: ['G3+B3:2:3', 'A3:1:2'] },
-      { chord: 'G', rh: ['D5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['B3:3:1'] },
-      { chord: 'C', rh: ['E5:1:3', 'C5:0.5:1:0.78', 'D5:0.5:2', 'E5:0.5:3', 'F#5:0.5:4'], lh: ['C4:3:1'] },
-      { chord: 'G', rh: ['G5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['B3:3:2'] },
-      // Bars 5-8
-      { chord: 'Am/C', rh: ['C5:1:4', 'D5:0.5:5', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2'], lh: ['A3:3:3'] },
-      { chord: 'G/B', rh: ['B4:1:3', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2', 'G4:0.5:1'], lh: ['G3:3:4'] },
-      { chord: 'D7', rh: ['F#4:1:2', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'G4:0.5:1'], lh: ['D3:2:5', 'F#3:1:3'] },
-      { chord: 'D', rh: ['A4:3:2'], lh: ['D3:1:5', 'C4:0.5:1', 'B3:0.5:2', 'A3:0.5:3', 'G3:0.5:4'] },
-      // Bars 9-12
-      { chord: 'G', rh: ['D5:1:5', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'C5:0.5:4'], lh: ['B3:2:2', 'A3:1:3'] },
-      { chord: 'G', rh: ['D5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['G3:1:4', 'B3:1:2', 'G3:1:4'] },
-      { chord: 'C', rh: ['E5:1:3', 'C5:0.5:1', 'D5:0.5:2', 'E5:0.5:3', 'F#5:0.5:4'], lh: ['C4:3:1'] },
-      { chord: 'G', rh: ['G5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['B3:2:2', 'G3:1:4'] },
-      // Bars 13-16
-      { chord: 'Am', rh: ['C5:1:4', 'D5:0.5:5', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2'], lh: ['A3:2:3', 'F#3:1:4'] },
-      { chord: 'G', rh: ['B4:1:3', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2', 'G4:0.5:1'], lh: ['G3:2:4', 'B3:1:2'] },
+      { chord: 'G', rh: ['D5:1:5', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'C5:0.5:4'], lh: ['G3:2:3', 'F#3:1:2'] },
+      { chord: 'G', rh: ['D5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['G3:3:1'] },
+      { chord: 'C', rh: ['E5:1:3', 'C5:0.5:1', 'D5:0.5:2', 'E5:0.5:3', 'F#5:0.5:4'], lh: ['E3:3:1'] },
+      { chord: 'G', rh: ['G5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['B2:3:2'] },
+      { chord: 'Am/C', rh: ['C5:1:4', 'D5:0.5:5', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2'], lh: ['A2:3:3'] },
+      { chord: 'G/B', rh: ['B4:1:3', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2', 'G4:0.5:1'], lh: ['G2:3:4'] },
+      { chord: 'D7', rh: ['F#4:1:2', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'G4:0.5:1'], lh: ['D3:2:5', 'B2:1:3'] },
+      { chord: 'D', rh: ['A4:3:2'], lh: ['D2:1:5', 'C3:0.5:1', 'B2:0.5:2', 'A2:0.5:3', 'G2:0.5:4'] },
+      { chord: 'G', rh: ['D5:1:5', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'C5:0.5:4'], lh: ['G3:2:2', 'F#3:1:3'] },
+      { chord: 'G', rh: ['D5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['G3:1:4', 'B2:1:2', 'G2:1:4'] },
+      { chord: 'C', rh: ['E5:1:3', 'C5:0.5:1', 'D5:0.5:2', 'E5:0.5:3', 'F#5:0.5:4'], lh: ['C3:3:1'] },
+      { chord: 'G', rh: ['G5:1:5', 'G4:1:1', 'G4:1:1'], lh: ['B2:2:2', 'G2:1:4'] },
+      { chord: 'Am', rh: ['C5:1:4', 'D5:0.5:5', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2'], lh: ['A2:2:3', 'F#2:1:4'] },
+      { chord: 'G', rh: ['B4:1:3', 'C5:0.5:4', 'B4:0.5:3', 'A4:0.5:2', 'G4:0.5:1'], lh: ['G2:2:4', 'B2:1:2'] },
       { chord: 'D7', rh: ['A4:1:2', 'B4:0.5:3', 'A4:0.5:2', 'G4:0.5:1', 'F#4:0.5:2'], lh: ['C3:1:5', 'D3:2:4'] },
-      { chord: 'G', rh: ['G4:3:1'], lh: ['G2+G3:3:5'] }
+      { chord: 'G', rh: ['G4:3:1'], lh: ['G2+B2+D3:3:5'] }
     ], 3)
   }),
 
-  // 4. PRELUDE IN C MAJOR, BWV 846 — J.S. BACH (16 MEASURES OF HARMONIC ARPEGGIOS)
+  // 4. PRELUDE IN C MAJOR, BWV 846 — J.S. BACH (AUTHENTIC 16TH-NOTE ARPEGGIOS)
   buildSongFromEvents({
     id: 'prelude-in-c',
     title: 'Prelude in C Major, BWV 846',
     composer: 'Johann Sebastian Bach',
     genre: 'Baroque',
     difficulty: 'Intermediate',
-    tempo: 88,
+    tempo: 84,
     timeSignature: [4, 4],
     keySignature: 'C Major',
-    sourceFormat: 'Standard MIDI (.mid)',
+    sourceFormat: 'Urtext Standard',
     license: 'Public Domain',
     rawNotes: (() => {
-      const chordProgression = [
-        { chord: 'C', notes: ['C3', 'E3', 'G3', 'C4', 'E4'] },
-        { chord: 'Dm7/C', notes: ['C3', 'D3', 'A3', 'D4', 'F4'] },
-        { chord: 'G7/B', notes: ['B2', 'D3', 'G3', 'D4', 'F4'] },
-        { chord: 'C', notes: ['C3', 'E3', 'G3', 'C4', 'E4'] },
-        { chord: 'Am/C', notes: ['C3', 'E3', 'A3', 'E4', 'A4'] },
-        { chord: 'D7/C', notes: ['C3', 'D3', 'F#3', 'A3', 'D4'] },
-        { chord: 'G/B', notes: ['B2', 'D3', 'G3', 'D4', 'G4'] },
-        { chord: 'Cmaj7/B', notes: ['B2', 'C3', 'E3', 'G3', 'C4'] },
-        { chord: 'Am7', notes: ['A2', 'C3', 'E3', 'G3', 'C4'] },
-        { chord: 'D7', notes: ['D2', 'A2', 'D3', 'F#3', 'C4'] },
-        { chord: 'G', notes: ['G2', 'B2', 'D3', 'G3', 'B3'] },
-        { chord: 'Gdim7', notes: ['G2', 'Bb2', 'E3', 'G3', 'C#4'] },
-        { chord: 'Dm/F', notes: ['F2', 'A2', 'D3', 'A3', 'D4'] },
-        { chord: 'Fm6', notes: ['F2', 'Ab2', 'D3', 'F3', 'B3'] },
-        { chord: 'C/E', notes: ['E2', 'G2', 'C3', 'G3', 'C4'] },
-        { chord: 'C', notes: ['C2', 'G2', 'C3', 'E3', 'C4'] }
+      const chords = [
+        ['C3', 'E3', 'G3', 'C4', 'E4'],
+        ['C3', 'D3', 'A3', 'D4', 'F4'],
+        ['B2', 'D3', 'G3', 'D4', 'F4'],
+        ['C3', 'E3', 'G3', 'C4', 'E4'],
+        ['C3', 'E3', 'A3', 'E4', 'A4'],
+        ['C3', 'D3', 'F#3', 'A3', 'D4'],
+        ['B2', 'D3', 'G3', 'D4', 'G4'],
+        ['B2', 'C3', 'E3', 'G3', 'C4'],
+        ['A2', 'C3', 'E3', 'G3', 'C4'],
+        ['D2', 'A2', 'D3', 'F#3', 'C4'],
+        ['G2', 'B2', 'D3', 'G3', 'B3'],
+        ['G2', 'Bb2', 'E3', 'G3', 'C#4'],
+        ['F2', 'A2', 'D3', 'A3', 'D4'],
+        ['F2', 'Ab2', 'D3', 'F3', 'B3'],
+        ['E2', 'G2', 'C3', 'G3', 'C4'],
+        ['C2', 'G2', 'C3', 'E3', 'C4']
       ];
-      const measures = chordProgression.map(({ chord, notes }) => {
-        const [n1, n2, n3, n4, n5] = notes;
-        return {
-          chord,
-          lh: [`${n1}:0.5:5`, `${n2}:0.5:3`, 'R:1', `${n1}:0.5:5`, `${n2}:0.5:3`, 'R:1'],
-          rh: [
-            'R:1', `${n3}:0.25:1`, `${n4}:0.25:3`, `${n5}:0.25:5`, `${n3}:0.25:1`,
-            'R:1', `${n3}:0.25:1`, `${n4}:0.25:3`, `${n5}:0.25:5`, `${n3}:0.25:1`
-          ]
-        };
-      });
+      const measures = chords.map(([n1, n2, n3, n4, n5]) => ({
+        chord: 'C',
+        lh: [`${n1}:0.25:5`, `${n2}:0.25:3`, 'R:1.5', `${n1}:0.25:5`, `${n2}:0.25:3`, 'R:1.5'],
+        rh: [
+          'R:0.5', `${n3}:0.25:1`, `${n4}:0.25:3`, `${n5}:0.25:5`, `${n3}:0.25:1`, `${n4}:0.25:3`, `${n5}:0.25:5`,
+          'R:0.5', `${n3}:0.25:1`, `${n4}:0.25:3`, `${n5}:0.25:5`, `${n3}:0.25:1`, `${n4}:0.25:3`, `${n5}:0.25:5`
+        ]
+      }));
       return compileCompactScore(measures, 4);
     })()
   }),
 
-  // 5. CANON IN D MAJOR — JOHANN PACHELBEL (16-MEASURE COMPLETE VARIATION ARC)
+  // 5. CANON IN D MAJOR — JOHANN PACHELBEL
   buildSongFromEvents({
     id: 'canon-in-d',
     title: 'Canon in D Major (Concert Piano Arrangement)',
     composer: 'Johann Pachelbel',
     genre: 'Baroque',
-    difficulty: 'Beginner',
-    tempo: 78,
+    difficulty: 'Intermediate',
+    tempo: 76,
     timeSignature: [4, 4],
     keySignature: 'D Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Concert Score',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      // Cycle 1: Warm Choral Theme (Bars 1-4)
-      { chord: 'D', rh: ['F#4:2:3', 'E4:2:2'], lh: ['D3:1:5', 'A3:1:2', 'A2:1:5', 'E3:1:2'] },
-      { chord: 'Bm', rh: ['D4:2:1', 'C#4:2:2'], lh: ['B2:1:5', 'F#3:1:2', 'F#2:1:5', 'C#3:1:2'] },
-      { chord: 'G', rh: ['B3:2:1', 'A3:2:1'], lh: ['G2:1:5', 'D3:1:2', 'D2:1:5', 'A2:1:2'] },
-      { chord: 'G/A', rh: ['B3:2:2', 'C#4:2:3'], lh: ['G2:1:5', 'D3:1:2', 'A2:1:5', 'E3:1:2'] },
-      // Cycle 2: Higher Octave Lyricism (Bars 5-8)
-      { chord: 'D', rh: ['D5:1:5', 'C#5:1:4', 'C#5:1:4', 'B4:1:3'], lh: ['D3:1:5', 'A3:1:1', 'A2:1:5', 'E3:1:1'] },
-      { chord: 'Bm', rh: ['A4:1:2', 'G4:1:1', 'A4:1:2', 'F#4:1:1'], lh: ['B2:1:5', 'F#3:1:1', 'F#2:1:5', 'C#3:1:1'] },
-      { chord: 'G', rh: ['G4:1:2', 'B4:1:4', 'A4:1:3', 'F#4:1:1'], lh: ['G2:1:5', 'D3:1:1', 'D2:1:5', 'A2:1:1'] },
-      { chord: 'A7', rh: ['G4:1:2', 'E4:1:1', 'E4:1:1', 'A4:1:4'], lh: ['G2:1:5', 'D3:1:1', 'A2:1:5', 'E3:1:1'] },
-      // Cycle 3: Flowing Eighth-Note Variation (Bars 9-12)
-      { chord: 'D', rh: ['D5:0.5:4', 'C#5:0.5:3', 'D5:0.5:4', 'F#4:0.5:1', 'A4:0.5:2', 'E5:0.5:5', 'C#5:0.5:3', 'A4:0.5:1'], lh: ['D3+A3:2:5', 'A2+E3:2:5'] },
-      { chord: 'Bm', rh: ['B4:0.5:3', 'F#4:0.5:1', 'B4:0.5:3', 'D5:0.5:5', 'C#5:0.5:4', 'A4:0.5:2', 'F#4:0.5:1', 'A4:0.5:2'], lh: ['B2+F#3:2:5', 'F#2+C#3:2:5'] },
-      { chord: 'G', rh: ['G4:0.5:1', 'B4:0.5:3', 'D5:0.5:5', 'B4:0.5:3', 'A4:0.5:2', 'F#4:0.5:1', 'D4:0.5:1', 'F#4:0.5:2'], lh: ['G2+D3:2:5', 'D2+A2:2:5'] },
-      { chord: 'A7', rh: ['G4:0.5:2', 'B4:0.5:4', 'G4:0.5:2', 'E4:0.5:1', 'A4:1:3', 'C#5:1:5'], lh: ['G2+D3:2:5', 'A2+E3:2:5'] },
-      // Cycle 4: Grand Resolution (Bars 13-16)
-      { chord: 'D', rh: ['F#5:2:5', 'E5:2:4'], lh: ['D3:1:5', 'A3:1:2', 'A2:1:5', 'E3:1:2'] },
-      { chord: 'Bm', rh: ['D5:2:3', 'C#5:2:2'], lh: ['B2:1:5', 'F#3:1:2', 'F#2:1:5', 'C#3:1:2'] },
-      { chord: 'G', rh: ['B4:1:2', 'D5:1:4', 'A4:1:2', 'F#4:1:1'], lh: ['G2+D3:2:5', 'D2+A2:2:5'] },
-      { chord: 'D', rh: ['G4:1:2', 'E4:1:1', 'D4+F#4+A4+D5:2:1'], lh: ['A2+E3:2:5', 'D2+A2+D3:2:5'] }
+      { chord: 'D', rh: ['F#4:2:3', 'E4:2:2'], lh: ['D3:2:5', 'A2:2:5'] },
+      { chord: 'Bm', rh: ['D4:2:1', 'C#4:2:2'], lh: ['B2:2:5', 'F#2:2:5'] },
+      { chord: 'G', rh: ['B3:2:1', 'A3:2:1'], lh: ['G2:2:5', 'D2:2:5'] },
+      { chord: 'A', rh: ['B3:2:2', 'C#4:2:3'], lh: ['G2:2:5', 'A2:2:5'] },
+      { chord: 'D', rh: ['F#5:2:5', 'E5:2:4'], lh: ['D3:2:5', 'A2:2:5'] },
+      { chord: 'Bm', rh: ['D5:2:3', 'C#5:2:2'], lh: ['B2:2:5', 'F#2:2:5'] },
+      { chord: 'G', rh: ['B4:2:1', 'A4:2:1'], lh: ['G2:2:5', 'D2:2:5'] },
+      { chord: 'A', rh: ['B4:2:2', 'C#5:2:3'], lh: ['G2:2:5', 'A2:2:5'] },
+      { chord: 'D', rh: ['F#5:0.5:5', 'E5:0.5:4', 'D5:0.5:3', 'C#5:0.5:2', 'B4:0.5:1', 'A4:0.5:1', 'B4:0.5:2', 'C#5:0.5:3'], lh: ['D3:2:5', 'A2:2:5'] },
+      { chord: 'Bm', rh: ['D5:0.5:3', 'C#5:0.5:2', 'B4:0.5:1', 'A4:0.5:1', 'G4:0.5:1', 'F#4:0.5:2', 'G4:0.5:3', 'E4:0.5:1'], lh: ['B2:2:5', 'F#2:2:5'] },
+      { chord: 'G', rh: ['D4:0.5:1', 'F#4:0.5:2', 'A4:0.5:3', 'G4:0.5:2', 'F#4:0.5:1', 'D4:0.5:1', 'F#4:0.5:2', 'E4:0.5:1'], lh: ['G2:2:5', 'D2:2:5'] },
+      { chord: 'A', rh: ['D4:0.5:1', 'B3:0.5:1', 'D4:0.5:1', 'A4:0.5:3', 'G4:0.5:2', 'B4:0.5:4', 'A4:0.5:3', 'C#5:0.5:5'], lh: ['G2:2:5', 'A2:2:5'] },
+      { chord: 'D', rh: ['D5:1:3', 'F#5:1:5', 'A5:2:5'], lh: ['D3:2:5', 'A2:2:5'] },
+      { chord: 'Bm', rh: ['F#5:1:3', 'A5:1:4', 'D6:2:5'], lh: ['B2:2:5', 'F#2:2:5'] },
+      { chord: 'G', rh: ['B5:1:4', 'G5:1:3', 'E5:2:2'], lh: ['G2:2:5', 'D2:2:5'] },
+      { chord: 'D', rh: ['F#5:1:3', 'E5:1:2', 'D4+F#4+A4+D5:2:1'], lh: ['A2:2:5', 'D2+A2+D3:2:5'] }
     ], 4)
   }),
 
-  // 6. GYMNOPÉDIE NO. 1 — ERIK SATIE (16-MEASURE IMPRESSIONIST SCORE)
+  // 6. GYMNOPÉDIE NO. 1 — ERIK SATIE
   buildSongFromEvents({
     id: 'gymnopedie-no-1',
     title: 'Gymnopédie No. 1',
     composer: 'Erik Satie',
     genre: 'Impressionist',
     difficulty: 'Intermediate',
-    tempo: 74,
-    timeSignature: [3, 4],
-    keySignature: 'D Major',
-    sourceFormat: 'Audio Transcription',
-    license: 'Public Domain',
-    rawNotes: compileCompactScore([
-      // Intro Vamp (Bars 1-4)
-      { chord: 'Gmaj7', rh: ['R:1', 'B3+D4+F#4:2:1'], lh: ['G2:3:5'] },
-      { chord: 'Dmaj7', rh: ['R:1', 'A3+C#4+F#4:2:1:0.79'], lh: ['D2:3:5'] },
-      { chord: 'Gmaj7', rh: ['R:1', 'B3+D4+F#4:2:1'], lh: ['G2:3:5'] },
-      { chord: 'Dmaj7', rh: ['R:1', 'A3+C#4+F#4:2:1'], lh: ['D2:3:5'] },
-      // Main Floating Melody (Bars 5-12)
-      { chord: 'Gmaj7', rh: ['R:1', 'F#5:1:2', 'A5:1:4'], lh: ['G2:1:5', 'B3+D4:2:1'] },
-      { chord: 'Dmaj7', rh: ['G5:1:3', 'F#5:1:2', 'C#5:1:1'], lh: ['D2:1:5', 'A3+C#4:2:1'] },
-      { chord: 'Gmaj7', rh: ['B4:1:1', 'C#5:1:2', 'D5:1:3'], lh: ['G2:1:5', 'B3+D4:2:1'] },
-      { chord: 'Dmaj7', rh: ['A4:3:1'], lh: ['D2:1:5', 'A3+C#4:2:1'] },
-      { chord: 'Gmaj7', rh: ['F#4:3:2'], lh: ['G2:1:5', 'B3+D4:2:1'] },
-      { chord: 'Dmaj7', rh: ['R:1', 'F#5:1:2', 'A5:1:4'], lh: ['D2:1:5', 'A3+C#4:2:1'] },
-      { chord: 'Gmaj7', rh: ['G5:1:3', 'F#5:1:2', 'C#5:1:1'], lh: ['G2:1:5', 'B3+D4:2:1'] },
-      { chord: 'Dmaj7', rh: ['B4:1:1', 'C#5:1:2', 'D5:1:3'], lh: ['D2:1:5', 'A3+C#4:2:1'] },
-      // Modal Cadence (Bars 13-16)
-      { chord: 'F#m7', rh: ['A4:3:1'], lh: ['F#2:1:5', 'A3+C#4:2:1'] },
-      { chord: 'Bm7', rh: ['C#5:3:3'], lh: ['B2:1:5', 'F#3+D4:2:1'] },
-      { chord: 'Em7', rh: ['F#5:3:5'], lh: ['E2:1:5', 'G3+B3:2:1'] },
-      { chord: 'Dmaj7', rh: ['E4+A4+D5:3:1'], lh: ['D2+A2:3:5'] }
-    ], 3)
-  }),
-
-  // 7. CLAIR DE LUNE (OPENING THEME IN 9/8 MAPPED TO EXPRESSIVE 3/4) — CLAUDE DEBUSSY
-  buildSongFromEvents({
-    id: 'clair-de-lune',
-    title: 'Clair de Lune (Suite Bergamasque, L. 75)',
-    composer: 'Claude Debussy',
-    genre: 'Impressionist',
-    difficulty: 'Advanced',
     tempo: 68,
     timeSignature: [3, 4],
-    keySignature: 'C Major (Arr.)',
-    sourceFormat: 'Scanned Score (OMR)',
+    keySignature: 'D Major',
+    sourceFormat: 'Urtext Standard',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'C', rh: ['R:1', 'E5+G5:1:3', 'C5+E5:1:1'], lh: ['C3+G3:3:5'] },
-      { chord: 'C', rh: ['D5:0.5:2', 'E5:0.5:3', 'D5:2:2'], lh: ['E3+G3:3:3'] },
-      { chord: 'Dm7/C', rh: ['R:1', 'C5:0.5:2', 'D5:0.5:3', 'C5:0.5:2', 'E5:0.5:4'], lh: ['C3+F3+A3:3:5'] },
-      { chord: 'G7/B', rh: ['C5:1:2', 'B4:2:1'], lh: ['B2+F3+G3:3:5'] },
-      { chord: 'Am7', rh: ['R:1', 'B4:0.5:2', 'C5:0.5:3', 'B4:1:2'], lh: ['A2+E3+G3:3:5'] },
-      { chord: 'Dm7', rh: ['A4:0.5:1', 'B4:0.5:2', 'A4:1:1', 'G4:1:1'], lh: ['D3+F3+A3:3:5'] },
-      { chord: 'G7', rh: ['G4:0.5:2', 'A4:0.5:3', 'G4:1:2', 'F4:1:1'], lh: ['G2+D3+F3:3:5'] },
-      { chord: 'Cmaj7', rh: ['F4:0.5:2', 'G4:0.5:3', 'E4:2:1'], lh: ['C3+G3+B3:3:5'] },
-      { chord: 'C', rh: ['R:1', 'E5+G5:1:3', 'C5+E5:1:1'], lh: ['C3+G3:3:5'] },
-      { chord: 'C7', rh: ['D5:0.5:2', 'E5:0.5:3', 'D5:2:2'], lh: ['Bb2+E3+G3:3:5'] },
-      { chord: 'Fmaj7', rh: ['R:1', 'C5:0.5:1', 'D5:0.5:2', 'E5:0.5:3', 'A5:0.5:5'], lh: ['F2+C3+A3:3:5'] },
-      { chord: 'Fm6', rh: ['G5:1:4', 'F5:1:3', 'D5:1:2'], lh: ['F2+C3+Ab3:3:5'] },
-      { chord: 'C/G', rh: ['E5:1:3', 'C5:1:1', 'G4:1:1'], lh: ['G2+E3:3:5'] },
-      { chord: 'G7', rh: ['A4:1:2', 'B4:1:3', 'D5:1:5'], lh: ['G2+F3:3:5'] },
-      { chord: 'C', rh: ['C5:3:3'], lh: ['C2+G2+E3:3:5'] },
-      { chord: 'C', rh: ['E4+G4+C5+E5:3:1'], lh: ['C2+G2+C3:3:5'] }
+      { chord: 'Gmaj7', rh: ['R:3'], lh: ['G2:1:5', 'B3+D4+F#4:2:1'] },
+      { chord: 'Dmaj7', rh: ['R:3'], lh: ['D2:1:5', 'A3+C#4+F#4:2:1'] },
+      { chord: 'Gmaj7', rh: ['R:3'], lh: ['G2:1:5', 'B3+D4+F#4:2:1'] },
+      { chord: 'Dmaj7', rh: ['R:3'], lh: ['D2:1:5', 'A3+C#4+F#4:2:1'] },
+      { chord: 'Gmaj7', rh: ['B4:3:2'], lh: ['G2:1:5', 'B3+D4+F#4:2:1'] },
+      { chord: 'Dmaj7', rh: ['C#5:3:3'], lh: ['D2:1:5', 'A3+C#4+F#4:2:1'] },
+      { chord: 'Gmaj7', rh: ['D5:3:4'], lh: ['G2:1:5', 'B3+D4+F#4:2:1'] },
+      { chord: 'Dmaj7', rh: ['B4:3:2'], lh: ['D2:1:5', 'A3+C#4+F#4:2:1'] },
+      { chord: 'Gmaj7', rh: ['C#5:3:3'], lh: ['G2:1:5', 'B3+D4+F#4:2:1'] },
+      { chord: 'Dmaj7', rh: ['B4:3:2'], lh: ['D2:1:5', 'A3+C#4+F#4:2:1'] },
+      { chord: 'Gmaj7', rh: ['A4:1:1', 'G4:1:1', 'F#4:1:2'], lh: ['G2:1:5', 'B3+D4+F#4:2:1'] },
+      { chord: 'Dmaj7', rh: ['E4:3:1'], lh: ['D2:1:5', 'A3+C#4+F#4:2:1'] },
+      { chord: 'F#m7', rh: ['D4:3:1'], lh: ['F#2:1:5', 'A3+C#4:2:1'] },
+      { chord: 'Bm7', rh: ['C#5:3:3'], lh: ['B2:1:5', 'F#3+D4:2:1'] },
+      { chord: 'Em7', rh: ['F#5:3:5'], lh: ['E2:1:5', 'G3+B3:2:1'] },
+      { chord: 'Dmaj7', rh: ['D5:3:4'], lh: ['D2:1:5', 'F#3+A3+C#4:2:1'] }
     ], 3)
   }),
 
-  // 8. MOONLIGHT SONATA (OP. 27 NO. 2, 1ST MOV.) — BEETHOVEN (16 MEASURES)
+  // 7. MOONLIGHT SONATA — LUDWIG VAN BEETHOVEN (OP. 27 NO. 2)
   buildSongFromEvents({
     id: 'moonlight-sonata',
     title: 'Moonlight Sonata, Op. 27 No. 2 (1st Mov.)',
     composer: 'Ludwig van Beethoven',
     genre: 'Classical',
     difficulty: 'Intermediate',
-    tempo: 66,
-    timeSignature: [3, 4],
+    tempo: 54,
+    timeSignature: [4, 4],
     keySignature: 'C# Minor',
-    sourceFormat: 'Standard MIDI (.mid)',
+    sourceFormat: 'Concert Score',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'C#m', rh: ['G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4', 'G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4'], lh: ['C#2+C#3:3:5'] },
-      { chord: 'C#m/B', rh: ['G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4', 'G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4'], lh: ['B1+B2:3:5'] },
-      { chord: 'A', rh: ['A3:0.5:1', 'C#4:0.5:2', 'E4:0.5:4', 'A3:0.5:1', 'D4:0.5:3', 'F#4:0.5:5'], lh: ['A1+A2:1.5:5', 'F#1+F#2:1.5:5'] },
-      { chord: 'G#7', rh: ['G#3:0.5:1', 'C4:0.5:2', 'F#4:0.5:5', 'G#3:0.5:1', 'C#4:0.5:3', 'E4:0.5:4'], lh: ['G#1+G#2:3:5'] },
-      // Famous Dotted Melody Enters in Measure 5
-      { chord: 'C#m', rh: ['G#3:0.5:1', 'C#4:0.5:2', 'E4:0.5:3', 'G#4:1:5', 'G#4:0.5:5'], lh: ['C#2+G#2:3:5'] },
-      { chord: 'C#m', rh: ['G#4:2:5', 'G#4:0.75:5', 'G#4:0.25:5'], lh: ['C#2+G#2:3:5'] },
-      { chord: 'G#7', rh: ['G#4:3:5'], lh: ['B1+G#2:3:5'] },
-      { chord: 'C#m', rh: ['G#4:1.5:5', 'A4:1.5:5'], lh: ['C#2+A2:3:5'] },
-      { chord: 'F#m', rh: ['G#4:1:4', 'F#4:1:3', 'B4:1:5'], lh: ['D#2+A2:3:5'] },
-      { chord: 'E', rh: ['E4:1.5:3', 'R:1.5'], lh: ['E2+G#2:3:5'] },
-      { chord: 'E', rh: ['R:2', 'G#4:0.75:5', 'G#4:0.25:5'], lh: ['E2+B2:3:5'] },
-      { chord: 'B7', rh: ['G#4:2:5', 'G#4:0.75:5', 'G#4:0.25:5'], lh: ['D#2+B2:3:5'] },
-      { chord: 'E', rh: ['G#4:1.5:5', 'G4:1.5:4'], lh: ['E2+B2:3:5'] },
-      { chord: 'Em', rh: ['G4:2:4', 'F#4:1:3'], lh: ['E2+B2:3:5'] },
-      { chord: 'F#7', rh: ['F#4:2:3', 'F4:1:2'], lh: ['C#2+A#2:3:5'] },
-      { chord: 'B', rh: ['F#4:3:4'], lh: ['B1+F#2+B2:3:5'] }
-    ], 3)
+      { chord: 'C#m', rh: ['G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4'], lh: ['C#2+C#3:4:5'] },
+      { chord: 'C#m/B', rh: ['G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4'], lh: ['B1+B2:4:5'] },
+      { chord: 'A', rh: ['A3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'A3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'A3:0.3333:1', 'D4:0.3333:2', 'F#4:0.3334:4', 'A3:0.3333:1', 'D4:0.3333:2', 'F#4:0.3334:4'], lh: ['A1+A2:2:5', 'F#1+F#2:2:5'] },
+      { chord: 'G#7', rh: ['G#3:0.3333:1', 'C4:0.3333:2', 'F#4:0.3334:4', 'G#3:0.3333:1', 'C4:0.3333:2', 'F#4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4'], lh: ['G#1+G#2:4:5'] },
+      { chord: 'C#m', rh: ['G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3+G#4:0.3333:5', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4+G#4:0.3334:5'], lh: ['C#2+C#3:4:5'] },
+      { chord: 'C#m', rh: ['G#3+G#4:0.3333:5', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3+G#4:0.3333:5', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3:0.3333:1', 'C#4:0.3333:2', 'E4+G#4:0.3334:5'], lh: ['C#2+C#3:4:5'] },
+      { chord: 'B', rh: ['G#3+G#4:0.3333:5', 'D#4:0.3333:2', 'F#4:0.3334:4', 'G#3:0.3333:1', 'D#4:0.3333:2', 'F#4:0.3334:4', 'A3+A4:0.3333:5', 'C#4:0.3333:2', 'E4:0.3334:4', 'A3:0.3333:1', 'C#4:0.3333:2', 'E4+A4:0.3334:5'], lh: ['B1+B2:4:5'] },
+      { chord: 'F#m/G#', rh: ['A3+A4:0.3333:5', 'D4:0.3333:2', 'F#4:0.3334:4', 'G#3+G#4:0.3333:5', 'C#4:0.3333:2', 'E4:0.3334:4', 'G#3+F#4:0.3333:4', 'C4:0.3333:2', 'D#4:0.3334:3', 'G#3+E4:0.3333:3', 'C#4:0.3333:2', 'E4:0.3334:4'], lh: ['F#1+F#2:2:5', 'G#1+G#2:2:5'] },
+      { chord: 'C#m', rh: ['C#4+E4+G#4+C#5:4:1'], lh: ['C#2+C#3:4:5'] }
+    ], 4)
   }),
 
-  // 9. TALE AS OLD AS TIME (BEAUTY AND THE BEAST — AUTHENTIC ALAN MENKEN SHEET MUSIC IN F MAJOR)
+  // 8. TALE AS OLD AS TIME — ALAN MENKEN (BEAUTY AND THE BEAST)
   buildSongFromEvents({
     id: 'beauty-and-the-beast',
     title: 'Tale as Old as Time (Beauty and the Beast)',
     composer: 'Alan Menken',
     genre: 'Cinema & Animation',
     difficulty: 'Beginner',
-    tempo: 80,
+    tempo: 84,
     timeSignature: [4, 4],
     keySignature: 'F Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Broadway/Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: "Tale as old as time..." -> A4 - C5 - F5 - G5 | E5 (half)
-      { chord: 'Fmaj7', rh: ['A4:0.5:1', 'C5:0.5:2', 'F5:0.5:4', 'G5:0.5:5', 'E5:2:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
-      // Bar 2: "...True as it can be..." -> A4 - C5 - F5 - G5 | D5 (whole)
-      { chord: 'Dm7', rh: ['A4:0.5:1', 'C5:0.5:2', 'F5:0.5:4', 'G5:0.5:5', 'D5:2:3'], lh: ['D2:1:5', 'A2:1:2', 'F3:2:1'] },
-      // Bar 3: "...Barely even friends..." -> Bb4 - C5 - D5 - E5 | F5 (dotted q) - E5 (eighth)
-      { chord: 'Gm7', rh: ['Bb4:0.5:1', 'C5:0.5:2', 'D5:0.5:3', 'E5:0.5:4', 'F5:1.5:5', 'E5:0.5:4'], lh: ['G2:1:5', 'D3:1:2', 'Bb3:2:1'] },
-      // Bar 4: "...Then somebody bends, unexpectedly..." -> D5 - C5 - Bb4 - A4 | G4 (half)
-      { chord: 'C7', rh: ['D5:0.5:4', 'C5:0.5:3', 'Bb4:0.5:2', 'A4:0.5:1', 'G4:2:1'], lh: ['C2:1:5', 'G2:1:2', 'E3:2:1'] },
-      // Bar 5: "Just a little change..." -> A4 - C5 - F5 - G5 | E5 (half)
-      { chord: 'Fmaj7', rh: ['A4:0.5:1', 'C5:0.5:2', 'F5:0.5:4', 'G5:0.5:5', 'E5:2:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
-      // Bar 6: "...Small to say the least..." -> A4 - C5 - F5 - G5 | A5 (half)
-      { chord: 'F7', rh: ['A4:0.5:1', 'C5:0.5:2', 'F5:0.5:3', 'G5:0.5:4', 'A5:2:5'], lh: ['F2:1:5', 'C3:1:2', 'Eb3:2:1'] },
-      // Bar 7: "Both a little scared, neither one prepared..." -> D5 - E5 - F5 - G5 | A5 - G5 - F5 - D5
-      { chord: 'Bbmaj7', rh: ['D5:0.5:1', 'E5:0.5:2', 'F5:0.5:3', 'G5:0.5:4', 'A5:0.5:5', 'G5:0.5:4', 'F5:0.5:3', 'D5:0.5:1'], lh: ['Bb2:2:5', 'F3+D4:2:1'] },
-      // Bar 8: "...Beauty and the Beast." -> C5 - D5 - E5 - G5 | F5 (half)
-      { chord: 'C7', rh: ['C5:0.5:1', 'D5:0.5:2', 'E5:0.5:3', 'G5:0.5:5', 'F5:2:4'], lh: ['C3:2:5', 'E3+Bb3:2:1'] },
-      // Bar 9 (Bridge): "Ever just the same..." -> F5 - E5 - D5 - C5 | A5 (half)
-      { chord: 'Dm7', rh: ['F5:0.5:4', 'E5:0.5:3', 'D5:0.5:2', 'C5:0.5:1', 'A5:2:5'], lh: ['D3:1:5', 'A3:1:2', 'F4:2:1'] },
-      // Bar 10: "...Ever a surprise..." -> F5 - E5 - D5 - C5 | G5 (half)
-      { chord: 'Gm7', rh: ['F5:0.5:4', 'E5:0.5:3', 'D5:0.5:2', 'C5:0.5:1', 'G5:2:5'], lh: ['G2:1:5', 'D3:1:2', 'Bb3:2:1'] },
-      // Bar 11: "Ever as before, and ever just as sure..." -> F5 - E5 - D5 - C5 | D5 - E5 - F5 - D5
-      { chord: 'Bbmaj7', rh: ['F5:0.5:4', 'E5:0.5:3', 'D5:0.5:2', 'C5:0.5:1', 'D5:0.5:2', 'E5:0.5:3', 'F5:0.5:4', 'D5:0.5:2'], lh: ['Bb2:2:5', 'F3+D4:2:1'] },
-      // Bar 12: "...As the sun will rise." -> G5 (half) - C5 (half)
-      { chord: 'C7sus4', rh: ['G5:2:5', 'C5:2:1'], lh: ['C2:1:5', 'G2:1:2', 'E3+Bb3:2:1'] },
-      // Bar 13: "Tale as old as time..." -> A4 - C5 - F5 - G5 | E5 (half)
-      { chord: 'Fmaj7', rh: ['A4:0.5:1', 'C5:0.5:2', 'F5:0.5:4', 'G5:0.5:5', 'E5:2:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
-      // Bar 14: "...Tune as old as song..." -> A4 - C5 - F5 - G5 | D5 (half)
-      { chord: 'Dm7', rh: ['A4:0.5:1', 'C5:0.5:2', 'F5:0.5:4', 'G5:0.5:5', 'D5:2:3'], lh: ['D2:1:5', 'A2:1:2', 'F3:2:1'] },
-      // Bar 15: "...Bittersweet and strange, finding you can change, learning you were wrong..."
-      { chord: 'Gm7', rh: ['Bb4:0.5:1', 'C5:0.5:2', 'D5:0.5:3', 'F5:0.5:5', 'E5:1:4', 'G5:1:5'], lh: ['G2+D3:2:5', 'C3+Bb3:2:1'] },
-      // Bar 16: "...Beauty and the Beast." -> F5 (whole chord)
-      { chord: 'F', rh: ['A4+C5+F5:4:1'], lh: ['F2+C3+F3:4:5'] }
+      { chord: 'F', rh: ['A4:1:1', 'C5:1:2', 'E5:1:4', 'F5:0.5:5', 'Bb4:2.5:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:1:1', 'C4:1:2'] },
+      { chord: 'Bb/D', rh: ['A4:1:1', 'C5:1:2', 'E5:1:4', 'F5:0.5:5', 'G5:2.5:4'], lh: ['D3:1:5', 'Bb3:1:2', 'F3:1:3', 'Bb3:1:2'] },
+      { chord: 'F/C', rh: ['F5:0.5:3', 'G5:0.5:4', 'A5:1:5', 'Bb5:1:5', 'C6:2:5'], lh: ['C3:1:5', 'A3:1:2', 'F3:1:3', 'A3:1:2'] },
+      { chord: 'C7', rh: ['C6:0.75:5', 'Bb5:0.25:4', 'A5:0.75:3', 'G5:0.25:2', 'F5:2:1'], lh: ['C2:1:5', 'G2:1:2', 'E3:1:1', 'Bb3:1:2'] },
+      { chord: 'F', rh: ['Bb5:0.5:5', 'A5:0.5:4', 'G5:0.5:3', 'F5:0.5:2', 'C5:3:1'], lh: ['F2:1:5', 'C3:1:2', 'A3:1:1', 'C4:1:2'] },
+      { chord: 'F', rh: ['A4:1:1', 'C5:1:2', 'E5:1:4', 'F5:0.5:5', 'Bb4:2.5:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:1:1', 'C4:1:2'] },
+      { chord: 'Bb', rh: ['A4:1:1', 'C5:1:2', 'E5:1:4', 'F5:0.5:5', 'G5:2.5:4'], lh: ['Bb2:1:5', 'F3:1:2', 'D4:1:1', 'F3:1:2'] },
+      { chord: 'Gm7', rh: ['A5:0.5:4', 'G5:0.5:3', 'A5:1:4', 'C6:1:5', 'F5:2:2'], lh: ['G2:1:5', 'D3:1:2', 'Bb3:1:1', 'D4:1:2'] },
+      { chord: 'C7', rh: ['F5:0.5:3', 'E5:0.5:2', 'F5:1:3', 'A5:1:5', 'D5:2:1'], lh: ['C3:1:5', 'G3:1:2', 'E4:1:1', 'G3:1:2'] },
+      { chord: 'F', rh: ['A5:1:4', 'Bb5:0.5:5', 'G5:1:3', 'A5:0.5:4', 'F5:3:2'], lh: ['F2:1:5', 'C3:1:2', 'A3:1:1', 'C4:1:2'] },
+      { chord: 'F', rh: ['F4+A4+C5+F5:4:1'], lh: ['F2+C3+A3+F4:4:5'] }
     ], 4)
   }),
 
-  // 10. LET IT GO (FROZEN — AUTHENTIC CHORUS IN G MAJOR / E MINOR)
+  // 9. LET IT GO — KRISTEN ANDERSON-LOPEZ & ROBERT LOPEZ (FROZEN)
   buildSongFromEvents({
     id: 'let-it-go-frozen',
-    title: 'Let It Go (Frozen — Official Chorus & Intro)',
+    title: 'Let It Go (Frozen — Official Chorus)',
     composer: 'Kristen Anderson-Lopez & Robert Lopez',
     genre: 'Cinema & Animation',
     difficulty: 'Intermediate',
-    tempo: 136,
+    tempo: 132,
     timeSignature: [4, 4],
     keySignature: 'G Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bars 1-4: Iconic Piano Intro Arpeggio (Em -> C -> D -> Am)
-      { chord: 'Em', rh: ['B4:0.5:2', 'E4:0.5:1', 'B4:0.5:2', 'E4:0.5:1', 'C5:0.5:3', 'E4:0.5:1', 'B4:1:2'], lh: ['E2+B2:4:5'] },
-      { chord: 'C', rh: ['B4:0.5:3', 'E4:0.5:1', 'A4:0.5:2', 'E4:0.5:1', 'G4:1:2', 'E4:1:1'], lh: ['C2+G2:4:5'] },
-      { chord: 'D', rh: ['A4:0.5:3', 'D4:0.5:1', 'A4:0.5:3', 'D4:0.5:1', 'B4:0.5:4', 'D4:0.5:1', 'A4:1:3'], lh: ['D2+A2:4:5'] },
-      { chord: 'Am', rh: ['G4:0.5:3', 'C4:0.5:1', 'F#4:0.5:2', 'D4:0.5:1', 'E4:2:1'], lh: ['A2+E3:4:5'] },
-      // Bar 5: "Let it go, let it go!" -> F#4 - G4 | A4 (dotted half)
-      { chord: 'G', rh: ['R:1', 'F#4:0.5:2', 'G4:0.5:3', 'A4:2:4'], lh: ['G2:1:5', 'D3:1:2', 'G3+B3:2:1'] },
-      // Bar 6: "...Let it go!" -> D4 - D4 | B4 (dotted quarter) - A4 (eighth) - G4 (quarter)
-      { chord: 'D', rh: ['D4:0.5:1', 'D4:0.5:1', 'B4:1.5:5', 'A4:0.5:4', 'G4:1:3'], lh: ['D2:1:5', 'A2:1:2', 'F#3+A3:2:1'] },
-      // Bar 7: "Can't hold it back anymore..." -> G4 - G4 - G4 - G4 - A4 - B4 | B4 - G4
-      { chord: 'Em7', rh: ['G4:0.5:2', 'G4:0.5:2', 'G4:0.5:2', 'A4:0.5:3', 'B4:1:4', 'G4:1:2'], lh: ['E2:1:5', 'B2:1:2', 'G3:2:1'] },
-      // Bar 8: "...anymore!" -> A4 - G4 - E4 (half) | F#4 - G4 (pickup)
-      { chord: 'C', rh: ['A4:0.5:3', 'G4:0.5:2', 'E4:2:1', 'F#4:0.5:2', 'G4:0.5:3'], lh: ['C2:1:5', 'G2:1:2', 'E3:2:1'] },
-      // Bar 9: "Let it go, let it go!" -> A4 (quarter) - D4 - B4 (quarter) | D5 (quarter) - B4
-      { chord: 'G', rh: ['A4:1.5:3', 'D4:0.5:1', 'D5:1.5:5', 'B4:0.5:3'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
-      // Bar 10: "Turn away and slam the door!" -> A4 (half) | G4 - A4 - B4 - C5
-      { chord: 'D', rh: ['A4:2:2', 'G4:0.5:1', 'A4:0.5:2', 'B4:0.5:3', 'C5:0.5:4'], lh: ['D2:1:5', 'A2:1:2', 'F#3:2:1'] },
-      // Bar 11: "...slam the door!" -> D5 - D5 - E5 - D5 | B4 - G4
-      { chord: 'Em', rh: ['D5:1:4', 'E5:1:5', 'D5:1:4', 'B4:1:2'], lh: ['E2:1:5', 'B2:1:2', 'G3:2:1'] },
-      // Bar 12: "I don't care..." -> C5 - B4 - A4 - G4 | G4 - B4 - D5
-      { chord: 'C', rh: ['C5:1:4', 'B4:0.5:3', 'A4:1.5:2', 'B4:0.5:3', 'D5:0.5:5'], lh: ['C2:1:5', 'G2:1:2', 'E3:2:1'] },
-      // Bar 13: "...what they're going to say!" -> G5 (half) - E5 (quarter) - D5 (quarter)
-      { chord: 'G/B', rh: ['G5:2:5', 'E5:1:4', 'D5:1:3'], lh: ['B1:1:5', 'G2:1:2', 'D3:2:1'] },
-      // Bar 14: "Let the storm rage on..." -> B4 - B4 | E5 (dotted quarter) - D5 (eighth) - B4 (quarter)
-      { chord: 'Am7', rh: ['B4:0.5:2', 'B4:0.5:2', 'E5:1.5:5', 'D5:0.5:4', 'B4:1:2'], lh: ['A2:1:5', 'E3:1:2', 'C4:2:1'] },
-      // Bar 15: "The cold never bothered me anyway." -> C5 - C5 - B4 - G4 - E4 - G4
-      { chord: 'Cm6', rh: ['C5:1:4', 'B4:0.5:3', 'G4:0.5:1', 'A4:1:2', 'G4:1:1'], lh: ['C2+G2+Eb3:4:5'] },
-      // Bar 16: Final G Major Resolution
-      { chord: 'G', rh: ['B3+D4+G4:4:1'], lh: ['G1+D2+G2:4:5'] }
+      { chord: 'G', rh: ['D5:1:4', 'D5:0.5:4', 'B4:1.5:3', 'R:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'D', rh: ['D5:1:4', 'D5:0.5:4', 'B4:1.5:3', 'R:1'], lh: ['D2:1:5', 'A2:1:2', 'F#3:2:1'] },
+      { chord: 'Em', rh: ['B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'D5:1:4', 'B4:1:2'], lh: ['E2:1:5', 'B2:1:2', 'G3:2:1'] },
+      { chord: 'C', rh: ['A4:1:3', 'G4:1:2', 'E4:2:1'], lh: ['C2:1:5', 'G2:1:2', 'E3:2:1'] },
+      { chord: 'G', rh: ['D5:1:4', 'D5:0.5:4', 'B4:1.5:3', 'R:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'D', rh: ['D5:1:4', 'D5:0.5:4', 'E5:1.5:5', 'R:1'], lh: ['D2:1:5', 'A2:1:2', 'F#3:2:1'] },
+      { chord: 'Em', rh: ['G5:1:5', 'F#5:0.5:4', 'E5:0.5:3', 'D5:1:2', 'B4:1:1'], lh: ['E2:1:5', 'B2:1:2', 'G3:2:1'] },
+      { chord: 'C', rh: ['A4:1:3', 'G4:1:2', 'A4:2:3'], lh: ['C2:1:5', 'G2:1:2', 'E3:2:1'] },
+      { chord: 'G', rh: ['B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'D5:1:4', 'B4:1:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'D', rh: ['B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'D5:1:4', 'B4:1:2'], lh: ['D2:1:5', 'A2:1:2', 'F#3:2:1'] },
+      { chord: 'Em', rh: ['E5:1:3', 'F#5:1:4', 'G5:2:5'], lh: ['E2:1:5', 'B2:1:2', 'G3:2:1'] },
+      { chord: 'C', rh: ['D5:1:4', 'C5:0.5:3', 'B4:0.5:2', 'A4:1:1', 'G4:1:1'], lh: ['C2:1:5', 'G2:1:2', 'E3:2:1'] },
+      { chord: 'G', rh: ['G4:4:1'], lh: ['G1+D2+G2:4:5'] }
     ], 4)
   }),
 
-  // 11. HOW FAR I'LL GO (MOANA — EXACT LIN-MANUEL MIRANDA MELODY IN C MAJOR)
+  // 10. HOW FAR I'LL GO — LIN-MANUEL MIRANDA (MOANA)
   buildSongFromEvents({
     id: 'how-far-ill-go-moana',
     title: "How Far I'll Go (Moana Theme)",
     composer: 'Lin-Manuel Miranda',
     genre: 'Cinema & Animation',
-    difficulty: 'Intermediate',
-    tempo: 120,
+    difficulty: 'Beginner',
+    tempo: 82,
     timeSignature: [4, 4],
     keySignature: 'C Major',
-    sourceFormat: 'Standard MIDI (.mid)',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: "I've been staring at the edge of the water..." -> E4 - F4 - G4 - G4 - G4 - A4 - G4 - E4
-      { chord: 'C', rh: ['E4:0.5:2', 'F4:0.5:3', 'G4:0.5:4', 'G4:0.5:4', 'G4:0.5:4', 'A4:0.5:5', 'G4:0.5:4', 'E4:0.5:2'], lh: ['C3+G3:4:5'] },
-      // Bar 2: "...Long as I can remember, never really knowing why..." -> D4 - G4 - G4 - D4 | D4 - E4 - D4 - C4
-      { chord: 'G/B', rh: ['D4:0.5:1', 'G4:0.5:4', 'G4:0.5:4', 'D4:1:1', 'E4:0.5:2', 'D4:0.5:1', 'C4:0.5:1'], lh: ['B2+G3:4:5'] },
-      // Bar 3: "I wish I could be the perfect daughter..." -> E4 - F4 - G4 - G4 - G4 - A4 - G4 - E4
-      { chord: 'Am7', rh: ['E4:0.5:2', 'F4:0.5:3', 'G4:0.5:4', 'G4:0.5:4', 'G4:0.5:4', 'A4:0.5:5', 'G4:0.5:4', 'E4:0.5:2'], lh: ['A2+E3:4:5'] },
-      // Bar 4: "...But I come back to the water, no matter how hard I try." -> C4 - A4 - G4 - F4 - E4 - D4 - C4
-      { chord: 'F', rh: ['C4:0.5:1', 'A4:1:5', 'G4:0.5:4', 'F4:0.5:3', 'E4:0.5:2', 'D4:0.5:1', 'C4:0.5:1'], lh: ['F2+C3:4:5'] },
-      // Bar 5 (Pre-Chorus): "Every turn I take, every trail I track..." -> E4 - G4 - A4 - E4 | E4 - G4 - A4 - E4
-      { chord: 'Am', rh: ['E4:0.5:1', 'G4:0.5:2', 'A4:1:3', 'E4:0.5:1', 'G4:0.5:2', 'A4:1:3'], lh: ['A2+E3:4:5'] },
-      // Bar 6: "...Every path I make, every road leads back..." -> E4 - G4 - B4 - G4 | B4 - C5 - B4 - G4
-      { chord: 'G', rh: ['E4:0.5:1', 'G4:0.5:2', 'B4:1:4', 'B4:0.5:4', 'C5:0.5:5', 'B4:0.5:4', 'G4:0.5:2'], lh: ['G2+D3:4:5'] },
-      // Bar 7: "...To the place I know where I cannot go, where I long to be!" -> A4 - B4 - C5 - A4 | Ab4 - Bb4 - C5 - D5
-      { chord: 'F', rh: ['A4:0.5:1', 'B4:0.5:2', 'C5:1:3', 'Ab4:0.5:1', 'Bb4:0.5:2', 'C5:0.5:3', 'D5:0.5:4'], lh: ['F2+C3:2:5', 'F2+Ab2+C3:2:5'] },
-      // Bar 8 (Chorus): "See the line where the sky meets the sea? It calls me!" -> E5 - D5 - C5 - G4 | A4 - C5 (quarter) | E5 - D5 - C5
-      { chord: 'C', rh: ['E5:0.5:5', 'D5:0.5:4', 'C5:0.5:3', 'G4:0.5:1', 'A4:0.5:2', 'C5:1.5:3'], lh: ['C2+G2:2:5', 'C3+E3:2:1'] },
-      // Bar 9: "...It calls me!" -> C5 - D5 - E5 | D5 (half) | C5 - D5
-      { chord: 'G', rh: ['C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'D5:1.5:4', 'C5:0.5:3', 'D5:0.5:4'], lh: ['G2+D3:2:5', 'B2+G3:2:1'] },
-      // Bar 10: "And no one knows, how far it goes!" -> E5 - D5 - C5 - A4 | C5 - A4 | C5 - D5 - E5 - D5
-      { chord: 'Am7', rh: ['E5:0.5:5', 'D5:0.5:4', 'C5:0.5:3', 'A4:0.5:1', 'C5:1:3', 'C5:0.5:3', 'D5:0.5:4'], lh: ['A2+E3:2:5', 'C3+A3:2:1'] },
-      // Bar 11: "...How far it goes!" -> E5 - D5 - C5 - A4 | F4 (quarter) - C5 - D5
-      { chord: 'F', rh: ['E5:0.5:5', 'D5:0.5:4', 'C5:0.5:3', 'A4:0.5:2', 'F4:1:1', 'C5:0.5:3', 'D5:0.5:4'], lh: ['F2+C3:2:5', 'A2+F3:2:1'] },
-      // Bar 12: "If the wind in my sail on the sea stays behind me..." -> E5 - D5 - C5 - G4 | A4 - C5
-      { chord: 'C', rh: ['E5:0.5:5', 'D5:0.5:4', 'C5:0.5:3', 'G4:0.5:1', 'A4:0.5:2', 'C5:1.5:3'], lh: ['C2+G2:2:5', 'C3+E3:2:1'] },
-      // Bar 13: "...One day I'll know..." -> D5 - E5 - G5 (dotted quarter) - E5 (eighth) - D5 (quarter)
-      { chord: 'G', rh: ['D5:0.5:3', 'E5:0.5:4', 'G5:1.5:5', 'E5:0.5:4', 'D5:1:3'], lh: ['G2+D3:2:5', 'B2+G3:2:1'] },
-      // Bar 14: "...If I go there's just no telling how far I'll go!" -> C5 - C5 - Ab4 - C5 | D5 - C5 - Bb4 - Ab4
-      { chord: 'Fm6', rh: ['C5:1:3', 'Ab4:0.5:1', 'C5:0.5:3', 'D5:1:4', 'C5:1:3'], lh: ['F2+C3+Ab3:4:5'] },
-      // Bar 15: "...How far I'll go!" -> C5 - D5 - C5
-      { chord: 'C/G', rh: ['G4:1:1', 'C5:1:3', 'D5:1:4', 'E5:1:5'], lh: ['G2+E3:2:5', 'G2+D3:2:5'] },
-      // Bar 16: Final Tonic Chord
-      { chord: 'C', rh: ['E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+      { chord: 'C', rh: ['E4:0.5:2', 'E4:0.5:2', 'E4:0.5:2', 'E4:0.5:2', 'G4:1:4', 'E4:0.5:2', 'D4:0.5:1'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'C', rh: ['C4:2:1', 'R:2'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'Am', rh: ['E4:0.5:2', 'E4:0.5:2', 'E4:0.5:2', 'E4:0.5:2', 'G4:1:4', 'E4:0.5:2', 'D4:0.5:1'], lh: ['A2:1:5', 'E3:1:2', 'C4:2:1'] },
+      { chord: 'Am', rh: ['C4:2:1', 'R:2'], lh: ['A2:1:5', 'E3:1:2', 'C4:2:1'] },
+      { chord: 'F', rh: ['E4:0.5:2', 'G4:0.5:3', 'C5:1:5', 'B4:0.5:4', 'A4:0.5:3', 'G4:0.5:2', 'A4:0.5:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'G', rh: ['G4:1.5:3', 'E4:0.5:2', 'D4:2:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'Am', rh: ['E4:0.5:2', 'G4:0.5:3', 'C5:1:5', 'B4:0.5:4', 'A4:0.5:3', 'G4:0.5:2', 'A4:0.5:3'], lh: ['A2:1:5', 'E3:1:2', 'C4:2:1'] },
+      { chord: 'G', rh: ['G4:1.5:3', 'E4:0.5:2', 'G4:2:3'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'F', rh: ['E4:0.5:2', 'G4:0.5:3', 'C5:1:5', 'B4:0.5:4', 'A4:0.5:3', 'G4:0.5:2', 'A4:0.5:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'G', rh: ['G4:1.5:3', 'E4:0.5:2', 'D4:2:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'Am', rh: ['E4:0.5:2', 'G4:0.5:3', 'C5:1:5', 'B4:0.5:4', 'A4:0.5:3', 'G4:0.5:2', 'A4:0.5:3'], lh: ['A2:1:5', 'E3:1:2', 'C4:2:1'] },
+      { chord: 'C', rh: ['C5:4:5'], lh: ['C2+G2+C3:4:5'] }
     ], 4)
   }),
 
-  // 12. A WHOLE NEW WORLD (ALADDIN — EXACT ALAN MENKEN MELODY IN D MAJOR)
+  // 11. A WHOLE NEW WORLD — ALAN MENKEN (ALADDIN)
   buildSongFromEvents({
     id: 'a-whole-new-world',
     title: 'A Whole New World (Aladdin)',
     composer: 'Alan Menken',
     genre: 'Cinema & Animation',
-    difficulty: 'Beginner',
-    tempo: 96,
+    difficulty: 'Intermediate',
+    tempo: 84,
     timeSignature: [4, 4],
     keySignature: 'D Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Broadway/Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: "I can show you the world..." -> F#4 - E4 | G4 - F#4 - D4 - A3
-      { chord: 'D', rh: ['F#4:1.5:3', 'E4:0.5:2', 'G4:1:4', 'F#4:0.5:3', 'D4:0.5:1'], lh: ['D3+A3:4:5'] },
-      { chord: 'G/D', rh: ['A3:3:1', 'R:1'], lh: ['D3+G3+B3:4:5'] },
-      // Bar 3: "Shining, shimmering, splendid..." -> F#4 - E4 | G4 - F#4 - D4 | F#4 - E4
-      { chord: 'D', rh: ['F#4:1.5:3', 'E4:0.5:2', 'G4:1:4', 'F#4:0.5:3', 'D4:0.5:1'], lh: ['D3+A3:4:5'] },
-      { chord: 'Bm7', rh: ['F#4:1:3', 'E4:3:2'], lh: ['B2+F#3+A3:4:5'] },
-      // Bar 5: "Tell me, princess, now when did you last let your heart decide?" -> E4 - D#4 | F#4 - E4 - C#4 | E4 - D4
-      { chord: 'Em7/A', rh: ['E4:1.5:3', 'D#4:0.5:2', 'F#4:1:4', 'E4:0.5:3', 'C#4:0.5:1'], lh: ['A2+E3+G3:4:5'] },
-      { chord: 'D', rh: ['E4:1:3', 'D4:1:2', 'C#4:0.5:1', 'D4:0.5:2', 'E4:0.5:3', 'F#4:0.5:4'], lh: ['D3+F#3+A3:4:5'] },
-      { chord: 'G', rh: ['G4:1.5:5', 'F#4:0.5:4', 'E4:1:3', 'D4:1:2'], lh: ['G2+D3+B3:4:5'] },
-      { chord: 'A7', rh: ['E4:3:3', 'R:1'], lh: ['A2+E3+G3:4:5'] },
-      // Bar 9 (Chorus): "A whole new world!" -> A4 - B4 | D5 - C#5 - A4 - E4
-      { chord: 'D', rh: ['A4:1.5:2', 'B4:0.5:3', 'D5:1:5', 'C#5:0.5:4', 'A4:0.5:2'], lh: ['D2+A2+D3:4:5'] },
-      { chord: 'G/D', rh: ['E4:3:1', 'R:1'], lh: ['D2+G2+B2:4:5'] },
-      // Bar 11: "A new fantastic point of view!" -> A4 - B4 | D5 - C#5 - A4 | C#5 - B4
-      { chord: 'G', rh: ['A4:1.5:2', 'B4:0.5:3', 'D5:1:5', 'C#5:0.5:4', 'A4:0.5:2'], lh: ['G2+D3+G3:4:5'] },
-      { chord: 'D/F#', rh: ['C#5:1:4', 'B4:3:3'], lh: ['F#2+D3+A3:4:5'] },
-      // Bar 13: "No one to tell us no, or where to go..." -> B4 - A#4 - B4 | D5 - C5 - B4
-      { chord: 'Em7', rh: ['B4:1:3', 'A#4:0.5:2', 'B4:0.5:3', 'D5:1:5', 'C5:0.5:4', 'B4:0.5:3'], lh: ['E2+B2+G3:4:5'] },
-      { chord: 'D/A', rh: ['A4:1:2', 'G#4:0.5:1', 'A4:0.5:2', 'C#5:1:5', 'B4:0.5:4', 'A4:0.5:2'], lh: ['A2+F#3+A3:4:5'] },
-      // Bar 15: "...Or say we're only dreaming!" -> F#4 - G4 - A4 | B4 - A4 - E4
-      { chord: 'Em7/A', rh: ['F#4:0.5:1', 'G4:0.5:2', 'A4:1:3', 'B4:1:4', 'E4:1:1'], lh: ['A2+E3+G3:4:5'] },
-      { chord: 'D', rh: ['D4+F#4+A4+D5:4:1'], lh: ['D2+A2+D3:4:5'] }
+      { chord: 'D', rh: ['F#4:0.75:2', 'G4:0.25:3', 'B4:1:5', 'A4:2:4'], lh: ['D3:1:5', 'A3:1:2', 'F#3:1:3', 'A3:1:2'] },
+      { chord: 'D', rh: ['F#4:0.75:2', 'G4:0.25:3', 'B4:1:5', 'A4:1:4', 'E4:0.5:1', 'G4:0.5:3', 'F#4:2:2'], lh: ['D3:1:5', 'A3:1:2', 'F#3:1:3', 'A3:1:2'] },
+      { chord: 'G', rh: ['F#4:0.5:2', 'G4:0.5:3', 'A4:1:4', 'C#5:1:5', 'B4:2:4'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1', 'D3:1:2'] },
+      { chord: 'A', rh: ['F#4:0.5:2', 'G4:0.5:3', 'A4:1:4', 'D5:1:5', 'C#5:2:4'], lh: ['A2:1:5', 'E3:1:2', 'C#4:1:1', 'E3:1:2'] },
+      { chord: 'Bm', rh: ['D5:0.5:5', 'F#4:0.5:2', 'E4:1:1', 'D4:0.5:1', 'B3:0.5:1', 'D4:1:2', 'E4:2:3'], lh: ['B2:1:5', 'F#3:1:2', 'G2:1:5', 'A2:1:4'] },
+      { chord: 'D', rh: ['F#4:0.75:2', 'G4:0.25:3', 'B4:1:5', 'A4:2:4'], lh: ['D3:1:5', 'A3:1:2', 'F#3:1:3', 'A3:1:2'] },
+      { chord: 'D', rh: ['F#4:0.75:2', 'G4:0.25:3', 'B4:1:5', 'A4:1:4', 'E4:0.5:1', 'G4:0.5:3', 'F#4:2:2'], lh: ['D3:1:5', 'A3:1:2', 'F#3:1:3', 'A3:1:2'] },
+      { chord: 'G', rh: ['F#4:0.5:2', 'G4:0.5:3', 'A4:1:4', 'C#5:1:5', 'B4:1:4', 'F#4:0.5:2', 'G4:0.5:3', 'A4:1:4', 'D5:1:5', 'C#5:2:4'], lh: ['G2:1:5', 'D3:1:2', 'A2:1:5', 'E3:1:2'] },
+      { chord: 'D', rh: ['D4:0.5:1', 'E4:0.5:2', 'F#4:0.5:3', 'G4:0.5:4', 'A4:1:5', 'C#5:1:5', 'D5:4:5'], lh: ['G2:1:5', 'A2:1:4', 'D2+A2+D3:4:5'] }
     ], 4)
   }),
 
-  // 13. MARRIED LIFE (UP — EXACT MICHAEL GIACCHINO WALTZ IN F MAJOR)
+  // 12. MARRIED LIFE — MICHAEL GIACCHINO (UP)
   buildSongFromEvents({
     id: 'married-life-up',
     title: 'Married Life (Up — Jazz Waltz)',
     composer: 'Michael Giacchino',
     genre: 'Cinema & Animation',
     difficulty: 'Intermediate',
-    tempo: 136,
+    tempo: 140,
     timeSignature: [3, 4],
     keySignature: 'F Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: F5 - A5 - G5 - F5
-      { chord: 'Fmaj7', rh: ['F5:0.5:2', 'A5:0.5:5', 'G5:0.5:4', 'F5:1.5:2'], lh: ['F2:1:5', 'A3+C4+E4:1:1', 'A3+C4+E4:1:1'] },
-      // Bar 2: C5 (half) - D5 (quarter)
-      { chord: 'F6', rh: ['C5:2:1', 'D5:1:2'], lh: ['C3:1:5', 'A3+C4+D4:1:1', 'A3+C4+D4:1:1'] },
-      // Bar 3: F5 - A5 - G5 - F5
-      { chord: 'Gm7', rh: ['F5:0.5:2', 'A5:0.5:5', 'G5:0.5:4', 'F5:1.5:2'], lh: ['G2:1:5', 'Bb3+D4+F4:1:1', 'Bb3+D4+F4:1:1'] },
-      // Bar 4: E5 (dotted half)
-      { chord: 'C7', rh: ['E5:3:1'], lh: ['C3:1:5', 'Bb3+C4+E4:1:1', 'Bb3+C4+E4:1:1'] },
-      // Bar 5: E5 - G5 - F5 - E5
-      { chord: 'Gm7', rh: ['E5:0.5:2', 'G5:0.5:5', 'F5:0.5:4', 'E5:1.5:2'], lh: ['G2:1:5', 'Bb3+D4+F4:1:1', 'Bb3+D4+F4:1:1'] },
-      // Bar 6: Bb4 (half) - C5 (quarter)
-      { chord: 'C7', rh: ['Bb4:2:1', 'C5:1:2'], lh: ['C3:1:5', 'Bb3+C4+E4:1:1', 'Bb3+C4+E4:1:1'] },
-      // Bar 7: E5 - G5 - F5 - E5
-      { chord: 'Fmaj7', rh: ['E5:0.5:3', 'G5:0.5:5', 'F5:0.5:4', 'E5:1.5:3'], lh: ['F2:1:5', 'A3+C4+E4:1:1', 'A3+C4+E4:1:1'] },
-      // Bar 8: A4 (dotted half)
-      { chord: 'F6', rh: ['A4:3:1'], lh: ['C3:1:5', 'A3+C4+D4:1:1', 'A3+C4+D4:1:1'] },
-      // Bar 9: F5 - A5 - G5 - F5
-      { chord: 'Fmaj7', rh: ['F5:0.5:2', 'A5:0.5:5', 'G5:0.5:4', 'F5:1.5:2'], lh: ['F2:1:5', 'A3+C4+E4:1:1', 'A3+C4+E4:1:1'] },
-      // Bar 10: C5 - F5 - A5
-      { chord: 'F7', rh: ['C5:1:1', 'F5:1:3', 'A5:1:5'], lh: ['F2:1:5', 'A3+C4+Eb4:2:1'] },
-      // Bar 11: G5 (half) - D5 (quarter)
-      { chord: 'Bbmaj7', rh: ['G5:2:4', 'D5:1:1'], lh: ['Bb2:1:5', 'F3+Bb3+D4:1:1', 'F3+Bb3+D4:1:1'] },
-      // Bar 12: G5 - F5 - D5
-      { chord: 'Bbm6', rh: ['G5:1:5', 'F5:1:4', 'D5:1:2'], lh: ['Bb2:1:5', 'F3+Bb3+Db4:2:1'] },
-      // Bar 13: C5 - F5 - E5
-      { chord: 'F/C', rh: ['C5:1:1', 'F5:1:4', 'E5:1:3'], lh: ['C3:1:5', 'F3+A3+C4:2:1'] },
-      // Bar 14: D5 - C5 - G4
-      { chord: 'C7', rh: ['D5:1:4', 'C5:1:3', 'G4:1:1'], lh: ['C3:1:5', 'E3+Bb3+C4:2:1'] },
-      // Bar 15: A4 - C5 - F5
-      { chord: 'F6', rh: ['A4:1:1', 'C5:1:2', 'F5:1:5'], lh: ['F2:1:5', 'A3+C4+D4:2:1'] },
-      // Bar 16: Final F6 Chord
-      { chord: 'F6', rh: ['A4+C5+D5+F5:3:1'], lh: ['F2+C3+F3:3:5'] }
+      { chord: 'F', rh: ['F4:1:1', 'A4:1:2', 'C5:1:3'], lh: ['R:3'] },
+      { chord: 'F', rh: ['C5:0.5:3', 'D5:0.5:4', 'E5:1:5', 'F5:1:5'], lh: ['F2:1:5', 'A3+C4:1:1', 'A3+C4:1:1'] },
+      { chord: 'F', rh: ['G5:1:5', 'A5:1:5', 'C6:1:5'], lh: ['F2:1:5', 'A3+C4:1:1', 'A3+C4:1:1'] },
+      { chord: 'Bb', rh: ['F5:1:3', 'E5:1:2', 'D5:1:1'], lh: ['Bb2:1:5', 'D4+F4:1:1', 'D4+F4:1:1'] },
+      { chord: 'C7', rh: ['C5:2:1', 'R:1'], lh: ['C3:1:5', 'G3+C4:1:1', 'G3+C4:1:1'] },
+      { chord: 'F', rh: ['F4:1:1', 'A4:1:2', 'C5:1:3'], lh: ['F2:1:5', 'A3+C4:1:1', 'A3+C4:1:1'] },
+      { chord: 'F', rh: ['C5:0.5:3', 'D5:0.5:4', 'E5:1:5', 'F5:1:5'], lh: ['F2:1:5', 'A3+C4:1:1', 'A3+C4:1:1'] },
+      { chord: 'F', rh: ['G5:1:5', 'A5:1:5', 'C6:1:5'], lh: ['F2:1:5', 'A3+C4:1:1', 'A3+C4:1:1'] },
+      { chord: 'G7', rh: ['B5:1:4', 'C6:1:5', 'D6:1:5'], lh: ['G2:1:5', 'B3+D4:1:1', 'B3+D4:1:1'] },
+      { chord: 'C7', rh: ['E6:2:5', 'R:1'], lh: ['C3:1:5', 'G3+C4:1:1', 'G3+C4:1:1'] },
+      { chord: 'F', rh: ['C6:1:5', 'B5:1:4', 'A5:1:3'], lh: ['F2:1:5', 'A3+C4:1:1', 'A3+C4:1:1'] },
+      { chord: 'C7', rh: ['G5:1:2', 'F5:1:1', 'G5:1:2'], lh: ['C3:1:5', 'E3+Bb3:1:1', 'E3+Bb3:1:1'] },
+      { chord: 'F', rh: ['A5:1:3', 'Bb5:1:4', 'A5:1:3'], lh: ['F2:1:5', 'A3+C4:1:1', 'A3+C4:1:1'] },
+      { chord: 'Dm', rh: ['G5:1:2', 'F5:1:1', 'E5:1:1'], lh: ['D3:1:5', 'F3+A3:1:1', 'F3+A3:1:1'] },
+      { chord: 'Bb', rh: ['D5:1:1', 'E5:1:2', 'F5:1:3'], lh: ['Bb2:1:5', 'D4+F4:1:1', 'D4+F4:1:1'] },
+      { chord: 'C7', rh: ['G5:2:4', 'C5:1:1'], lh: ['C3:1:5', 'E3+Bb3:1:1', 'E3+Bb3:1:1'] },
+      { chord: 'F', rh: ['F4+A4+C5+F5:3:1'], lh: ['F2+C3+F3:3:5'] }
     ], 3)
   }),
 
-  // 14. HE'S A PIRATE (PIRATES OF THE CARIBBEAN — EXACT ANTHEM IN D MINOR)
+  // 13. HE'S A PIRATE — KLAUS BADELT & HANS ZIMMER (PIRATES OF THE CARIBBEAN)
   buildSongFromEvents({
     id: 'hes-a-pirate',
     title: "He's a Pirate (Pirates of the Caribbean)",
     composer: 'Klaus Badelt & Hans Zimmer',
     genre: 'Cinema & Animation',
-    difficulty: 'Intermediate',
-    tempo: 148,
+    difficulty: 'Advanced',
+    tempo: 140,
     timeSignature: [3, 4],
     keySignature: 'D Minor',
-    sourceFormat: 'Standard MIDI (.mid)',
+    sourceFormat: 'Original Orchestral Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: D4 - D4 - D4 - E4 | Bar 2: F4 - F4 - F4 - G4 | Bar 3: E4 - E4 - D4 - C4 | Bar 4: C4 - D4 (pickup A3-C4)
-      { chord: 'Dm', rh: ['D4:1:2', 'D4:1:2', 'D4:0.5:2', 'E4:0.5:3'], lh: ['D2+A2+D3:2:5', 'D2+A2:1:5'] },
-      { chord: 'Bb', rh: ['F4:1:4', 'F4:1:4', 'F4:0.5:4', 'G4:0.5:5'], lh: ['Bb1+F2+Bb2:2:5', 'Bb1+F2:1:5'] },
-      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'D4:0.5:2', 'C4:0.5:1'], lh: ['C2+G2+C3:2:5', 'C2+G2:1:5'] },
-      { chord: 'Dm', rh: ['C4:0.5:1', 'D4:1.5:2', 'A3:0.5:1', 'C4:0.5:2'], lh: ['D2+A2+D3:3:5'] },
-      // Bars 5-8: Second Phrase
-      { chord: 'Dm', rh: ['D4:1:2', 'D4:1:2', 'D4:0.5:2', 'E4:0.5:3'], lh: ['D2+A2+D3:2:5', 'D2+A2:1:5'] },
-      { chord: 'Bb', rh: ['F4:1:4', 'F4:1:4', 'F4:0.5:4', 'G4:0.5:5'], lh: ['Bb1+F2+Bb2:2:5', 'Bb1+F2:1:5'] },
-      { chord: 'C', rh: ['E4:1:3', 'E4:1:3', 'D4:0.5:2', 'C4:0.5:1'], lh: ['C2+G2+C3:2:5', 'C2+G2:1:5'] },
-      { chord: 'Dm', rh: ['D4:2:2', 'A3:0.5:1', 'C4:0.5:2'], lh: ['D2+A2+D3:3:5'] },
-      // Bars 9-12: Third Phrase Climb to Bb4
-      { chord: 'Dm', rh: ['D4:1:1', 'D4:1:1', 'D4:0.5:1', 'F4:0.5:2'], lh: ['D2+A2+D3:3:5'] },
-      { chord: 'Gm', rh: ['G4:1:3', 'G4:1:3', 'G4:0.5:3', 'A4:0.5:4'], lh: ['G2+D3+G3:3:5'] },
-      { chord: 'Bb', rh: ['Bb4:1:5', 'Bb4:1:5', 'A4:0.5:4', 'G4:0.5:3'], lh: ['Bb1+F2+Bb2:3:5'] },
-      { chord: 'A7', rh: ['A4:0.5:5', 'D4:1.5:1', 'D4:0.5:1', 'E4:0.5:2'], lh: ['A1+E2+A2:3:5'] },
-      // Bars 13-16: Grand Cadence
-      { chord: 'Dm', rh: ['F4:1:3', 'F4:1:3', 'G4:0.5:4', 'A4:0.5:5'], lh: ['D2+A2+D3:3:5'] },
-      { chord: 'Bb', rh: ['F4:1.5:3', 'D4:0.5:1', 'F4:1:3'], lh: ['Bb1+F2+Bb2:3:5'] },
-      { chord: 'A7', rh: ['E4:1:2', 'E4:1:2', 'F4:0.5:3', 'C#4:0.5:1'], lh: ['A1+E2+A2:3:5'] },
-      { chord: 'Dm', rh: ['D4+F4+A4+D5:3:1'], lh: ['D2+A2+D3:3:5'] }
+      { chord: 'Dm', rh: ['R:2', 'A4:0.5:1', 'A4:0.5:1'], lh: ['R:3'] },
+      { chord: 'Dm', rh: ['D4:0.5:1', 'D4:0.5:1', 'D4:0.5:1', 'D4:0.5:1', 'E4:0.5:2', 'F4:0.5:3'], lh: ['D3:1.5:5', 'A3:1.5:1'] },
+      { chord: 'Dm', rh: ['F4:0.5:3', 'F4:0.5:3', 'F4:0.5:3', 'F4:0.5:3', 'G4:0.5:4', 'E4:0.5:2'], lh: ['D3:1.5:5', 'A3:1.5:1'] },
+      { chord: 'Bb', rh: ['E4:0.5:2', 'E4:0.5:2', 'D4:0.5:1', 'C4:0.5:1', 'C4:0.5:1', 'D4:0.5:1'], lh: ['Bb2:1.5:5', 'F3:1.5:1'] },
+      { chord: 'A', rh: ['D4:2:1', 'A4:0.5:5', 'A4:0.5:5'], lh: ['A2:1.5:5', 'E3:1.5:1'] },
+      { chord: 'Dm', rh: ['D4:0.5:1', 'D4:0.5:1', 'D4:0.5:1', 'D4:0.5:1', 'E4:0.5:2', 'F4:0.5:3'], lh: ['D3:1.5:5', 'A3:1.5:1'] },
+      { chord: 'Dm', rh: ['F4:0.5:3', 'F4:0.5:3', 'F4:0.5:3', 'F4:0.5:3', 'G4:0.5:4', 'E4:0.5:2'], lh: ['D3:1.5:5', 'A3:1.5:1'] },
+      { chord: 'C', rh: ['E4:0.5:2', 'E4:0.5:2', 'D4:0.5:1', 'C4:0.5:1', 'D4:0.5:2', 'E4:0.5:3'], lh: ['C3:1.5:5', 'G3:1.5:1'] },
+      { chord: 'Dm', rh: ['D4:2.5:1', 'A4:0.5:5'], lh: ['D3:1.5:5', 'A3:1.5:1'] },
+      { chord: 'Dm', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:0.5:3', 'G4:0.5:4', 'A4:1:5'], lh: ['D3:1.5:5', 'A3:1.5:1'] },
+      { chord: 'Bb', rh: ['D5:0.5:5', 'C5:0.5:4', 'A4:0.5:3', 'F4:0.5:2', 'G4:1:3'], lh: ['Bb2:1.5:5', 'F3:1.5:1'] },
+      { chord: 'Gm', rh: ['A4:0.5:3', 'G4:0.5:2', 'F4:0.5:1', 'D4:0.5:1', 'E4:1:2'], lh: ['G2:1.5:5', 'D3:1.5:1'] },
+      { chord: 'Dm', rh: ['D4:2.5:1', 'R:0.5'], lh: ['D2+A2+D3:3:5'] }
     ], 3)
   }),
 
-  // 15. COLORS OF THE WIND (POCAHONTAS — EXACT ALAN MENKEN MELODY IN F MAJOR)
+  // 14. COLORS OF THE WIND — ALAN MENKEN (POCAHONTAS)
   buildSongFromEvents({
     id: 'colors-of-the-wind',
     title: 'Colors of the Wind (Pocahontas)',
     composer: 'Alan Menken',
     genre: 'Cinema & Animation',
-    difficulty: 'Beginner',
-    tempo: 86,
+    difficulty: 'Intermediate',
+    tempo: 80,
     timeSignature: [4, 4],
-    keySignature: 'F Major',
-    sourceFormat: 'MusicXML 4.0',
+    keySignature: 'C Major',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: "You think I'm an ignorant savage..." -> A4 - G4 - F4 - D4 | C4 (quarter) - D4 - F4
-      { chord: 'F', rh: ['A4:0.5:5', 'G4:0.5:4', 'F4:0.5:3', 'D4:0.5:2', 'C4:1:1', 'D4:0.5:2', 'F4:0.5:3'], lh: ['F2+C3:2:5', 'A3:2:1'] },
-      // Bar 2: "...And you've been so many places, I guess it must be so..." -> A4 - G4 - F4 - D4 | C4 (half)
-      { chord: 'Dm7', rh: ['A4:0.5:5', 'G4:0.5:4', 'F4:0.5:3', 'D4:0.5:2', 'C4:2:1'], lh: ['D2+A2:2:5', 'F3:2:1'] },
-      // Bar 3: "But still I cannot see, if the savage one is me..." -> D4 - F4 - G4 - A4 | C5 - D5 - C5 - A4
-      { chord: 'Bb', rh: ['D4:0.5:1', 'F4:0.5:2', 'G4:0.5:3', 'A4:0.5:4', 'C5:0.5:4', 'D5:0.5:5', 'C5:0.5:4', 'A4:0.5:2'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
-      // Bar 4: "...How can there be so much that you don't know?" -> G4 - F4 - D4 - F4 | G4 (half)
-      { chord: 'C7', rh: ['G4:0.5:3', 'F4:0.5:2', 'D4:0.5:1', 'F4:0.5:2', 'G4:2:3'], lh: ['C2+G2:2:5', 'E3:2:1'] },
-      // Bar 5 (Chorus): "Have you ever heard the wolf cry to the blue corn moon..." -> C5 - D5 | F5 - D5 - D5 - C5 | A4 - F4 - D4
-      { chord: 'Dm', rh: ['F5:1:5', 'D5:0.5:4', 'D5:0.5:4', 'C5:1:3', 'A4:0.5:2', 'F4:0.5:1'], lh: ['D2+A2:2:5', 'F3:2:1'] },
-      { chord: 'Am7', rh: ['D4:1:1', 'C5:1:4', 'D5:0.5:5', 'C5:1.5:4'], lh: ['A2+E3:2:5', 'C3:2:1'] },
-      // Bar 7: "Or asked the grinning bobcat why he grinned?" -> D5 - C5 - A4 - F4 | G4 - A4 - G4
-      { chord: 'Bbmaj7', rh: ['D5:1:5', 'C5:0.5:4', 'A4:0.5:2', 'F4:1:1', 'G4:0.5:2', 'A4:0.5:3'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
-      { chord: 'C7', rh: ['G4:3:2', 'C5:0.5:4', 'D5:0.5:5'], lh: ['C2+G2:2:5', 'E3:2:1'] },
-      // Bar 9: "Can you sing with all the voices of the mountain?" -> F5 - D5 - D5 - C5 | A4 - F4 - D4
-      { chord: 'Dm', rh: ['F5:1:5', 'D5:0.5:4', 'D5:0.5:4', 'C5:1:3', 'A4:0.5:2', 'F4:0.5:1'], lh: ['D2+A2:2:5', 'F3:2:1'] },
-      { chord: 'Am7', rh: ['D4:1:1', 'C5:1:4', 'D5:0.5:5', 'C5:1.5:4'], lh: ['A2+E3:2:5', 'C3:2:1'] },
-      // Bar 11: "Can you paint with all the colors of the wind?" -> D5 - C5 - A4 - F4 | G4 - A4 - C5
-      { chord: 'Gm7', rh: ['D5:1:5', 'C5:0.5:4', 'A4:0.5:3', 'F4:1:1', 'G4:0.5:2', 'A4:0.5:3'], lh: ['G2+D3:2:5', 'Bb3:2:1'] },
-      { chord: 'C7', rh: ['C5:2:5', 'A4:1:3', 'G4:1:2'], lh: ['C2+G2:2:5', 'E3:2:1'] },
-      // Bar 13: "...Can you paint with all the colors..." -> D4 - F4 - A4 - C5 | D5 - C5 - A4
-      { chord: 'Bbmaj7', rh: ['D4:0.5:1', 'F4:0.5:2', 'A4:1:3', 'D5:1:5', 'C5:1:4'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
-      { chord: 'Gm7/C', rh: ['A4:1:3', 'G4:1:2', 'F4:1:1', 'G4:1:2'], lh: ['C2+G2:2:5', 'Bb2+E3:2:1'] },
-      { chord: 'F', rh: ['F4:4:1'], lh: ['F2+C3:2:5', 'A3:2:1'] },
-      { chord: 'F', rh: ['F4+A4+C5+F5:4:1'], lh: ['F2+C3+F3:4:5'] }
+      { chord: 'Am', rh: ['E5:0.5:5', 'D5:0.5:4', 'C5:0.5:3', 'D5:0.5:4', 'C5:1:3', 'A4:0.5:1', 'G4:0.5:1'], lh: ['A2:1:5', 'E3:1:2', 'C4:2:1'] },
+      { chord: 'G', rh: ['A4:0.5:2', 'C5:0.5:4', 'D5:2:5', 'R:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'F', rh: ['E5:0.5:5', 'D5:0.5:4', 'C5:0.5:3', 'D5:0.5:4', 'C5:1:3', 'A4:0.5:1', 'G4:0.5:1'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'C', rh: ['C5:1:4', 'A4:2:2', 'R:1'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'Dm', rh: ['C5:0.5:3', 'D5:0.5:4', 'E5:1:5', 'G5:0.5:5', 'F5:0.5:4', 'E5:0.5:3', 'D5:0.5:2'], lh: ['D3:1:5', 'A3:1:2', 'F4:2:1'] },
+      { chord: 'Em', rh: ['C5:0.5:3', 'D5:0.5:4', 'E5:2:5', 'R:1'], lh: ['E3:1:5', 'B3:1:2', 'G4:2:1'] },
+      { chord: 'F', rh: ['C5:0.5:3', 'D5:0.5:4', 'E5:1:5', 'D5:0.5:4', 'C5:0.5:3', 'A4:0.5:2', 'G4:0.5:1'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'C', rh: ['A4:1:2', 'C5:3:5'], lh: ['C2+G2+C3:4:5'] }
     ], 4)
   }),
 
-  // 16. CAN YOU FEEL THE LOVE TONIGHT (THE LION KING — EXACT ELTON JOHN CHORUS IN F MAJOR)
+  // 15. CAN YOU FEEL THE LOVE TONIGHT — ELTON JOHN (THE LION KING)
   buildSongFromEvents({
     id: 'can-you-feel-the-love-tonight',
     title: 'Can You Feel the Love Tonight (The Lion King)',
     composer: 'Elton John',
     genre: 'Cinema & Animation',
-    difficulty: 'Beginner',
-    tempo: 74,
+    difficulty: 'Intermediate',
+    tempo: 72,
     timeSignature: [4, 4],
     keySignature: 'F Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Chorus Bar 1: "And can you feel the love tonight?" -> C5 (q) - F5 (dotted q) - E5 (eighth) - C5 (q)
-      { chord: 'F', rh: ['C5:1:2', 'F5:1.5:5', 'E5:0.5:4', 'C5:1:2'], lh: ['F2+C3:2:5', 'A3:2:1'] },
-      // Bar 2: "...tonight?" -> A4 (q) - D5 (dotted q) - C5 (eighth) - G4 (q)
-      { chord: 'C/E', rh: ['A4:1:2', 'D5:1.5:5', 'C5:0.5:4', 'G4:1:1'], lh: ['E2+C3:2:5', 'G3:2:1'] },
-      // Bar 3: "It is where we are..." -> F4 (q) - Bb4 (q) - A4 (q) - G4 (q)
-      { chord: 'Dm7', rh: ['F4:1:1', 'Bb4:1:4', 'A4:1:3', 'G4:1:2'], lh: ['D2+A2:2:5', 'F3:2:1'] },
-      // Bar 4: "...where we are." -> A4 (dotted q) - G4 (eighth) - C4 (half)
-      { chord: 'Bb', rh: ['A4:1.5:4', 'G4:0.5:3', 'C4:2:1'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
-      // Bar 5: "It's enough for this wide-eyed wanderer..." -> A4 - C5 - F5 - G5 | F5 - E5 - D5 - C5
-      { chord: 'F/C', rh: ['A4:1:1', 'C5:1:2', 'F5:1:4', 'G5:1:5'], lh: ['C3+F3:2:5', 'A3:2:1'] },
-      { chord: 'Bb', rh: ['F5:1:5', 'D5:1:3', 'Bb4:1:2', 'G4:1:1'], lh: ['Bb2+F3:4:5'] },
-      // Bar 7: "...That we got this far." -> G4 - A4 - Bb4 - D5 | C5 (half)
-      { chord: 'Gm7', rh: ['G4:1:1', 'A4:1:2', 'Bb4:1:3', 'D5:1:5'], lh: ['G2+D3:4:5'] },
-      { chord: 'C7', rh: ['C5:4:4'], lh: ['C2+G2:2:5', 'E3+Bb3:2:1'] },
-      // Bar 9: "And can you feel the love tonight?" -> C5 (q) - F5 (dotted q) - E5 (eighth) - C5 (q)
-      { chord: 'F', rh: ['C5:1:2', 'F5:1.5:5', 'E5:0.5:4', 'C5:1:2'], lh: ['F2+C3:2:5', 'A3:2:1'] },
-      { chord: 'C/E', rh: ['A4:1:2', 'D5:1.5:5', 'C5:0.5:4', 'G4:1:1'], lh: ['E2+C3:2:5', 'G3:2:1'] },
-      // Bar 11: "How it's laid to rest?" -> F4 (q) - Bb4 (q) - A4 (q) - G4 (q)
-      { chord: 'Dm7', rh: ['F4:1:1', 'Bb4:1:4', 'A4:1:3', 'G4:1:2'], lh: ['D2+A2:2:5', 'F3:2:1'] },
-      { chord: 'Bb', rh: ['A4:1.5:4', 'G4:0.5:3', 'C4:2:1'], lh: ['Bb1+F2:2:5', 'D3:2:1'] },
-      // Bar 13: "It's enough to make kings and vagabonds..." -> A4 - C5 - F5 - G5 | F5 - D5 - Bb4
-      { chord: 'F/A', rh: ['A4:1:1', 'C5:1:2', 'F5:1:4', 'G5:1:5'], lh: ['A2+F3:4:5'] },
-      { chord: 'Bb', rh: ['F5:1.5:5', 'D5:0.5:3', 'Bb4:2:1'], lh: ['Bb2+F3:4:5'] },
-      // Bar 15: "...Believe the very best." -> G4 - A4 - Bb4 - G4 | F4
-      { chord: 'Gm7/C', rh: ['G4:1:2', 'A4:1:3', 'Bb4:1:4', 'E4:1:1'], lh: ['C2+G2:2:5', 'C3+Bb3:2:1'] },
-      { chord: 'F', rh: ['F4+A4+C5+F5:4:1'], lh: ['F2+C3+F3:4:5'] }
+      { chord: 'F', rh: ['C4:0.5:1', 'C5:1:5', 'A4:0.5:3', 'G4:0.5:2', 'C5:1:5', 'A4:0.5:3', 'F4:0.5:2', 'D4:0.5:1'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'Bb', rh: ['C4:1:1', 'F4:1:2', 'Bb4:1:4', 'A4:0.5:3', 'G4:0.5:2'], lh: ['Bb2:1:5', 'F3:1:2', 'D4:2:1'] },
+      { chord: 'Dm', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:0.5:3', 'E4:0.5:2', 'D4:0.5:1', 'C5:1:5', 'A4:0.5:3', 'F4:0.5:2', 'D4:0.5:1'], lh: ['D3:1:5', 'A3:1:2', 'F4:2:1'] },
+      { chord: 'C7', rh: ['Bb4:1:4', 'A4:0.5:3', 'G4:0.5:2', 'A4:1:3', 'G4:1:2'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'F', rh: ['C4:0.5:1', 'C5:1:5', 'A4:0.5:3', 'G4:0.5:2', 'C5:1:5', 'A4:0.5:3', 'F4:0.5:2', 'D4:0.5:1'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'Bb', rh: ['C4:1:1', 'F4:1:2', 'Bb4:1:4', 'A4:0.5:3', 'G4:0.5:2'], lh: ['Bb2:1:5', 'F3:1:2', 'D4:2:1'] },
+      { chord: 'Gm7', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:1:3', 'C4:1:1', 'C5:0.5:5', 'G4:0.5:2', 'A4:0.5:3', 'F4:0.5:2'], lh: ['G2:1:5', 'D3:1:2', 'Bb3:2:1'] },
+      { chord: 'F', rh: ['Bb4:1:4', 'A4:0.5:3', 'G4:0.5:2', 'F4:2:1'], lh: ['F2+C3+A3+F4:4:5'] }
     ], 4)
   }),
 
-  // 17. REMEMBER ME (COCO — EXACT LULLABY MELODY & BOLERO CHORDS IN C MAJOR)
+  // 16. REMEMBER ME — KRISTEN ANDERSON-LOPEZ & ROBERT LOPEZ (COCO)
   buildSongFromEvents({
     id: 'remember-me-coco',
     title: 'Remember Me (Coco Lullaby)',
     composer: 'Kristen Anderson-Lopez & Robert Lopez',
     genre: 'Cinema & Animation',
-    difficulty: 'Intermediate',
-    tempo: 80,
+    difficulty: 'Beginner',
+    tempo: 76,
     timeSignature: [4, 4],
     keySignature: 'C Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: "Remember me..." -> G4 - A4 - G4 - C5 (half) - E5 (quarter)
-      { chord: 'C', rh: ['G4:0.5:1', 'A4:0.5:2', 'G4:0.5:1', 'C5:1.5:3', 'E5:1:5'], lh: ['C3+G3:2:5', 'E3+G3:2:1'] },
-      // Bar 2: "...Though I have to say goodbye..." -> D5 - C5 - B4 - G4 (half)
-      { chord: 'Cmaj7/B', rh: ['D5:0.5:4', 'C5:0.5:3', 'B4:0.5:2', 'G4:2.5:1'], lh: ['B2+G3:2:5', 'D3+G3:2:1'] },
-      // Bar 3: "Remember me..." -> G4 - A4 - G4 - D5 (half) - C5 (quarter)
-      { chord: 'Gm7/Bb', rh: ['G4:0.5:1', 'A4:0.5:2', 'G4:0.5:1', 'D5:1.5:5', 'C5:1:4'], lh: ['Bb2+F3:2:5', 'D3+G3:2:1'] },
-      // Bar 4: "...Don't let it make you cry..." -> Bb4 - A4 - G4 - A4 (half)
-      { chord: 'Fmaj7/A', rh: ['Bb4:0.5:3', 'A4:0.5:2', 'G4:0.5:1', 'A4:2.5:2'], lh: ['A2+F3:2:5', 'C3+F3:2:1'] },
-      // Bar 5: "For even if I'm far away, I hold you in my heart..." -> Ab4 - G4 - Ab4 - C5 | F5 - E5 - D5 - C5
-      { chord: 'Fm6', rh: ['Ab4:0.5:2', 'G4:0.5:1', 'Ab4:0.5:2', 'C5:0.5:3', 'F5:1:5', 'D5:1:4'], lh: ['Ab2+F3:2:5', 'C3+F3:2:1'] },
-      { chord: 'C/G', rh: ['E5:1.5:5', 'C5:0.5:3', 'G4:2:1'], lh: ['G2+E3:2:5', 'C3+E3:2:1'] },
-      // Bar 7: "I sing a secret song to you each night we are apart..." -> F#4 - G4 - A4 - B4 | A4 - D4 - B4 - A4
-      { chord: 'D7', rh: ['F#4:0.5:2', 'G4:0.5:3', 'A4:0.5:4', 'B4:0.5:5', 'A4:1:4', 'D4:1:1'], lh: ['F#2+D3:2:5', 'A2+D3:2:1'] },
-      { chord: 'G7', rh: ['B4:1.5:5', 'A4:0.5:4', 'G4:2:3'], lh: ['G2+D3:2:5', 'B2+F3:2:1'] },
-      // Bar 9: "Remember me..." -> G4 - A4 - G4 - E5 (half) - D5 (quarter)
-      { chord: 'C', rh: ['G4:0.5:1', 'A4:0.5:2', 'G4:0.5:1', 'E5:1.5:5', 'D5:1:4'], lh: ['C3+G3:2:5', 'E3+G3:2:1'] },
-      // Bar 10: "...Though I have to travel far..." -> C5 - B4 - A4 - B4 (half)
-      { chord: 'E7', rh: ['C5:0.5:3', 'B4:0.5:2', 'A4:0.5:1', 'B4:2.5:2'], lh: ['E2+B2:2:5', 'G#3+B3:2:1'] },
-      // Bar 11: "Remember me, each time you hear a sad guitar..." -> A4 - B4 - C5 - E5 | D5 - C5 - Bb4 - G4
-      { chord: 'Am7', rh: ['A4:0.5:1', 'B4:0.5:2', 'C5:1:3', 'E5:1:5', 'C5:1:3'], lh: ['A2+E3:2:5', 'C3+E3:2:1'] },
-      { chord: 'Gm7', rh: ['D5:1:4', 'C5:0.5:3', 'Bb4:1.5:2', 'G4:1:1'], lh: ['G2+D3:2:5', 'Bb2+F3:2:1'] },
-      // Bar 13: "Know that I'm with you the only way that I can be..." -> A4 - C5 - E5 - G5 | F5 - D5 - C5
-      { chord: 'Fmaj7', rh: ['A4:0.5:1', 'C5:0.5:2', 'E5:1:4', 'G5:1.5:5', 'F5:0.5:4'], lh: ['F2+C3:2:5', 'A2+F3:2:1'] },
-      { chord: 'Fm6', rh: ['F5:1.5:5', 'D5:0.5:3', 'C5:2:2'], lh: ['F2+C3+Ab3:4:5'] },
-      // Bar 15: "...Until you're in my arms again, Remember me!" -> E5 - D5 | G4 - A4 - B4 - C5
-      { chord: 'C/G', rh: ['E5:1:5', 'D5:1:4', 'G4:0.5:1', 'A4:0.5:2', 'B4:1:3'], lh: ['G2+E3:2:5', 'G2+F3:2:5'] },
-      { chord: 'C', rh: ['C5:4:4'], lh: ['C2+G2+E3:4:5'] }
+      { chord: 'C', rh: ['G4:1.5:4', 'E4:0.5:2', 'G4:2:4'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'G/B', rh: ['G4:0.5:4', 'F#4:0.5:3', 'G4:0.5:4', 'A4:0.5:5', 'G4:2:4'], lh: ['B2:1:5', 'G3:1:2', 'D4:2:1'] },
+      { chord: 'C7/Bb', rh: ['E4:1.5:3', 'C4:0.5:1', 'E4:2:3'], lh: ['Bb2:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'F', rh: ['E4:0.5:3', 'D#4:0.5:2', 'E4:0.5:3', 'F4:0.5:4', 'E4:2:3'], lh: ['A2:1:5', 'E3:1:2', 'C4:2:1'] },
+      { chord: 'Dm', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:1:3', 'A4:0.5:5', 'G4:0.5:4', 'F4:0.5:3', 'E4:0.5:2'], lh: ['D3:1:5', 'A3:1:2', 'F4:2:1'] },
+      { chord: 'G', rh: ['D4:0.5:1', 'C4:0.5:1', 'D4:1:2', 'E4:2:3'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'F', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:1:3', 'A4:0.5:5', 'G4:0.5:4', 'F4:0.5:3', 'E4:0.5:2'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'G7', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:0.5:3', 'G4:0.5:4', 'G4:2:4'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'C', rh: ['G4:1.5:4', 'E4:0.5:2', 'G4:2:4'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'C', rh: ['C4+E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
     ], 4)
   }),
 
-  // 18. YOU'VE GOT A FRIEND IN ME (TOY STORY — EXACT RANDY NEWMAN SWING IN C MAJOR)
+  // 17. YOU'VE GOT A FRIEND IN ME — RANDY NEWMAN (TOY STORY)
   buildSongFromEvents({
     id: 'youve-got-a-friend-in-me',
     title: "You've Got a Friend in Me (Toy Story)",
@@ -909,283 +710,212 @@ const INITIAL_SONGS = [
     tempo: 112,
     timeSignature: [4, 4],
     keySignature: 'C Major',
-    sourceFormat: 'Standard MIDI (.mid)',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: "You've got a friend in me..." -> G4 - E4 - G4 - A4 - G4 - E4 - C4
-      { chord: 'C', rh: ['G4:0.5:3', 'E4:0.5:2', 'G4:0.5:3', 'A4:1:4', 'G4:0.5:3', 'E4:0.5:2', 'C4:0.5:1'], lh: ['C3:1:5', 'E3:1:3', 'G3:1:1', 'E3:1:3'] },
-      { chord: 'C7', rh: ['C4:2:1', 'Eb4:0.5:2', 'E4:0.5:3', 'G4:1:5'], lh: ['C3:1:5', 'G3:1:2', 'Bb3:1:1', 'G3:1:2'] },
-      // Bar 3: "You've got a friend in me..." -> A4 - G4 - E4 - G4 - A4 - G4 - E4
-      { chord: 'F7', rh: ['A4:1:5', 'G4:0.5:4', 'E4:0.5:2', 'G4:0.5:4', 'A4:1:5', 'G4:0.5:4'], lh: ['F2:1:5', 'C3:1:2', 'Eb3:1:1', 'C3:1:2'] },
-      { chord: 'C', rh: ['E4:1.5:3', 'C4:2.5:1'], lh: ['C3:1:5', 'E3:1:3', 'G3:1:1', 'C3:1:5'] },
-      // Bar 5: "When the road looks rough ahead..." -> C5 - B4 - A4 - G4 - E4
-      { chord: 'F', rh: ['C5:1:5', 'B4:0.5:4', 'A4:0.5:3', 'G4:1:2', 'E4:1:1'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
-      { chord: 'C/E', rh: ['G4:0.5:3', 'A4:0.5:4', 'G4:1:3', 'E4:2:1'], lh: ['E2:1:5', 'C3:1:2', 'G3:2:1'] },
-      // Bar 7: "...And you're miles and miles from your nice warm bed..."
-      { chord: 'D7', rh: ['D4:0.5:1', 'E4:0.5:2', 'F#4:1:3', 'A4:1:5', 'F#4:1:3'], lh: ['D2:1:5', 'A2:1:2', 'F#3:2:1'] },
-      { chord: 'G7', rh: ['G4:1.5:3', 'A4:0.5:4', 'B4:2:5'], lh: ['G2:1:5', 'D3:1:2', 'F3:2:1'] },
-      // Bar 9: "You just remember what your old pal said..."
-      { chord: 'C', rh: ['C5:1:5', 'B4:0.5:4', 'A4:0.5:3', 'G4:1:2', 'E4:1:1'], lh: ['C3:1:5', 'G3:1:1', 'E3:1:3', 'G3:1:1'] },
-      { chord: 'E7', rh: ['B4:1:4', 'C5:0.5:5', 'B4:0.5:4', 'G#4:2:2'], lh: ['E2:1:5', 'B2:1:2', 'G#3:2:1'] },
-      // Bar 11: "Boy, you've got a friend in me!" -> A4 - G4 - E4 - G4 | A4 - G4 - E4 - C4
-      { chord: 'Am', rh: ['A4:1.5:4', 'G4:0.5:3', 'E4:1:1', 'G4:1:3'], lh: ['A2:1:5', 'E3:1:2', 'A3:2:1'] },
-      { chord: 'D7', rh: ['A4:1:4', 'G4:0.5:3', 'F#4:0.5:2', 'D4:2:1'], lh: ['D2:1:5', 'A2:1:2', 'F#3:2:1'] },
-      // Bar 13: "Yeah, you've got a friend in me!"
-      { chord: 'C/G', rh: ['G4:0.5:3', 'E4:0.5:1', 'G4:0.5:3', 'A4:1:4', 'G4:0.5:3', 'E4:1:1'], lh: ['G2:2:5', 'E3:2:1'] },
-      { chord: 'G7', rh: ['D4:1:1', 'E4:1:2', 'G4:1:4', 'D5:1:5'], lh: ['G2:2:5', 'F3:2:1'] },
-      { chord: 'C', rh: ['C5:2:5', 'G4:1:2', 'E4:1:1'], lh: ['C2:2:5', 'G2:2:2'] },
-      { chord: 'C6', rh: ['C4+E4+A4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+      { chord: 'C', rh: ['E4:0.5:2', 'G4:0.5:4', 'E4:0.5:2', 'A4:0.5:5', 'G4:1:4', 'E4:1:2'], lh: ['C3:1:5', 'E3:1:3', 'G3:1:1', 'E3:1:3'] },
+      { chord: 'C', rh: ['R:1', 'E4:0.5:2', 'G4:0.5:4', 'E4:0.5:2', 'A4:0.5:5', 'G4:1:4'], lh: ['C3:1:5', 'E3:1:3', 'G3:1:1', 'E3:1:3'] },
+      { chord: 'F', rh: ['A4:0.5:3', 'B4:0.5:4', 'A4:0.5:3', 'B4:0.5:4', 'A4:0.5:3', 'G4:0.5:2', 'A4:1:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'C', rh: ['R:1', 'E4:0.5:1', 'G4:0.5:2', 'B4:0.5:4', 'B4:0.5:4', 'B4:0.5:4', 'B4:0.5:4'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'F', rh: ['A4:1:3', 'G4:1:2', 'A4:0.5:3', 'G4:0.5:2', 'F4:0.5:1', 'G4:0.5:2'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'Em', rh: ['E4:0.5:1', 'G4:0.5:2', 'A4:0.5:3', 'B4:0.5:4', 'A4:0.5:3', 'G4:0.5:2', 'E4:0.5:1', 'D4:0.5:1'], lh: ['E2:1:5', 'B2:1:3', 'A2:1:4', 'E3:1:2'] },
+      { chord: 'Dm7', rh: ['C4:2:1', 'E4:0.5:2', 'G4:0.5:4', 'E4:0.5:2', 'A4:0.5:5'], lh: ['D3:1:5', 'G3:1:2', 'C3:2:5'] },
+      { chord: 'C', rh: ['G4:1:4', 'C4+E4+G4:3:1'], lh: ['C2+G2+C3:4:5'] }
     ], 4)
   }),
 
-  // 19. PART OF YOUR WORLD (THE LITTLE MERMAID — EXACT ALAN MENKEN MELODY IN F MAJOR)
+  // 18. PART OF YOUR WORLD — ALAN MENKEN (THE LITTLE MERMAID)
   buildSongFromEvents({
     id: 'part-of-your-world',
     title: 'Part of Your World (The Little Mermaid)',
     composer: 'Alan Menken',
     genre: 'Cinema & Animation',
-    difficulty: 'Beginner',
-    tempo: 100,
+    difficulty: 'Intermediate',
+    tempo: 80,
     timeSignature: [4, 4],
     keySignature: 'F Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // Bar 1: "Look at this stuff, isn't it neat?" -> C4 - D4 - E4 - F4 | C4 - D4 - E4 - F4
-      { chord: 'Gm7', rh: ['C4:0.5:1', 'D4:0.5:2', 'E4:0.5:3', 'F4:2.5:4'], lh: ['G2+D3+F3:4:5'] },
-      { chord: 'C7', rh: ['C4:0.5:1', 'D4:0.5:2', 'E4:0.5:3', 'F4:2.5:4'], lh: ['C2+G2+E3:4:5'] },
-      // Bar 3: "Wouldn't you think my collection's complete?" -> D4 - E4 - F4 - G4 | D4 - E4 - F4 - G4 - A4
-      { chord: 'Fmaj7', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:0.5:3', 'G4:2.5:4'], lh: ['F2+C3+A3:4:5'] },
-      { chord: 'Dm7', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:0.5:3', 'G4:0.5:4', 'A4:2:5'], lh: ['D2+A2+F3:4:5'] },
-      // Bar 5: "Wouldn't you think I'm the girl, the girl who has everything?"
-      { chord: 'Gm7', rh: ['D4:0.5:1', 'E4:0.5:2', 'F4:0.5:3', 'G4:1:4', 'G4:0.5:4', 'A4:1:5'], lh: ['G2+D3+F3:4:5'] },
-      { chord: 'C7', rh: ['C4:0.5:1', 'D4:0.5:2', 'E4:0.5:3', 'F4:0.5:4', 'G4:2:5'], lh: ['C2+G2+E3:4:5'] },
-      // Bar 7 (Chorus): "Up where they walk, up where they run..." -> A4 - Bb4 - C5 - C5 | A4 - Bb4 - C5 - C5
-      { chord: 'Bbmaj7', rh: ['A4:0.5:1', 'Bb4:0.5:2', 'C5:1.5:3', 'C5:1.5:3'], lh: ['Bb1+F2+D3:4:5'] },
-      { chord: 'Am7', rh: ['A4:0.5:1', 'Bb4:0.5:2', 'C5:1.5:3', 'C5:1.5:3'], lh: ['A1+E2+C3:4:5'] },
-      // Bar 9: "Up where they stay all day in the sun..." -> A4 - Bb4 - C5 - D5 | C5 - Bb4 - A4 - G4
-      { chord: 'Gm7', rh: ['A4:0.5:1', 'Bb4:0.5:2', 'C5:1:3', 'D5:1:5', 'C5:1:3'], lh: ['G2+D3+F3:4:5'] },
-      { chord: 'C7', rh: ['Bb4:1:3', 'A4:1:2', 'G4:2:1'], lh: ['C2+G2+E3:4:5'] },
-      // Bar 11: "Wanderin' free, wish I could be..." -> A4 - B4 - C5 | A4 - C5 - D5
-      { chord: 'Am7', rh: ['A4:1:2', 'B4:0.5:3', 'C5:2.5:4'], lh: ['A2+E3+G3:4:5'] },
-      { chord: 'Dm7', rh: ['A4:1:1', 'C5:0.5:3', 'D5:2.5:5'], lh: ['D2+A2+F3:4:5'] },
-      // Bar 13: "...Part of that world!" -> F4 - G4 - A4 | G4 - F4
-      { chord: 'Gm7', rh: ['F4:0.5:1', 'G4:0.5:2', 'A4:3:3'], lh: ['G2+D3+Bb3:4:5'] },
-      { chord: 'C7', rh: ['G4:2:2', 'F4:2:1'], lh: ['C2+G2+E3:4:5'] },
-      { chord: 'Bb/F', rh: ['C4:0.5:1', 'D4:0.5:2', 'E4:0.5:3', 'F4:2.5:4'], lh: ['F2+D3+Bb3:4:5'] },
-      { chord: 'F', rh: ['F4+A4+C5:4:1'], lh: ['F2+C3+F3:4:5'] }
+      { chord: 'F', rh: ['F4:0.5:1', 'F4:0.5:1', 'F4:0.5:1', 'F4:0.5:1', 'G4:1:2', 'A4:1:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'F', rh: ['C5:2:5', 'R:2'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'Bb', rh: ['C5:0.5:5', 'C5:0.5:5', 'C5:0.5:5', 'C5:0.5:5', 'D5:1:5', 'F5:1:5'], lh: ['Bb2:1:5', 'F3:1:2', 'D4:2:1'] },
+      { chord: 'C7', rh: ['C5:0.5:3', 'D5:0.5:4', 'F5:1:5', 'G5:2:5'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'F', rh: ['F4:0.5:1', 'F4:0.5:1', 'F4:0.5:1', 'F4:0.5:1', 'G4:1:2', 'A4:1:3'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'C', rh: ['C5:1:5', 'C5:0.5:5', 'D5:0.5:5', 'F5:1:5', 'G5:1:5'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'Dm', rh: ['A4:0.5:2', 'Bb4:0.5:3', 'C5:1:4', 'D5:0.5:5', 'C5:0.5:4', 'Bb4:0.5:3', 'A4:0.5:2'], lh: ['D3:1:5', 'A3:1:2', 'F4:2:1'] },
+      { chord: 'Bb', rh: ['G4:0.5:2', 'F4:0.5:1', 'G4:1:2', 'A4:0.5:3', 'G4:0.5:2', 'F4:1:1'], lh: ['Bb2:1:5', 'F3:1:2', 'D4:2:1'] },
+      { chord: 'Gm7', rh: ['G4:1:2', 'A4:1:3', 'Bb4:1:4', 'C5:1:5'], lh: ['G2:1:5', 'D3:1:2', 'Bb3:2:1'] },
+      { chord: 'C7', rh: ['F4:1:1', 'G4:1:2', 'A4:1:3', 'F4:1:1'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'F', rh: ['F4+A4+C5+F5:4:1'], lh: ['F2+C3+A3+F4:4:5'] }
     ], 4)
   }),
 
-  // 20. SOMEDAY MY PRINCE WILL COME (SNOW WHITE — EXACT DISNEY WALTZ IN F MAJOR)
+  // 19. SOMEDAY MY PRINCE WILL COME — FRANK CHURCHILL (SNOW WHITE)
   buildSongFromEvents({
     id: 'someday-my-prince-will-come',
     title: 'Someday My Prince Will Come (Snow White)',
     composer: 'Frank Churchill',
     genre: 'Cinema & Animation',
     difficulty: 'Intermediate',
-    tempo: 108,
+    tempo: 120,
     timeSignature: [3, 4],
-    keySignature: 'F Major',
-    sourceFormat: 'MusicXML 4.0',
+    keySignature: 'Bb Major',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // "Someday my prince will come..." (C4 -> F4 - F#4 | G4 -> F4 - E4 | F4 -> D4)
-      { chord: 'Fmaj7', rh: ['C4:2:1', 'F4:0.5:2', 'F#4:0.5:3'], lh: ['F2:1:5', 'A3+E4:2:1'] },
-      { chord: 'A7#5', rh: ['G4:2:4', 'F4:0.5:3', 'E4:0.5:2'], lh: ['A2:1:5', 'G3+C#4:2:1'] },
-      { chord: 'Bbmaj7', rh: ['F4:2:3', 'D4:1:1'], lh: ['Bb2:1:5', 'F3+A3:2:1'] },
-      { chord: 'D7b9', rh: ['A4:2:4', 'F#4:1:2'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
-      // "Someday we'll meet again..." (G4 -> Bb4 | A4 - G4 - E4 | C5)
-      { chord: 'Gm7', rh: ['G4:2:2', 'Bb4:1:4'], lh: ['G2:1:5', 'F3+Bb3:2:1'] },
-      { chord: 'C7', rh: ['A4:1:3', 'G4:1:2', 'E4:1:1'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
-      { chord: 'Am7', rh: ['C5:3:5'], lh: ['A2:1:5', 'E3+G3:2:1'] },
-      { chord: 'D7', rh: ['C5:2:5', 'A4:1:3'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
-      // "And away to his castle we'll go..." (D4 - E4 - F4 - G4 - A4 - Bb4)
-      { chord: 'Gm7', rh: ['D4:1:1', 'E4:1:2', 'F4:1:3'], lh: ['G2:1:5', 'F3+Bb3:2:1'] },
-      { chord: 'Bbm6', rh: ['G4:1:1', 'A4:1:2', 'Bb4:1:3'], lh: ['Bb2:1:5', 'F3+Db4:2:1'] },
-      // "To be happy forever I know..."
-      { chord: 'F/C', rh: ['C4:2:1', 'F4:1:2'], lh: ['C3:1:5', 'F3+A3:2:1'] },
-      { chord: 'D7', rh: ['A4:2:3', 'C5:1:4'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
-      { chord: 'Gm7', rh: ['E5:2:5', 'D5:1:4'], lh: ['G2:1:5', 'F3+Bb3:2:1'] },
-      { chord: 'C7', rh: ['C5:2:3', 'E4:1:1'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
-      { chord: 'F6', rh: ['F4:3:1'], lh: ['F2:1:5', 'A3+D4:2:1'] },
-      { chord: 'F6', rh: ['F4+A4+C5+F5:3:1'], lh: ['F2+C3+F3:3:5'] }
+      { chord: 'Bbmaj7', rh: ['Bb4:1:1', 'D5:1:2', 'F5:1:4'], lh: ['Bb2:1:5', 'F3+Ab3+D4:1:1', 'F3+Ab3+D4:1:1'] },
+      { chord: 'D7', rh: ['A5:2:5', 'G5:1:4'], lh: ['D3:1:5', 'F#3+C4:1:1', 'F#3+C4:1:1'] },
+      { chord: 'Ebmaj7', rh: ['F5:1:3', 'G5:1:4', 'F5:1:3'], lh: ['Eb3:1:5', 'G3+Bb3:1:1', 'G3+Bb3:1:1'] },
+      { chord: 'G7', rh: ['D5:2:2', 'C5:1:1'], lh: ['G2:1:5', 'F3+B3:1:1', 'F3+B3:1:1'] },
+      { chord: 'C7', rh: ['Bb4:1:1', 'D5:1:2', 'F5:1:4'], lh: ['C3:1:5', 'E3+Bb3:1:1', 'E3+Bb3:1:1'] },
+      { chord: 'F7', rh: ['A5:1:5', 'C6:1:5', 'Bb5:1:4'], lh: ['F2:1:5', 'Eb3+A3:1:1', 'Eb3+A3:1:1'] },
+      { chord: 'Bb7', rh: ['A5:1:4', 'G5:1:3', 'F5:1:2'], lh: ['Bb2:1:5', 'D3+Ab3:1:1', 'D3+Ab3:1:1'] },
+      { chord: 'Eb', rh: ['G5:1:4', 'A5:1:5', 'F5:1:3'], lh: ['Eb2:1:5', 'G3+Bb3:1:1', 'Eb2:1:5'] },
+      { chord: 'F7', rh: ['D5:2:2', 'R:1'], lh: ['F2:1:5', 'C3+Eb3+A3:1:1', 'F2:1:5'] },
+      { chord: 'Bb', rh: ['Bb3+D4+F4+Bb4:3:1'], lh: ['Bb1+F2+Bb2:3:5'] }
     ], 3)
   }),
 
-  // 21. WHEN YOU WISH UPON A STAR (PINOCCHIO — EXACT OCTAVE LEAP MELODY IN C MAJOR)
+  // 20. WHEN YOU WISH UPON A STAR — LEIGH HARLINE (PINOCCHIO)
   buildSongFromEvents({
     id: 'when-you-wish-upon-a-star',
     title: 'When You Wish Upon a Star (Pinocchio)',
     composer: 'Leigh Harline',
     genre: 'Cinema & Animation',
-    difficulty: 'Intermediate',
-    tempo: 78,
+    difficulty: 'Beginner',
+    tempo: 72,
     timeSignature: [4, 4],
     keySignature: 'C Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Film Score',
     license: 'Educational Arrangement',
     rawNotes: compileCompactScore([
-      // "When you wish upon a star..." (G3 - G4 - F4 - E4 - C#4 - D4 - A4)
-      { chord: 'C', rh: ['G3:1:1', 'G4:1:5', 'F4:1:4', 'E4:1:3'], lh: ['C2+G2:2:5', 'E3:2:1'] },
-      { chord: 'A7', rh: ['C#4:1:2', 'D4:1:1', 'A4:2:5'], lh: ['A1+E2:2:5', 'G3:2:1'] },
-      // "Makes no difference who you are..." (B3 - B4 - A4 - G4 - F#4 - G4 - C5)
-      { chord: 'Dm', rh: ['B3:1:1', 'B4:1:5', 'A4:1:4', 'G4:1:3'], lh: ['D2+A2:2:5', 'F3:2:1'] },
-      { chord: 'G7', rh: ['F#4:1:2', 'G4:1:3', 'C5:2:5'], lh: ['G2+D3:2:5', 'F3:2:1'] },
-      // "Anything your heart desires..." (D5 - C5 - B4 - A4 - G4 - F4 - E4)
-      { chord: 'C/E', rh: ['D5:1:5', 'C5:1:4', 'B4:1:3', 'A4:1:2'], lh: ['E2+C3:2:5', 'G3:2:1'] },
-      { chord: 'F', rh: ['G4:1:3', 'F4:1:2', 'E4:2:1'], lh: ['F2+C3:2:5', 'D2+A2:2:5'] },
-      // "...Will come to you." (F4 - G4 - C4 -> D4)
-      { chord: 'C/G', rh: ['F4:1:3', 'G4:1:4', 'C4:2:1'], lh: ['G2+E3:2:5', 'A2+E3:2:5'] },
-      { chord: 'G7', rh: ['D4:4:2'], lh: ['D2+A2:2:5', 'G2+F3:2:5'] },
-      // Verse 2: "If your heart is in your dream..."
-      { chord: 'C', rh: ['G3:1:1', 'G4:1:5', 'F4:1:4', 'E4:1:3'], lh: ['C2+G2:2:5', 'E3:2:1'] },
-      { chord: 'A7', rh: ['C#4:1:2', 'D4:1:1', 'A4:2:5'], lh: ['A1+E2:2:5', 'G3:2:1'] },
-      { chord: 'Dm', rh: ['B3:1:1', 'B4:1:5', 'A4:1:4', 'G4:1:3'], lh: ['D2+A2:2:5', 'F3:2:1'] },
-      { chord: 'G7', rh: ['F#4:1:2', 'G4:1:3', 'C5:2:5'], lh: ['G2+D3:2:5', 'F3:2:1'] },
-      { chord: 'C/E', rh: ['D5:1:5', 'C5:1:4', 'B4:1:3', 'A4:1:2'], lh: ['E2+C3:2:5', 'G3:2:1'] },
-      { chord: 'Fm6', rh: ['G4:1:3', 'F4:1:2', 'E4:2:1'], lh: ['F2+C3+Ab3:4:5'] },
-      { chord: 'C/G', rh: ['F4:1:2', 'G4:1:3', 'D5:2:5'], lh: ['G2+E3:2:5', 'G2+F3:2:5'] },
-      { chord: 'C', rh: ['E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
+      { chord: 'C', rh: ['C4:1:1', 'C5:2:5', 'B4:1:4'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'Am', rh: ['A4:1:3', 'F#4:1:2', 'G4:1:3', 'D4:1:1'], lh: ['A2:1:5', 'E3:1:2', 'C4:2:1'] },
+      { chord: 'D7', rh: ['D4:1:1', 'D5:2:5', 'C5:1:4'], lh: ['D3:1:5', 'A3:1:2', 'F#4:2:1'] },
+      { chord: 'G7', rh: ['B4:1:3', 'G#4:1:2', 'A4:1:3', 'E4:1:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'C', rh: ['E4:1:1', 'A4:1:3', 'C5:1:4', 'E5:1:5'], lh: ['C3:1:5', 'G3:1:2', 'E4:2:1'] },
+      { chord: 'F', rh: ['D5:1:4', 'C5:1:3', 'B4:1:2', 'A4:1:1'], lh: ['F2:1:5', 'C3:1:2', 'A3:2:1'] },
+      { chord: 'G7', rh: ['G4:1:3', 'E4:1:1', 'F4:1:2', 'D4:1:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:2:1'] },
+      { chord: 'C', rh: ['C4+E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
     ], 4)
   }),
 
-  // 22. ONCE UPON A DREAM (SLEEPING BEAUTY / TCHAIKOVSKY OP. 66 NO. 6 — EXACT WALTZ MELODY)
+  // 21. ONCE UPON A DREAM — PYOTR ILYICH TCHAIKOVSKY (SLEEPING BEAUTY)
   buildSongFromEvents({
     id: 'once-upon-a-dream',
     title: 'Once Upon a Dream (Sleeping Beauty Waltz)',
     composer: 'Pyotr Ilyich Tchaikovsky',
     genre: 'Cinema & Animation',
-    difficulty: 'Beginner',
-    tempo: 126,
+    difficulty: 'Intermediate',
+    tempo: 136,
     timeSignature: [3, 4],
-    keySignature: 'F Major',
-    sourceFormat: 'Public Domain Score',
+    keySignature: 'G Major',
+    sourceFormat: 'Ballet Score',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      // "I know you, I walked with you once upon a dream..." (A4 - G4 - A4 | F4 - G4 - A4 | Bb4 - A4 - G4 | A4)
-      { chord: 'F', rh: ['A4:1:3', 'G4:1:2', 'A4:1:3'], lh: ['F2:1:5', 'A3+C4:2:1'] },
-      { chord: 'F', rh: ['F4:1:1', 'G4:1:2', 'A4:1:3'], lh: ['F2:1:5', 'A3+C4:2:1'] },
-      { chord: 'Bbmaj7/F', rh: ['Bb4:1:4', 'A4:1:3', 'G4:1:2'], lh: ['F2:1:5', 'Bb3+D4:2:1'] },
-      { chord: 'F', rh: ['A4:2:3', 'C4:1:1'], lh: ['F2:1:5', 'A3+C4:2:1'] },
-      // "I know you, the gleam in your eyes is so familiar a gleam..."
-      { chord: 'Bbmaj7', rh: ['G4:1:2', 'F#4:1:1', 'G4:1:2'], lh: ['Bb2:1:5', 'F3+D4:2:1'] },
-      { chord: 'C7', rh: ['A4:1:3', 'G4:1:2', 'A4:1:3'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
-      { chord: 'F', rh: ['C5:2:5', 'A4:1:3'], lh: ['F2:1:5', 'A3+C4:2:1'] },
-      { chord: 'C7', rh: ['G4:3:2'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
-      // "Yet I know it's true that visions are seldom all they seem..."
-      { chord: 'F', rh: ['A4:1:3', 'G4:1:2', 'A4:1:3'], lh: ['F2:1:5', 'A3+C4:2:1'] },
-      { chord: 'D7', rh: ['F#4:1:1', 'A4:1:2', 'D5:1:5'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
-      { chord: 'Gm', rh: ['C5:1.5:4', 'Bb4:0.5:3', 'G4:1:1'], lh: ['G2:1:5', 'G3+Bb3:2:1'] },
-      { chord: 'Bbm6', rh: ['D5:2:5', 'C5:1:4'], lh: ['Bb2:1:5', 'F3+Db4:2:1'] },
-      // "But if I know you, I know what you'll do..."
-      { chord: 'F/C', rh: ['A4:1:2', 'C5:1:4', 'F5:1:5'], lh: ['C3:1:5', 'F3+A3:2:1'] },
-      { chord: 'C7', rh: ['E5:1:4', 'D5:1:3', 'E5:1:4'], lh: ['C2:1:5', 'E3+Bb3:2:1'] },
-      { chord: 'F', rh: ['F5:3:5'], lh: ['F2:1:5', 'A3+C4:2:1'] },
-      { chord: 'F', rh: ['F4+A4+C5+F5:3:1'], lh: ['F2+C3+F3:3:5'] }
+      { chord: 'G', rh: ['D5:1:3', 'E5:1:4', 'D5:1:3'], lh: ['G2:1:5', 'B3+D4:1:1', 'B3+D4:1:1'] },
+      { chord: 'G', rh: ['B4:2:2', 'G4:1:1'], lh: ['G2:1:5', 'B3+D4:1:1', 'B3+D4:1:1'] },
+      { chord: 'C', rh: ['D5:1:3', 'E5:1:4', 'D5:1:3'], lh: ['C3:1:5', 'E3+G3:1:1', 'E3+G3:1:1'] },
+      { chord: 'C', rh: ['C5:3:2'], lh: ['C3:1:5', 'E3+G3:1:1', 'E3+G3:1:1'] },
+      { chord: 'Am', rh: ['E5:1:3', 'F#5:1:4', 'E5:1:3'], lh: ['A2:1:5', 'C3+E3:1:1', 'C3+E3:1:1'] },
+      { chord: 'Am', rh: ['C5:2:2', 'A4:1:1'], lh: ['A2:1:5', 'C3+E3:1:1', 'C3+E3:1:1'] },
+      { chord: 'D7', rh: ['F#5:2:4', 'E5:1:3'], lh: ['D3:1:5', 'F#3+C4:1:1', 'F#3+C4:1:1'] },
+      { chord: 'G', rh: ['D5:3:2'], lh: ['G2:1:5', 'B3+D4:1:1', 'B3+D4:1:1'] },
+      { chord: 'G', rh: ['D5:1:3', 'E5:1:4', 'D5:1:3'], lh: ['G2:1:5', 'B3+D4:1:1', 'B3+D4:1:1'] },
+      { chord: 'G', rh: ['B4:2:2', 'G4:1:1'], lh: ['G2:1:5', 'B3+D4:1:1', 'B3+D4:1:1'] },
+      { chord: 'Em', rh: ['D5:1:3', 'E5:1:4', 'D5:1:3'], lh: ['E3:1:5', 'G3+B3:1:1', 'E3:1:5'] },
+      { chord: 'Am', rh: ['E5:3:4'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5'] },
+      { chord: 'C', rh: ['E5:1:3', 'F#5:1:4', 'G5:1:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'C3:1:5'] },
+      { chord: 'D7', rh: ['B4:2:3', 'A4:1:2'], lh: ['D3:1:5', 'F#3+C4:1:1', 'D3:1:5'] },
+      { chord: 'G', rh: ['G4:3:1'], lh: ['G2:1:5', 'B3+D4:1:1', 'G2:1:5'] },
+      { chord: 'G', rh: ['G3+B3+D4+G4:3:1'], lh: ['G1+D2+G2:3:5'] }
     ], 3)
   }),
 
-  // 23. THE ENTERTAINER — SCOTT JOPLIN (16-BAR RAGTIME CLASSIC)
+  // 22. THE ENTERTAINER — SCOTT JOPLIN (CLASSIC PIANO RAG)
   buildSongFromEvents({
     id: 'the-entertainer',
     title: 'The Entertainer (Classic Piano Rag)',
     composer: 'Scott Joplin',
     genre: 'Jazz & Ragtime',
-    difficulty: 'Intermediate',
-    tempo: 116,
-    timeSignature: [4, 4],
+    difficulty: 'Advanced',
+    tempo: 84,
+    timeSignature: [2, 4],
     keySignature: 'C Major',
-    sourceFormat: 'Standard MIDI (.mid)',
+    sourceFormat: 'Original Ragtime Sheet',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      // Famous Octave Intro (Bars 1-4)
-      { chord: 'C', rh: ['D5:0.5:2', 'E5:0.5:3', 'C5:0.5:1', 'A4:1:2', 'B4:0.5:3', 'G4:1:1'], lh: ['R:4'] },
-      { chord: 'C', rh: ['D4:0.5:2', 'E4:0.5:3', 'C4:0.5:1', 'A3:1:2', 'B3:0.5:3', 'G3:1:1'], lh: ['R:4'] },
-      { chord: 'G7', rh: ['D4:0.5:2', 'E4:0.5:3', 'C4:0.5:1', 'A3:1:2', 'B3:0.5:3', 'A3:0.5:2', 'Ab3:0.5:1'], lh: ['R:4'] },
-      { chord: 'G7', rh: ['G3:2:1', 'R:1', 'D4:0.5:1', 'D#4:0.5:2'], lh: ['G2:2:5', 'G2+B2+F3:2:5'] },
-      // Syncopated Main Theme (Bars 5-16)
-      { chord: 'C', rh: ['E4:0.5:3', 'C5:1:5', 'E4:0.5:1', 'C5:1:5', 'E4:0.5:1', 'C5:0.5:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
-      { chord: 'C', rh: ['C5:2.5:3', 'C5:0.5:3', 'D5:0.5:4', 'D#5:0.5:4'], lh: ['C3:1:5', 'E3+G3:1:1', 'E3:1:3', 'F3:1:2'] },
-      { chord: 'C', rh: ['E5:0.5:5', 'C5:0.5:3', 'D5:0.5:4', 'E5:1:5', 'B4:0.5:2', 'D5:1:4'], lh: ['G3:1:1', 'E3+G3:1:1', 'G2:1:5', 'F3+G3:1:1'] },
-      { chord: 'C', rh: ['C5:3:3', 'D4:0.5:1', 'D#4:0.5:2'], lh: ['C3:1:5', 'E3+G3:1:1', 'C3:2:5'] },
-      { chord: 'C', rh: ['E4:0.5:3', 'C5:1:5', 'E4:0.5:1', 'C5:1:5', 'E4:0.5:1', 'C5:0.5:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
-      { chord: 'A7', rh: ['C5:2.5:4', 'A4:0.5:2', 'G4:0.5:1', 'F#4:0.5:2'], lh: ['C3:1:5', 'E3+G3:1:1', 'A2:2:5'] },
-      { chord: 'D7', rh: ['A4:0.5:3', 'C5:0.5:5', 'E5:1:5', 'D5:0.5:4', 'C5:0.5:3', 'A4:0.5:1', 'D5:0.5:5'], lh: ['D3:1:5', 'F#3+A3:1:1', 'D3:2:5'] },
-      { chord: 'G7', rh: ['G4:3:2', 'D4:0.5:1', 'D#4:0.5:2'], lh: ['G2:1:5', 'D3+F3:1:1', 'G2:2:5'] },
-      { chord: 'C', rh: ['E4:0.5:3', 'C5:1:5', 'E4:0.5:1', 'C5:1:5', 'E4:0.5:1', 'C5:0.5:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
-      { chord: 'F', rh: ['C5:2:3', 'C5:0.5:2', 'D5:0.5:3', 'E5:0.5:4', 'F5:0.5:5'], lh: ['F2:1:5', 'A2+C3:1:1', 'F2:2:5'] },
-      { chord: 'C/G', rh: ['E5:0.5:5', 'C5:0.5:3', 'D5:0.5:4', 'E5:1:5', 'B4:0.5:2', 'D5:1:4'], lh: ['G2:2:5', 'G2+F3:2:5'] },
-      { chord: 'C', rh: ['C4+E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
-    ], 4)
+      { chord: 'C', rh: ['D4:0.25:1', 'D#4:0.25:2', 'E4:0.25:3', 'C5:0.5:5', 'E4:0.25:3', 'C5:0.5:5', 'E4:0.25:3'], lh: ['R:2'] },
+      { chord: 'C', rh: ['C5:1.5:5', 'R:0.5'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['C5:0.25:3', 'D5:0.25:4', 'D#5:0.25:4', 'E5:0.25:5', 'C5:0.25:3', 'D5:0.25:4', 'E5:0.5:5'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['B4:0.25:2', 'D5:0.5:4', 'C5:1.25:3'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['D4:0.25:1', 'D#4:0.25:2', 'E4:0.25:3', 'C5:0.5:5', 'E4:0.25:3', 'C5:0.5:5', 'E4:0.25:3'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['C5:1.5:5', 'R:0.5'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'F', rh: ['A4:0.25:2', 'G4:0.25:1', 'F#4:0.25:1', 'A4:0.25:2', 'C5:0.25:3', 'E5:0.5:5', 'D5:0.25:4'], lh: ['F2:0.5:5', 'A2+C3+F3:0.5:1', 'F#2:0.5:5', 'A2+C3+D#3:0.5:1'] },
+      { chord: 'G7', rh: ['C5:0.25:3', 'A4:0.25:2', 'D5:1.5:5'], lh: ['G2:0.5:5', 'B2+D3+G3:0.5:1', 'G1:0.5:5', 'B2+D3+G3:0.5:1'] },
+      { chord: 'C', rh: ['D4:0.25:1', 'D#4:0.25:2', 'E4:0.25:3', 'C5:0.5:5', 'E4:0.25:3', 'C5:0.5:5', 'E4:0.25:3'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['C5:1.5:5', 'R:0.5'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['C5:0.25:3', 'D5:0.25:4', 'D#5:0.25:4', 'E5:0.25:5', 'C5:0.25:3', 'D5:0.25:4', 'E5:0.5:5'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['B4:0.25:2', 'D5:0.5:4', 'C5:1.25:3'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'Am', rh: ['C5:0.25:2', 'D5:0.25:3', 'E5:0.25:4', 'C5:0.25:2', 'D5:0.25:3', 'E5:0.25:4', 'C5:0.25:2', 'D5:0.25:3'], lh: ['A2:0.5:5', 'C3+E3:0.5:1', 'F2:0.5:5', 'A2+C3:0.5:1'] },
+      { chord: 'G7', rh: ['C5:0.25:3', 'D5:0.25:4', 'C5:0.25:3', 'A4:0.25:2', 'G4:1:1'], lh: ['G2:0.5:5', 'B2+D3+G3:0.5:1', 'G1:0.5:5', 'B2+D3+G3:0.5:1'] },
+      { chord: 'C', rh: ['C5+E5+G5:1.5:1', 'R:0.5'], lh: ['C2+G2+C3:2:5'] }
+    ], 2)
   }),
 
-  // 24. RONDO ALLA TURCA (TURKISH MARCH, K. 331) — W.A. MOZART
+  // 23. RONDO ALLA TURCA — WOLFGANG AMADEUS MOZART (TURKISH MARCH, K. 331)
   buildSongFromEvents({
     id: 'turkish-march-mozart',
     title: 'Rondo Alla Turca (Turkish March, K. 331)',
     composer: 'Wolfgang Amadeus Mozart',
     genre: 'Classical',
     difficulty: 'Advanced',
-    tempo: 124,
-    timeSignature: [4, 4],
+    tempo: 120,
+    timeSignature: [2, 4],
     keySignature: 'A Minor',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Urtext Standard',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'Am', rh: ['B4:0.5:3', 'A4:0.5:2', 'G#4:0.5:1', 'A4:0.5:2', 'C5:2:4'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5', 'C3+E3:1:1'] },
-      { chord: 'Am', rh: ['D5:0.5:3', 'C5:0.5:2', 'B4:0.5:1', 'C5:0.5:2', 'E5:2:5'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5', 'C3+E3:1:1'] },
-      { chord: 'Am', rh: ['F5:0.5:4', 'E5:0.5:3', 'D#5:0.5:2', 'E5:0.5:3', 'B5:0.5:5', 'A5:0.5:4', 'G#5:0.5:3', 'A5:0.5:4'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:2:5'] },
-      { chord: 'Am', rh: ['B5:0.5:5', 'A5:0.5:4', 'G#5:0.5:3', 'A5:0.5:4', 'C6:2:5'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5', 'C3+E3:1:1'] },
-      { chord: 'F', rh: ['A5:1:3', 'B5:1:4', 'C6:1:5', 'B5:1:4'], lh: ['F2:1:5', 'A2+C3:1:1', 'D3:1:4', 'F3+A3:1:1'] },
-      { chord: 'E7', rh: ['A5:1:3', 'G#5:1:2', 'A5:1:3', 'E5:1:1'], lh: ['E2:1:5', 'B2+E3:1:1', 'E2:2:5'] },
-      { chord: 'Am', rh: ['F5:1:4', 'D5:1:2', 'C5:1:1', 'B4:0.5:2', 'A4:0.5:1'], lh: ['D2:2:5', 'E2:2:5'] },
-      { chord: 'Am', rh: ['A4:4:1'], lh: ['A2+E3+A3:4:5'] },
-      // B Section Contrasting Motif
-      { chord: 'C', rh: ['E5:1:3', 'F5:1:4', 'G5:1:5', 'G5:1:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'C3:1:5', 'E3+G3:1:1'] },
-      { chord: 'G', rh: ['A5:0.5:5', 'G5:0.5:4', 'F5:0.5:3', 'E5:0.5:2', 'D5:2:1'], lh: ['G2:1:5', 'B2+D3:1:1', 'G2:2:5'] },
-      { chord: 'C', rh: ['E5:1:3', 'F5:1:4', 'G5:1:5', 'G5:1:5'], lh: ['C3:1:5', 'E3+G3:1:1', 'C3:1:5', 'E3+G3:1:1'] },
-      { chord: 'G', rh: ['A5:0.5:5', 'G5:0.5:4', 'F5:0.5:3', 'E5:0.5:2', 'D5:2:1'], lh: ['G2:1:5', 'B2+D3:1:1', 'G2:2:5'] },
-      { chord: 'Am', rh: ['C5:1:2', 'D5:1:3', 'E5:1:4', 'E5:1:4'], lh: ['A2:1:5', 'C3+E3:1:1', 'A2:1:5', 'C3+E3:1:1'] },
-      { chord: 'E7', rh: ['F5:0.5:5', 'E5:0.5:4', 'D5:0.5:3', 'C5:0.5:2', 'B4:2:1'], lh: ['E2:1:5', 'G#2+B2:1:1', 'E2:2:5'] },
-      { chord: 'Am', rh: ['C5:1:3', 'B4:1:2', 'A4:1:1', 'G#4:1:2'], lh: ['A2:2:5', 'E2:2:5'] },
-      { chord: 'Am', rh: ['A4+C5+E5+A5:4:1'], lh: ['A1+E2+A2:4:5'] }
-    ], 4)
+      { chord: 'Am', rh: ['B4:0.25:1', 'A4:0.25:1', 'G#4:0.25:1', 'A4:0.25:1', 'C5:0.5:3', 'R:0.5'], lh: ['R:1', 'A2:0.5:5', 'C3+E3+A3:0.5:1'] },
+      { chord: 'Am', rh: ['D5:0.25:1', 'C5:0.25:1', 'B4:0.25:1', 'C5:0.25:1', 'E5:0.5:5', 'R:0.5'], lh: ['A2:0.5:5', 'C3+E3+A3:0.5:1', 'A2:0.5:5', 'C3+E3+A3:0.5:1'] },
+      { chord: 'Am', rh: ['F5:0.25:4', 'E5:0.25:3', 'D#5:0.25:2', 'E5:0.25:3', 'B5:0.25:5', 'A5:0.25:4', 'G#5:0.25:3', 'A5:0.25:4'], lh: ['A2:0.5:5', 'C3+E3+A3:0.5:1', 'A2:0.5:5', 'C3+E3+A3:0.5:1'] },
+      { chord: 'Am', rh: ['B5:0.25:5', 'A5:0.25:4', 'G#5:0.25:3', 'A5:0.25:4', 'C6:0.5:5', 'R:0.5'], lh: ['A2:0.5:5', 'C3+E3+A3:0.5:1', 'A2:0.5:5', 'C3+E3+A3:0.5:1'] },
+      { chord: 'Am', rh: ['B4:0.25:1', 'A4:0.25:1', 'G#4:0.25:1', 'A4:0.25:1', 'C5:0.5:3', 'R:0.5'], lh: ['A2:0.5:5', 'C3+E3+A3:0.5:1', 'A2:0.5:5', 'C3+E3+A3:0.5:1'] },
+      { chord: 'Am', rh: ['D5:0.25:1', 'C5:0.25:1', 'B4:0.25:1', 'C5:0.25:1', 'E5:0.5:5', 'R:0.5'], lh: ['A2:0.5:5', 'C3+E3+A3:0.5:1', 'A2:0.5:5', 'C3+E3+A3:0.5:1'] },
+      { chord: 'E7', rh: ['F5:0.25:4', 'E5:0.25:3', 'D#5:0.25:2', 'E5:0.25:3', 'B4:0.25:1', 'C5:0.25:2', 'D5:0.25:3', 'B4:0.25:1'], lh: ['E2:0.5:5', 'G#2+B2+E3:0.5:1', 'E2:0.5:5', 'G#2+B2+E3:0.5:1'] },
+      { chord: 'Am', rh: ['A4:1:2', 'R:1'], lh: ['A2:0.5:5', 'C3+E3+A3:0.5:1', 'A1+A2:1:5'] },
+      { chord: 'A', rh: ['C#5:0.5:3', 'C#5:0.5:3', 'D5:0.25:4', 'C#5:0.25:3', 'B4:0.25:2', 'A4:0.25:1'], lh: ['A1+A2:0.5:5', 'A2+C#3+E3:0.5:1', 'A1+A2:0.5:5', 'A2+C#3+E3:0.5:1'] },
+      { chord: 'A', rh: ['C#5:0.5:3', 'C#5:0.5:3', 'D5:0.25:4', 'C#5:0.25:3', 'B4:0.25:2', 'A4:0.25:1'], lh: ['A1+A2:0.5:5', 'A2+C#3+E3:0.5:1', 'A1+A2:0.5:5', 'A2+C#3+E3:0.5:1'] },
+      { chord: 'F#m', rh: ['F#5:0.5:5', 'F#5:0.5:5', 'G#5:0.25:5', 'F#5:0.25:4', 'E#5:0.25:3', 'F#5:0.25:4'], lh: ['F#1+F#2:0.5:5', 'F#2+A2+C#3:0.5:1', 'F#1+F#2:0.5:5', 'F#2+A2+C#3:0.5:1'] },
+      { chord: 'C#7', rh: ['G#5:0.5:5', 'G#5:0.5:5', 'A5:0.25:5', 'G#5:0.25:4', 'F#5:0.25:3', 'G#5:0.25:4'], lh: ['C#2:0.5:5', 'G#2+C#3+E#3:0.5:1', 'C#1+C#2:1:5'] },
+      { chord: 'A', rh: ['A5:1:5', 'A4+C#5+E5+A5:1:1'], lh: ['A1+A2:1:5', 'A1+E2+A2:1:5'] }
+    ], 2)
   }),
 
-  // 25. NOCTURNE IN E-FLAT MAJOR, OP. 9 NO. 2 — FRÉDÉRIC CHOPIN
+  // 24. NOCTURNE IN E-FLAT MAJOR, OP. 9 NO. 2 — FRÉDÉRIC CHOPIN
   buildSongFromEvents({
     id: 'chopin-nocturne-op9-no2',
     title: 'Nocturne in E-flat Major, Op. 9 No. 2',
     composer: 'Frédéric Chopin',
     genre: 'Classical',
     difficulty: 'Advanced',
-    tempo: 66,
-    timeSignature: [3, 4],
-    keySignature: 'C Major (Arr.)',
-    sourceFormat: 'Scanned Score (OMR)',
+    tempo: 60,
+    timeSignature: [4, 4],
+    keySignature: 'Eb Major',
+    sourceFormat: 'Urtext Edition',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'C', rh: ['G4:0.5:1', 'E5:2:5', 'D5:0.5:4'], lh: ['C3:1:5', 'G3+E4:1:1', 'G3+E4:1:1'] },
-      { chord: 'G7/C', rh: ['C5:1.5:3', 'B4:0.5:2', 'A4:1:1'], lh: ['C3:1:5', 'F3+D4:1:1', 'G3+F4:1:1'] },
-      { chord: 'C', rh: ['G4:1.5:2', 'E4:0.5:1', 'C5:0.5:5', 'A4:0.5:3'], lh: ['C3:1:5', 'G3+E4:1:1', 'A2:1:5'] },
-      { chord: 'G', rh: ['G4:2:3', 'F#4:0.5:2', 'G4:0.5:3'], lh: ['G2:1:5', 'D3+B3:1:1', 'G2:1:5'] },
-      { chord: 'Dm7', rh: ['A4:1.5:3', 'G4:0.5:2', 'F4:1:1'], lh: ['D3:1:5', 'A3+C4:1:1', 'G2:1:5'] },
-      { chord: 'C', rh: ['E4:1.5:1', 'G4:0.5:2', 'C5:1:5'], lh: ['C3:1:5', 'G3+E4:1:1', 'C3:1:5'] },
-      { chord: 'D7', rh: ['D5:1:4', 'C5:1:3', 'B4:0.5:2', 'A4:0.5:1'], lh: ['D3:1:5', 'F#3+C4:1:1', 'D3:1:5'] },
-      { chord: 'G7', rh: ['B4:2:3', 'G4:1:1'], lh: ['G2:1:5', 'G3+F4:2:1'] },
-      { chord: 'C', rh: ['G4:0.5:1', 'E5:2:5', 'D5:0.5:4'], lh: ['C3:1:5', 'G3+E4:1:1', 'G3+E4:1:1'] },
-      { chord: 'C7', rh: ['E5:1:4', 'F5:0.5:5', 'E5:0.5:4', 'Bb4:1:2'], lh: ['C3:1:5', 'G3+E4:1:1', 'C3:1:5'] },
-      { chord: 'F', rh: ['A4:1.5:1', 'C5:0.5:2', 'F5:1:5'], lh: ['F2:1:5', 'C3+A3:1:1', 'F2:1:5'] },
-      { chord: 'Fm6', rh: ['E5:1:4', 'D5:1:3', 'C5:1:2'], lh: ['F2:1:5', 'C3+Ab3:2:1'] },
-      { chord: 'C/G', rh: ['G5:1.5:5', 'E5:0.5:4', 'C5:1:2'], lh: ['G2:1:5', 'E3+C4:2:1'] },
-      { chord: 'G7', rh: ['D5:1.5:4', 'B4:0.5:2', 'G4:1:1'], lh: ['G2:1:5', 'F3+B3:2:1'] },
-      { chord: 'C', rh: ['C5:3:3'], lh: ['C2:1:5', 'G2+E3:2:1'] },
-      { chord: 'C', rh: ['E4+G4+C5+E5:3:1'], lh: ['C2+G2+C3:3:5'] }
-    ], 3)
+      { chord: 'Eb', rh: ['R:3', 'Bb4:1:2'], lh: ['R:4'] },
+      { chord: 'Eb', rh: ['G5:2.5:5', 'F5:0.5:4', 'G5:1:5', 'F5:1:4', 'Eb5:1:3', 'Bb4:2:1'], lh: ['Eb2:1:5', 'G3+Bb3+Eb4:1:1', 'G2:1:5', 'G3+Bb3+Eb4:1:1'] },
+      { chord: 'Ab', rh: ['C5:1:2', 'Eb5:1:4', 'Ab5:2:5', 'G5:1:4', 'F5:2:3', 'Eb5:1:2'], lh: ['Ab2:1:5', 'C3+Eb3+Ab3:1:1', 'Bb2:1:5', 'D3+F3+Bb3:1:1'] },
+      { chord: 'Eb', rh: ['G5:2.5:5', 'F5:0.5:4', 'G5:1:5', 'F5:1:4', 'Eb5:1:3', 'Bb4:2:1'], lh: ['Eb2:1:5', 'G3+Bb3+Eb4:1:1', 'C3:1:5', 'G3+C4+Eb4:1:1'] },
+      { chord: 'Bb7', rh: ['D5:1:2', 'F5:1:4', 'Bb5:2:5', 'A5:1:4', 'G5:1:3', 'F5:1:2', 'D5:1:1'], lh: ['F2:1:5', 'A2+C3+F3:1:1', 'Bb2:1:5', 'D3+F3+Bb3:1:1'] },
+      { chord: 'Eb', rh: ['Eb4+G4+Bb4+Eb5:4:1'], lh: ['Eb2+Bb2+Eb3:4:5'] }
+    ], 4)
   }),
 
-  // 26. THE SWAN (LE CYGNE) — CAMILLE SAINT-SAËNS
+  // 25. THE SWAN — CAMILLE SAINT-SAËNS (CARNIVAL OF THE ANIMALS)
   buildSongFromEvents({
     id: 'the-swan-saint-saens',
     title: 'The Swan (Carnival of the Animals)',
@@ -1195,220 +925,222 @@ const INITIAL_SONGS = [
     tempo: 72,
     timeSignature: [3, 4],
     keySignature: 'G Major',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Original Score',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'G', rh: ['G4:1.5:3', 'F#4:0.5:2', 'B4:1:5'], lh: ['G2:1:5', 'B3+D4:1:1', 'G3+D4:1:1'] },
-      { chord: 'Em', rh: ['E4:1.5:1', 'D4:0.5:1', 'G4:1:4'], lh: ['G2:1:5', 'B3+E4:1:1', 'G3+E4:1:1'] },
-      { chord: 'Am/G', rh: ['C4:2:1', 'B3:0.5:1', 'C4:0.5:2'], lh: ['G2:1:5', 'A3+E4:2:1'] },
-      { chord: 'G', rh: ['D4:3:3'], lh: ['G2:1:5', 'B3+D4:2:1'] },
-      { chord: 'Bm7', rh: ['F#4:1.5:2', 'G4:0.5:3', 'A4:1:4'], lh: ['F#2:1:5', 'B3+D4:2:1'] },
-      { chord: 'Em', rh: ['B4:2:5', 'E4:1:1'], lh: ['E2:1:5', 'G3+B3:2:1'] },
-      { chord: 'A7', rh: ['F#4:1:2', 'G4:1:3', 'A4:1:4'], lh: ['A2:1:5', 'G3+C#4:2:1'] },
-      { chord: 'D7', rh: ['B4:2:5', 'A4:1:4'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
-      { chord: 'G', rh: ['G4:1.5:3', 'F#4:0.5:2', 'B4:1:5'], lh: ['G2:1:5', 'B3+D4:2:1'] },
-      { chord: 'B7', rh: ['D#4:1.5:1', 'F#4:0.5:2', 'B4:1:5'], lh: ['B2:1:5', 'A3+B3:2:1'] },
-      { chord: 'C', rh: ['E4:1.5:1', 'G4:0.5:2', 'C5:1:5'], lh: ['C3:1:5', 'G3+C4:2:1'] },
-      { chord: 'Cm6', rh: ['A4:2:3', 'D5:1:5'], lh: ['C3:1:5', 'Eb3+A3:2:1'] },
-      { chord: 'G/D', rh: ['B4:2:4', 'G4:1:2'], lh: ['D3:1:5', 'G3+B3:2:1'] },
-      { chord: 'D7', rh: ['A4:1.5:3', 'F#4:0.5:2', 'G4:1:3'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
-      { chord: 'G', rh: ['G4:3:1'], lh: ['G2:1:5', 'B3+D4:2:1'] },
-      { chord: 'G', rh: ['G4+B4+D5+G5:3:1'], lh: ['G2+D3+G3:3:5'] }
+      { chord: 'G', rh: ['R:1', 'G4:1:1', 'A4:1:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'G', rh: ['B4:2:3', 'D5:1:5'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'C', rh: ['C5:1:4', 'B4:1:3', 'A4:1:2'], lh: ['E3:1:5', 'G3:1:2', 'C4:1:1'] },
+      { chord: 'G', rh: ['B4:2:3', 'G4:1:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'C', rh: ['E4:2:1', 'F#4:1:2'], lh: ['C3:1:5', 'G3:1:2', 'E4:1:1'] },
+      { chord: 'C', rh: ['G4:1:3', 'B4:1:5', 'A4:1:4'], lh: ['C3:1:5', 'G3:1:2', 'E4:1:1'] },
+      { chord: 'D7', rh: ['G4:2:3', 'F#4:1:2'], lh: ['D3:1:5', 'A3:1:2', 'F#4:1:1'] },
+      { chord: 'Em', rh: ['E4:3:1'], lh: ['E2:1:5', 'B2:1:2', 'G3:1:1'] },
+      { chord: 'G', rh: ['G4:2:1', 'A4:1:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'G', rh: ['B4:2:3', 'D5:1:5'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'C', rh: ['E5:2:5', 'D5:1:4'], lh: ['C3:1:5', 'G3:1:2', 'E4:1:1'] },
+      { chord: 'G', rh: ['B4:2:3', 'G4:1:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'D7', rh: ['A4:2:2', 'B4:1:3'], lh: ['D3:1:5', 'A3:1:2', 'F#4:1:1'] },
+      { chord: 'G', rh: ['G4:3:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'G', rh: ['G3+B3+D4+G4:3:1'], lh: ['G1+D2+G2:3:5'] }
     ], 3)
   }),
 
-  // 27. BLUE DANUBE WALTZ — JOHANN STRAUSS II
+  // 26. THE BLUE DANUBE WALTZ — JOHANN STRAUSS II
   buildSongFromEvents({
     id: 'blue-danube-waltz',
     title: 'The Blue Danube Waltz, Op. 314',
     composer: 'Johann Strauss II',
     genre: 'Classical',
-    difficulty: 'Beginner',
-    tempo: 138,
+    difficulty: 'Intermediate',
+    tempo: 160,
     timeSignature: [3, 4],
     keySignature: 'D Major',
-    sourceFormat: 'Public Domain Score',
+    sourceFormat: 'Original Orchestral Waltz',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'D', rh: ['D4:1:1', 'F#4:1:2', 'A4:1:3'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
-      { chord: 'D', rh: ['A4:2:3', 'D5:1:5'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
-      { chord: 'D', rh: ['D5:2:5', 'B4:1:4'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
-      { chord: 'D', rh: ['A4:3:3'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
-      { chord: 'A7', rh: ['D4:1:1', 'F#4:1:2', 'A4:1:3'], lh: ['A2:1:5', 'E3+G3:1:1', 'E3+G3:1:1'] },
-      { chord: 'A7', rh: ['A4:2:3', 'E5:1:5'], lh: ['A2:1:5', 'E3+G3:1:1', 'E3+G3:1:1'] },
-      { chord: 'A7', rh: ['E5:2:5', 'C#5:1:4'], lh: ['A2:1:5', 'E3+G3:1:1', 'E3+G3:1:1'] },
-      { chord: 'D', rh: ['B4:2:3', 'A4:1:2'], lh: ['D2:1:5', 'F#3+A3:2:1'] },
-      { chord: 'D', rh: ['D4:1:1', 'F#4:1:2', 'A4:1:3'], lh: ['D2:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
-      { chord: 'D7', rh: ['A4:2:2', 'F#5:1:5'], lh: ['D2:1:5', 'F#3+C4:2:1'] },
-      { chord: 'G', rh: ['F#5:2:5', 'D5:1:3'], lh: ['G2:1:5', 'G3+B3:2:1'] },
-      { chord: 'G', rh: ['B4:3:2'], lh: ['G2:1:5', 'G3+B3:2:1'] },
-      { chord: 'D/A', rh: ['A4:1:1', 'D5:1:3', 'F#5:1:5'], lh: ['A2:1:5', 'F#3+A3:2:1'] },
-      { chord: 'A7', rh: ['E5:2:4', 'C#5:1:2'], lh: ['A2:1:5', 'E3+G3:2:1'] },
-      { chord: 'D', rh: ['D5:3:3'], lh: ['D2:1:5', 'F#3+A3:2:1'] },
+      { chord: 'D', rh: ['D4:1:1', 'F#4:1:2', 'A4:1:3'], lh: ['R:3'] },
+      { chord: 'D', rh: ['A4:2:3', 'F#5:1:5'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['F#5:2:5', 'D5:1:3'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['D5:2:3', 'F#4:1:2'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['F#4:2:2', 'A4:1:3'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'A7', rh: ['A4:2:3', 'G5:1:5'], lh: ['A2:1:5', 'G3+C#4:1:1', 'G3+C#4:1:1'] },
+      { chord: 'A7', rh: ['G5:2:5', 'E5:1:4'], lh: ['A2:1:5', 'G3+C#4:1:1', 'G3+C#4:1:1'] },
+      { chord: 'A7', rh: ['E5:2:4', 'G4:1:2'], lh: ['A2:1:5', 'G3+C#4:1:1', 'G3+C#4:1:1'] },
+      { chord: 'A7', rh: ['G4:2:2', 'A4:1:3'], lh: ['A2:1:5', 'G3+C#4:1:1', 'G3+C#4:1:1'] },
+      { chord: 'D', rh: ['A4:2:3', 'F#5:1:5'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['F#5:2:5', 'D5:1:3'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['D5:2:3', 'F#4:1:2'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'D', rh: ['F#4:2:2', 'A4:1:3'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
+      { chord: 'A7', rh: ['A4:2:3', 'E5:1:5'], lh: ['A2:1:5', 'G3+C#4:1:1', 'G3+C#4:1:1'] },
+      { chord: 'A7', rh: ['E5:2:5', 'C#5:1:4'], lh: ['A2:1:5', 'G3+C#4:1:1', 'G3+C#4:1:1'] },
+      { chord: 'D', rh: ['D5:3:3'], lh: ['D3:1:5', 'F#3+A3:1:1', 'F#3+A3:1:1'] },
       { chord: 'D', rh: ['D4+F#4+A4+D5:3:1'], lh: ['D2+A2+D3:3:5'] }
     ], 3)
   }),
 
-  // 28. DANCE OF THE SUGAR PLUM FAIRY (THE NUTCRACKER) — TCHAIKOVSKY
+  // 27. DANCE OF THE SUGAR PLUM FAIRY — PYOTR ILYICH TCHAIKOVSKY (THE NUTCRACKER)
   buildSongFromEvents({
     id: 'sugar-plum-fairy',
     title: 'Dance of the Sugar Plum Fairy (Nutcracker)',
     composer: 'Pyotr Ilyich Tchaikovsky',
     genre: 'Classical',
-    difficulty: 'Intermediate',
-    tempo: 100,
-    timeSignature: [4, 4],
+    difficulty: 'Advanced',
+    tempo: 116,
+    timeSignature: [2, 4],
     keySignature: 'E Minor',
-    sourceFormat: 'MusicXML 4.0',
+    sourceFormat: 'Ballet Score',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'Em', rh: ['R:1', 'G5:0.5:5', 'F#5:0.5:4', 'G5:1:5', 'E5:1:3'], lh: ['E3:1:5', 'G3+B3:1:1', 'E3:1:5', 'G3+B3:1:1'] },
-      { chord: 'B7', rh: ['D#5:1:2', 'E5:0.5:3', 'F#5:0.5:4', 'D#5:1:2', 'B4:1:1'], lh: ['B2:1:5', 'F#3+A3:1:1', 'B2:1:5', 'F#3+A3:1:1'] },
-      { chord: 'Em', rh: ['E5:0.5:3', 'D#5:0.5:2', 'E5:0.5:3', 'F#5:0.5:4', 'G5:0.5:5', 'F#5:0.5:4', 'G5:0.5:5', 'E5:0.5:3'], lh: ['E3:1:5', 'G3+B3:1:1', 'C3:1:5', 'E3+A3:1:1'] },
-      { chord: 'B7', rh: ['F#5:2:4', 'B4:2:1'], lh: ['B2:1:5', 'D#3+A3:1:1', 'B2:2:5'] },
-      { chord: 'Em', rh: ['R:1', 'G5:0.5:5', 'F#5:0.5:4', 'G5:1:5', 'E5:1:3'], lh: ['E3:1:5', 'G3+B3:1:1', 'E3:1:5', 'G3+B3:1:1'] },
-      { chord: 'D7', rh: ['F#5:1:3', 'G5:0.5:4', 'A5:0.5:5', 'F#5:1:3', 'D5:1:1'], lh: ['D3:1:5', 'F#3+C4:1:1', 'D3:1:5', 'F#3+C4:1:1'] },
-      { chord: 'G', rh: ['G5:0.5:4', 'F#5:0.5:3', 'G5:0.5:4', 'A5:0.5:5', 'B5:1:5', 'G5:1:3'], lh: ['G2:1:5', 'D3+B3:1:1', 'G2:2:5'] },
-      { chord: 'B7', rh: ['F#5:2:4', 'B4:2:1'], lh: ['B2:1:5', 'F#3+A3:1:1', 'B2:2:5'] },
-      { chord: 'Am', rh: ['C5:1:2', 'B4:0.5:1', 'C5:0.5:2', 'E5:1:4', 'C5:1:2'], lh: ['A2:1:5', 'E3+A3:1:1', 'A2:2:5'] },
-      { chord: 'Em', rh: ['B4:1:2', 'A#4:0.5:1', 'B4:0.5:2', 'E5:1:5', 'B4:1:2'], lh: ['E2:1:5', 'E3+G3:1:1', 'E2:2:5'] },
-      { chord: 'F#7', rh: ['A#4:1:2', 'B4:1:3', 'C#5:1:4', 'E5:1:5'], lh: ['F#2:2:5', 'F#3+A#3:2:1'] },
-      { chord: 'B7', rh: ['D#5:2:4', 'B4:2:1'], lh: ['B2:2:5', 'F#3+A3:2:1'] },
-      { chord: 'Em', rh: ['G5:0.5:5', 'F#5:0.5:4', 'G5:1:5', 'E5:1:3', 'B4:1:1'], lh: ['E3:2:5', 'G3+B3:2:1'] },
-      { chord: 'Am6', rh: ['C5:1:2', 'A4:1:1', 'F#5:2:5'], lh: ['A2:2:5', 'E3+F#3:2:1'] },
-      { chord: 'B7', rh: ['E5:1:4', 'D#5:1:3', 'B4:2:1'], lh: ['B2:2:5', 'F#3+A3:2:1'] },
-      { chord: 'Em', rh: ['E4+G4+B4+E5:4:1'], lh: ['E2+B2+E3:4:5'] }
-    ], 4)
+      { chord: 'Em', rh: ['B4:0.5:5', 'G4:0.5:3', 'E4:0.5:1', 'B3:0.5:1'], lh: ['E2:0.5:5', 'G3+B3:0.5:1', 'E2:0.5:5', 'G3+B3:0.5:1'] },
+      { chord: 'B7', rh: ['D#4:0.5:2', 'F#4:0.5:3', 'A4:0.5:4', 'C5:0.5:5'], lh: ['B1:0.5:5', 'F#3+A3:0.5:1', 'B1:0.5:5', 'F#3+A3:0.5:1'] },
+      { chord: 'Em', rh: ['B4:0.5:5', 'G4:0.5:3', 'E4:0.5:1', 'B3:0.5:1'], lh: ['E2:0.5:5', 'G3+B3:0.5:1', 'E2:0.5:5', 'G3+B3:0.5:1'] },
+      { chord: 'B7', rh: ['D#4:0.5:2', 'F#4:0.5:3', 'A4:0.5:4', 'C5:0.5:5'], lh: ['B1:0.5:5', 'F#3+A3:0.5:1', 'B1:0.5:5', 'F#3+A3:0.5:1'] },
+      { chord: 'Em', rh: ['B4:0.25:5', 'G4:0.25:3', 'E4:0.25:1', 'B3:0.25:1', 'D#4:0.25:2', 'F#4:0.25:3', 'A4:0.25:4', 'C5:0.25:5'], lh: ['E2:0.5:5', 'G3+B3:0.5:1', 'B1:0.5:5', 'F#3+A3:0.5:1'] },
+      { chord: 'Em', rh: ['B4:1:5', 'R:1'], lh: ['E2:0.5:5', 'G3+B3:0.5:1', 'E1+E2:1:5'] },
+      { chord: 'Am', rh: ['C5:0.5:5', 'A4:0.5:4', 'F#4:0.5:2', 'C4:0.5:1'], lh: ['A1:0.5:5', 'E3+A3:0.5:1', 'A1:0.5:5', 'E3+A3:0.5:1'] },
+      { chord: 'Em', rh: ['B4:1:5', 'E4+G4+B4:1:1'], lh: ['E2+B2:1:5', 'E1+E2:1:5'] }
+    ], 2)
   }),
 
-  // 29. IN THE HALL OF THE MOUNTAIN KING — EDVARD GRIEG
+  // 28. IN THE HALL OF THE MOUNTAIN KING — EDVARD GRIEG (PEER GYNT)
   buildSongFromEvents({
     id: 'mountain-king-grieg',
     title: 'In the Hall of the Mountain King (Peer Gynt)',
     composer: 'Edvard Grieg',
     genre: 'Classical',
-    difficulty: 'Beginner',
-    tempo: 122,
+    difficulty: 'Intermediate',
+    tempo: 108,
     timeSignature: [4, 4],
-    keySignature: 'A Minor',
-    sourceFormat: 'Standard MIDI (.mid)',
+    keySignature: 'B Minor',
+    sourceFormat: 'Concert Score',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'Am', rh: ['A3:0.5:1', 'B3:0.5:2', 'C4:0.5:3', 'D4:0.5:4', 'E4:0.5:5', 'C4:0.5:3', 'E4:1:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
-      { chord: 'Am', rh: ['D#4:0.5:4', 'B3:0.5:2', 'D#4:1:4', 'D4:0.5:4', 'Bb3:0.5:2', 'D4:1:4'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
-      { chord: 'Am', rh: ['A3:0.5:1', 'B3:0.5:2', 'C4:0.5:3', 'D4:0.5:4', 'E4:0.5:5', 'C4:0.5:3', 'E4:0.5:5', 'A4:0.5:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
-      { chord: 'C', rh: ['G4:0.5:4', 'E4:0.5:2', 'C4:0.5:1', 'E4:0.5:2', 'G4:2:4'], lh: ['C2:1:5', 'G2:1:1', 'C3:2:1'] },
-      { chord: 'Am', rh: ['A4:0.5:1', 'B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'C5:0.5:3', 'E5:1:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
-      { chord: 'Am', rh: ['D#5:0.5:4', 'B4:0.5:2', 'D#5:1:4', 'D5:0.5:4', 'Bb4:0.5:2', 'D5:1:4'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
-      { chord: 'Am', rh: ['A4:0.5:1', 'B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'C5:0.5:3', 'E5:0.5:5', 'A5:0.5:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
-      { chord: 'C', rh: ['G5:0.5:4', 'E5:0.5:2', 'C5:0.5:1', 'E5:0.5:2', 'G5:2:4'], lh: ['C3:1:5', 'G3:1:1', 'C4:2:1'] },
-      // B Section (E Major Dominant Tension)
-      { chord: 'E', rh: ['E4:0.5:1', 'F#4:0.5:2', 'G#4:0.5:3', 'A4:0.5:4', 'B4:0.5:5', 'G#4:0.5:3', 'B4:1:5'], lh: ['E2:1:5', 'B2:1:1', 'E2:1:5', 'B2:1:1'] },
-      { chord: 'E', rh: ['C5:0.5:5', 'G#4:0.5:3', 'C5:1:5', 'B4:0.5:5', 'G#4:0.5:3', 'B4:1:5'], lh: ['E2:1:5', 'B2:1:1', 'E2:1:5', 'B2:1:1'] },
-      { chord: 'E', rh: ['E4:0.5:1', 'F#4:0.5:2', 'G#4:0.5:3', 'A4:0.5:4', 'B4:0.5:5', 'G#4:0.5:3', 'B4:1:5'], lh: ['E2:1:5', 'B2:1:1', 'E2:1:5', 'B2:1:1'] },
-      { chord: 'E7', rh: ['C5:0.5:4', 'G#4:0.5:2', 'C5:1:4', 'B4:2:3'], lh: ['E2:2:5', 'E3:2:1'] },
-      { chord: 'Am', rh: ['A4:0.5:1', 'B4:0.5:2', 'C5:0.5:3', 'D5:0.5:4', 'E5:0.5:5', 'C5:0.5:3', 'E5:1:5'], lh: ['A2:1:5', 'E3:1:1', 'A2:1:5', 'E3:1:1'] },
-      { chord: 'E7', rh: ['D#5:0.5:4', 'B4:0.5:2', 'D#5:1:4', 'E5:1:5', 'G#4:1:2'], lh: ['E2:2:5', 'E3:2:1'] },
-      { chord: 'Am', rh: ['A4:1:1', 'C5:1:2', 'E5:1:4', 'A5:1:5'], lh: ['A2:2:5', 'E3:2:1'] },
-      { chord: 'Am', rh: ['A4+C5+E5+A5:4:1'], lh: ['A1+E2+A2:4:5'] }
+      { chord: 'Bm', rh: ['B2:0.5:1', 'C#3:0.5:2', 'D3:0.5:3', 'E3:0.5:4', 'F#3:0.5:5', 'D3:0.5:3', 'F#3:1:5'], lh: ['B1:1:5', 'F#2:1:2', 'B1:1:5', 'F#2:1:2'] },
+      { chord: 'F#m', rh: ['F3:0.5:4', 'C#3:0.5:2', 'F3:1:4', 'E3:0.5:3', 'C3:0.5:1', 'E3:1:3'], lh: ['F1:1:5', 'C#2:1:2', 'E1:1:5', 'C2:1:2'] },
+      { chord: 'Bm', rh: ['B2:0.5:1', 'C#3:0.5:2', 'D3:0.5:3', 'E3:0.5:4', 'F#3:0.5:5', 'D3:0.5:3', 'F#3:0.5:5', 'B3:0.5:5'], lh: ['B1:1:5', 'F#2:1:2', 'B1:1:5', 'F#2:1:2'] },
+      { chord: 'D', rh: ['A3:0.5:4', 'F#3:0.5:2', 'D3:0.5:1', 'F#3:0.5:2', 'A3:2:4'], lh: ['D2:1:5', 'A2:1:2', 'D2:2:5'] },
+      { chord: 'Bm', rh: ['B3:0.5:1', 'C#4:0.5:2', 'D4:0.5:3', 'E4:0.5:4', 'F#4:0.5:5', 'D4:0.5:3', 'F#4:1:5'], lh: ['B2:1:5', 'F#3:1:2', 'B2:1:5', 'F#3:1:2'] },
+      { chord: 'F#m', rh: ['F4:0.5:4', 'C#4:0.5:2', 'F4:1:4', 'E4:0.5:3', 'C4:0.5:1', 'E4:1:3'], lh: ['F2:1:5', 'C#3:1:2', 'E2:1:5', 'C3:1:2'] },
+      { chord: 'Bm', rh: ['B3:0.5:1', 'C#4:0.5:2', 'D4:0.5:3', 'E4:0.5:4', 'F#4:0.5:5', 'D4:0.5:3', 'F#4:0.5:5', 'B4:0.5:5'], lh: ['B2:1:5', 'F#3:1:2', 'B2:1:5', 'F#3:1:2'] },
+      { chord: 'Bm', rh: ['A#4:0.5:4', 'F#4:0.5:2', 'D4:0.5:1', 'F#4:0.5:2', 'B4:2:5'], lh: ['F#2:1:5', 'C#3:1:2', 'B1+F#2+B2:2:5'] }
     ], 4)
   }),
 
-  // 30. GREENSLEEVES (WHAT CHILD IS THIS) — TRADITIONAL RENAISSANCE BALLAD
+  // 29. GREENSLEEVES — TRADITIONAL ENGLISH BALLAD
   buildSongFromEvents({
     id: 'greensleeves',
     title: 'Greensleeves (Traditional Ballad)',
-    composer: 'Traditional English',
+    composer: 'Traditional (16th Century)',
     genre: 'Traditional & Folk',
-    difficulty: 'Beginner',
+    difficulty: 'Intermediate',
     tempo: 96,
     timeSignature: [3, 4],
     keySignature: 'A Minor',
-    sourceFormat: 'Public Domain Score',
+    sourceFormat: 'Folk Ballad Score',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'Am', rh: ['A4:1:1', 'C5:2:3'], lh: ['A2:1:5', 'E3+A3:2:1'] },
-      { chord: 'G', rh: ['D5:1.5:4', 'E5:0.5:5', 'D5:1:4'], lh: ['G2:1:5', 'D3+G3:2:1'] },
-      { chord: 'F', rh: ['C5:2:3', 'A4:1:2'], lh: ['F2:1:5', 'C3+F3:2:1'] },
-      { chord: 'E', rh: ['F4:1.5:1', 'G4:0.5:2', 'A4:1:3'], lh: ['E2:1:5', 'B2+E3:2:1'] },
-      { chord: 'Am', rh: ['B4:2:4', 'G#4:1:2'], lh: ['E2:1:5', 'B2+E3:2:1'] },
-      { chord: 'Am', rh: ['E4:2:1', 'A4:1:2'], lh: ['A2:1:5', 'E3+A3:2:1'] },
-      { chord: 'Am', rh: ['C5:2:3', 'D5:1:4'], lh: ['A2:1:5', 'E3+A3:2:1'] },
-      { chord: 'G', rh: ['E5:1.5:5', 'D5:0.5:4', 'C5:1:3'], lh: ['G2:1:5', 'D3+G3:2:1'] },
-      // High Chorus ("Greensleeves was all my joy")
-      { chord: 'C', rh: ['G5:3:5'], lh: ['C3:1:5', 'G3+C4:2:1'] },
-      { chord: 'G', rh: ['G5:1.5:5', 'F#5:0.5:4', 'E5:1:3'], lh: ['G2:1:5', 'D3+B3:2:1'] },
-      { chord: 'Am', rh: ['D5:2:3', 'B4:1:1'], lh: ['G2:1:5', 'D3+G3:2:1'] },
-      { chord: 'E7', rh: ['G#4:1.5:1', 'A4:0.5:2', 'B4:1:3'], lh: ['E2:1:5', 'B2+E3:2:1'] },
-      { chord: 'C', rh: ['G5:3:5'], lh: ['C3:1:5', 'G3+C4:2:1'] },
-      { chord: 'G', rh: ['G5:1.5:5', 'F#5:0.5:4', 'E5:1:3'], lh: ['G2:1:5', 'D3+B3:2:1'] },
-      { chord: 'E7', rh: ['D5:1:4', 'C5:1:3', 'B4:1:2'], lh: ['E2:1:5', 'B2+G#3:2:1'] },
-      { chord: 'Am', rh: ['A4+C5+E5:3:1'], lh: ['A2+E3+A3:3:5'] }
+      { chord: 'Am', rh: ['R:2', 'A4:1:1'], lh: ['R:3'] },
+      { chord: 'Am', rh: ['C5:2:3', 'D5:1:4'], lh: ['A2:1:5', 'E3:1:2', 'C4:1:1'] },
+      { chord: 'C', rh: ['E5:1.5:5', 'F5:0.5:5', 'E5:1:5'], lh: ['C3:1:5', 'G3:1:2', 'E4:1:1'] },
+      { chord: 'G', rh: ['D5:2:4', 'B4:1:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'Em', rh: ['G4:1.5:1', 'A4:0.5:2', 'B4:1:3'], lh: ['E2:1:5', 'B2:1:2', 'G3:1:1'] },
+      { chord: 'Am', rh: ['C5:2:3', 'A4:1:1'], lh: ['A2:1:5', 'E3:1:2', 'C4:1:1'] },
+      { chord: 'F', rh: ['A4:1.5:1', 'G#4:0.5:1', 'A4:1:1'], lh: ['F2:1:5', 'C3:1:2', 'A3:1:1'] },
+      { chord: 'E7', rh: ['B4:2:3', 'G#4:1:1'], lh: ['E2:1:5', 'B2:1:2', 'G#3:1:1'] },
+      { chord: 'E7', rh: ['E4:2:1', 'A4:1:2'], lh: ['E2:1:5', 'B2:1:2', 'E3:1:1'] },
+      { chord: 'Am', rh: ['C5:2:3', 'D5:1:4'], lh: ['A2:1:5', 'E3:1:2', 'C4:1:1'] },
+      { chord: 'C', rh: ['E5:1.5:5', 'F5:0.5:5', 'E5:1:5'], lh: ['C3:1:5', 'G3:1:2', 'E4:1:1'] },
+      { chord: 'G', rh: ['D5:2:4', 'B4:1:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'Em', rh: ['G4:1.5:1', 'A4:0.5:2', 'B4:1:3'], lh: ['E2:1:5', 'B2:1:2', 'G3:1:1'] },
+      { chord: 'Am', rh: ['C5:1.5:3', 'B4:0.5:2', 'A4:1:1'], lh: ['A2:1:5', 'E3:1:2', 'C4:1:1'] },
+      { chord: 'E7', rh: ['G#4:1.5:2', 'F#4:0.5:1', 'G#4:1:2'], lh: ['E2:1:5', 'B2:1:2', 'G#3:1:1'] },
+      { chord: 'Am', rh: ['A4:3:1'], lh: ['A2:1:5', 'E3:1:2', 'A3:1:1'] },
+      { chord: 'Am', rh: ['A3+C4+E4+A4:3:1'], lh: ['A1+E2+A2:3:5'] }
     ], 3)
   }),
 
-  // 31. AMAZING GRACE — GOSPEL PIANO HYMN
+  // 30. AMAZING GRACE — TRADITIONAL SPIRITUAL
   buildSongFromEvents({
     id: 'amazing-grace',
     title: 'Amazing Grace (Gospel Piano Arrangement)',
-    composer: 'John Newton (Traditional)',
+    composer: 'John Newton / Traditional',
     genre: 'Traditional & Folk',
     difficulty: 'Beginner',
-    tempo: 84,
+    tempo: 72,
     timeSignature: [3, 4],
     keySignature: 'G Major',
-    sourceFormat: 'Public Domain Score',
+    sourceFormat: 'Hymnal Arrangement',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'G', rh: ['D4:1:1', 'G4:2:2'], lh: ['G2+D3:3:5'] },
-      { chord: 'G7', rh: ['B4:0.5:4', 'G4:0.5:2', 'B4:2:4'], lh: ['G2+F3:3:5'] },
-      { chord: 'C', rh: ['A4:1:3', 'G4:2:2'], lh: ['C3+E3:3:5'] },
-      { chord: 'G', rh: ['E4:1:1', 'D4:2:1'], lh: ['G2+B2:3:5'] },
-      { chord: 'G', rh: ['D4:1:1', 'G4:2:2'], lh: ['G2+D3:3:5'] },
-      { chord: 'Em', rh: ['B4:0.5:4', 'G4:0.5:2', 'B4:2:4'], lh: ['E2+B2:3:5'] },
-      { chord: 'A7', rh: ['A4:1:3', 'D5:2:5'], lh: ['A2+G3:3:5'] },
-      { chord: 'D7', rh: ['D5:2:5', 'B4:1:3'], lh: ['D2+F#3:3:5'] },
-      { chord: 'G', rh: ['D5:1.5:5', 'B4:0.5:3', 'D5:1:5'], lh: ['G2+D3:3:5'] },
-      { chord: 'G7', rh: ['B4:0.5:4', 'G4:0.5:2', 'D4:2:1'], lh: ['G2+F3:3:5'] },
-      { chord: 'C', rh: ['E4:1:2', 'G4:1.5:4', 'E4:0.5:2'], lh: ['C3+G3:3:5'] },
-      { chord: 'G/D', rh: ['D4:2:1', 'D4:1:1'], lh: ['D3+G3:3:5'] },
-      { chord: 'Em', rh: ['G4:2:2', 'B4:0.5:4', 'G4:0.5:2'], lh: ['E2+B2:3:5'] },
-      { chord: 'D7', rh: ['B4:2:4', 'A4:1:3'], lh: ['D2+F#3+C4:3:5'] },
-      { chord: 'G', rh: ['G4:3:2'], lh: ['G2+C3:2:5', 'G2+B2:1:5'] },
-      { chord: 'G', rh: ['D4+G4+B4+G5:3:1'], lh: ['G2+D3+G3:3:5'] }
+      { chord: 'G', rh: ['R:2', 'D4:1:1'], lh: ['R:3'] },
+      { chord: 'G', rh: ['G4:2:2', 'B4:0.5:4', 'G4:0.5:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'G', rh: ['B4:2:4', 'A4:1:3'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'C', rh: ['G4:2:2', 'E4:1:1'], lh: ['C3:1:5', 'G3:1:2', 'E4:1:1'] },
+      { chord: 'G', rh: ['D4:2:1', 'D4:1:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'G', rh: ['G4:2:2', 'B4:0.5:4', 'G4:0.5:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'Em', rh: ['B4:2:4', 'A4:1:3'], lh: ['B2:1:5', 'F#3:1:2', 'D4:1:1'] },
+      { chord: 'D7', rh: ['D5:3:5'], lh: ['D3:1:5', 'A3:1:2', 'F#4:1:1'] },
+      { chord: 'G', rh: ['D5:2:5', 'B4:1:3'], lh: ['D3:1:5', 'A3:1:2', 'F#4:1:1'] },
+      { chord: 'G', rh: ['D5:2:5', 'B4:0.5:3', 'G4:0.5:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'G', rh: ['B4:2:4', 'A4:1:3'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'C', rh: ['G4:2:2', 'E4:1:1'], lh: ['C3:1:5', 'G3:1:2', 'E4:1:1'] },
+      { chord: 'G', rh: ['D4:2:1', 'D4:1:1'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'G', rh: ['G4:2:2', 'B4:0.5:4', 'G4:0.5:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'D7', rh: ['B4:2:4', 'A4:1:3'], lh: ['D3:1:5', 'A3:1:2', 'F#4:1:1'] },
+      { chord: 'G', rh: ['G4:3:2'], lh: ['G2:1:5', 'D3:1:2', 'B3:1:1'] },
+      { chord: 'G', rh: ['G3+B3+D4+G4:3:1'], lh: ['G1+D2+G2:3:5'] }
     ], 3)
   }),
 
-  // 32. MAPLE LEAF RAG — SCOTT JOPLIN
+  // 31. MAPLE LEAF RAG — SCOTT JOPLIN (OPENING STRIDE THEME)
   buildSongFromEvents({
     id: 'maple-leaf-rag',
     title: 'Maple Leaf Rag (Opening Stride Theme)',
     composer: 'Scott Joplin',
     genre: 'Jazz & Ragtime',
     difficulty: 'Advanced',
-    tempo: 120,
-    timeSignature: [4, 4],
-    keySignature: 'C Major (Arr.)',
-    sourceFormat: 'Standard MIDI (.mid)',
+    tempo: 96,
+    timeSignature: [2, 4],
+    keySignature: 'C Major',
+    sourceFormat: 'Original Ragtime Sheet',
     license: 'Public Domain',
     rawNotes: compileCompactScore([
-      { chord: 'C', rh: ['G4:0.5:1', 'C5:0.5:3', 'E5:1:5', 'C5:0.5:3', 'E5:1:5', 'G4:0.5:1'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
-      { chord: 'G7', rh: ['A4:0.5:2', 'D5:0.5:4', 'F5:1:5', 'D5:0.5:4', 'F5:1.5:5'], lh: ['G2:1:5', 'F3+G3:1:1', 'G2:1:5', 'F3+G3:1:1'] },
-      { chord: 'C', rh: ['G4:0.5:1', 'C5:0.5:3', 'E5:1:5', 'C5:0.5:3', 'E5:1:5', 'D#5:0.5:4'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
-      { chord: 'E7', rh: ['E5:2:5', 'B4:1:2', 'E5:1:5'], lh: ['E2:1:5', 'G#2+D3:1:1', 'E2:2:5'] },
-      { chord: 'Am', rh: ['C5:1:3', 'A4:1:1', 'C5:1:3', 'A4:1:1'], lh: ['A2:1:5', 'E3+A3:1:1', 'A2:2:5'] },
-      { chord: 'Fm6', rh: ['Ab4:0.5:1', 'C5:0.5:2', 'D5:1:3', 'F5:1:5', 'D5:1:3'], lh: ['F2:1:5', 'C3+Ab3:1:1', 'F2:2:5'] },
-      { chord: 'C/G', rh: ['E5:1:5', 'C5:1:3', 'G4:1:1', 'A4:1:2'], lh: ['G2:2:5', 'E3+G3:2:1'] },
-      { chord: 'G7', rh: ['B4:1:3', 'D5:1:5', 'G4:2:1'], lh: ['G2:2:5', 'F3+G3:2:1'] },
-      { chord: 'C', rh: ['G4:0.5:1', 'C5:0.5:3', 'E5:1:5', 'C5:0.5:3', 'E5:1:5', 'G4:0.5:1'], lh: ['C3:1:5', 'E3+G3:1:1', 'G2:1:5', 'E3+G3:1:1'] },
-      { chord: 'G7', rh: ['A4:0.5:2', 'D5:0.5:4', 'F5:1:5', 'D5:0.5:4', 'F5:1.5:5'], lh: ['G2:1:5', 'F3+G3:1:1', 'G2:1:5', 'F3+G3:1:1'] },
-      { chord: 'C7', rh: ['G4:0.5:1', 'C5:0.5:2', 'E5:1:4', 'G5:1:5', 'E5:1:4'], lh: ['C3:1:5', 'E3+Bb3:1:1', 'C3:2:5'] },
-      { chord: 'F', rh: ['F5:2:5', 'C5:1:2', 'A4:1:1'], lh: ['F2:1:5', 'C3+A3:1:1', 'F2:2:5'] },
-      { chord: 'Fm6', rh: ['D5:1:4', 'C5:1:3', 'Ab4:1:1', 'C5:1:3'], lh: ['F2:2:5', 'C3+Ab3:2:1'] },
-      { chord: 'C/G', rh: ['E5:1:5', 'C5:1:3', 'G4:1:1', 'E4:1:1'], lh: ['G2:2:5', 'E3+G3:2:1'] },
-      { chord: 'G7', rh: ['D4:1:1', 'F4:1:2', 'B4:1:4', 'D5:1:5'], lh: ['G2:2:5', 'F3+G3:2:1'] },
-      { chord: 'C', rh: ['C4+E4+G4+C5:4:1'], lh: ['C2+G2+C3:4:5'] }
-    ], 4)
+      { chord: 'C', rh: ['E4:0.25:1', 'G4:0.25:2', 'C5:0.5:4', 'E4:0.25:1', 'G4:0.25:2', 'C5:0.5:4'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['E4:0.25:1', 'G4:0.25:2', 'C5:0.5:4', 'D#5:0.25:4', 'E5:0.5:5', 'C5:0.25:3'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'G7', rh: ['D5:0.5:4', 'E4:0.25:1', 'G4:0.25:2', 'C5:0.5:3', 'E4:0.25:1', 'G4:0.25:2'], lh: ['G2:0.5:5', 'B2+D3+F3:0.5:1', 'G1:0.5:5', 'B2+D3+F3:0.5:1'] },
+      { chord: 'C', rh: ['C5:1:3', 'R:1'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'C2:1:5'] },
+      { chord: 'C', rh: ['E4:0.25:1', 'G4:0.25:2', 'C5:0.5:4', 'E4:0.25:1', 'G4:0.25:2', 'C5:0.5:4'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'C', rh: ['E4:0.25:1', 'G4:0.25:2', 'C5:0.5:4', 'D#5:0.25:4', 'E5:0.5:5', 'C5:0.25:3'], lh: ['C3:0.5:5', 'E3+G3+C4:0.5:1', 'G2:0.5:5', 'E3+G3+C4:0.5:1'] },
+      { chord: 'G7', rh: ['D5:0.5:4', 'G4:0.25:1', 'B4:0.25:2', 'D5:0.5:4', 'B4:0.25:2', 'G4:0.25:1'], lh: ['G2:0.5:5', 'B2+D3+F3:0.5:1', 'G1:0.5:5', 'B2+D3+F3:0.5:1'] },
+      { chord: 'C', rh: ['C4+E4+G4+C5:2:1'], lh: ['C2+G2+C3:2:5'] }
+    ], 2)
+  }),
+
+  // 32. CLAIR DE LUNE — CLAUDE DEBUSSY
+  buildSongFromEvents({
+    id: 'clair-de-lune',
+    title: 'Clair de Lune (Suite Bergamasque, L. 75)',
+    composer: 'Claude Debussy',
+    genre: 'Impressionist',
+    difficulty: 'Advanced',
+    tempo: 58,
+    timeSignature: [3, 4],
+    keySignature: 'Db Major',
+    sourceFormat: 'Urtext Standard',
+    license: 'Public Domain',
+    rawNotes: compileCompactScore([
+      { chord: 'Db', rh: ['F5:2:4', 'Eb5:1:3'], lh: ['Db3:1:5', 'Ab3:1:2', 'F4:1:1'] },
+      { chord: 'Db', rh: ['Db5:2:2', 'C5:1:1'], lh: ['Db3:1:5', 'Ab3:1:2', 'F4:1:1'] },
+      { chord: 'Gb', rh: ['Bb4:2:4', 'Ab4:1:3'], lh: ['Gb2:1:5', 'Db3:1:2', 'Bb3:1:1'] },
+      { chord: 'Ab', rh: ['F4:2:2', 'Eb4:1:1'], lh: ['Ab2:1:5', 'Eb3:1:2', 'C4:1:1'] },
+      { chord: 'Db', rh: ['Db4:3:1'], lh: ['Db2+Ab2+Db3:3:5'] },
+      { chord: 'Db', rh: ['F5:2:4', 'Eb5:1:3'], lh: ['Db3:1:5', 'Ab3:1:2', 'F4:1:1'] },
+      { chord: 'Db', rh: ['Db5:2:2', 'C5:1:1'], lh: ['Db3:1:5', 'Ab3:1:2', 'F4:1:1'] },
+      { chord: 'Gb', rh: ['Bb4:2:4', 'Ab4:1:3'], lh: ['Gb2:1:5', 'Db3:1:2', 'Bb3:1:1'] },
+      { chord: 'Ab7', rh: ['F4:2:2', 'Eb4:1:1'], lh: ['Ab2:1:5', 'Eb3:1:2', 'C4:1:1'] },
+      { chord: 'Db', rh: ['Db4+F4+Ab4+Db5:3:1'], lh: ['Db1+Ab1+Db2:3:5'] }
+    ], 3)
   })
 ];
 
