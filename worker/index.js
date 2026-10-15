@@ -1,5 +1,6 @@
 import { HELPER_MARK, HELPER_PATH, LIBRARY_PATH, PAGES_ORIGIN } from '../shared/musescore-contract.mjs';
 import { fetchScoreMidi } from '../server/musescore.mjs';
+import { readScoreWithBrowser } from './browser-score.js';
 
 const STATUS = {
   'bad-url': 400,
@@ -116,7 +117,14 @@ async function handleHelper(request, env) {
   const sourceUrl = body.url.trim();
   const cached = await findByUrl(env.DB, sourceUrl);
   if (cached) return json(payload(cached), 200, request);
-  const result = await fetchScoreMidi(sourceUrl, request.signal);
+  let result = await fetchScoreMidi(sourceUrl, request.signal);
+  if (!result.ok && result.error !== 'bad-url' && env.BROWSER) {
+    try {
+      result = await readScoreWithBrowser(env.BROWSER, sourceUrl);
+    } catch (error) {
+      console.log(error instanceof Error ? error.message : 'browser-score-failed');
+    }
+  }
   if (!result.ok) return json({ error: result.error }, STATUS[result.error], request);
   await saveScore(env.DB, result, sourceUrl);
   return json({
