@@ -3,10 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { APP_BASE, HELPER_ERRORS, HELPER_MARK, HELPER_PATH } from '../shared/musescore-contract.mjs';
+import { APP_BASE, HELPER_ERRORS, HELPER_MARK, HELPER_PATH, LIBRARY_PATH } from '../shared/musescore-contract.mjs';
 import { fetchScoreMidi } from './musescore.mjs';
+import { createLibrary } from './library.mjs';
 
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');
+const library = createLibrary(path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'library-data'));
 const MAX_BODY = 2048;
 
 const HTTP_STATUS = {
@@ -170,6 +172,32 @@ async function serveStatic(req, res, pathname) {
   res.end(req.method === 'HEAD' ? undefined : data);
 }
 
+function midiPayload(stored) {
+  return {
+    title: stored.title,
+    scoreId: stored.scoreId,
+    midiBase64: Buffer.from(stored.bytes).toString('base64'),
+  };
+}
+
+async function handleLibrary(req, res, scoreId) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    sendEmpty(res, 405);
+    return;
+  }
+  if (!scoreId) {
+    const scores = await library.list();
+    sendJson(res, 200, { scores });
+    return;
+  }
+  const stored = await library.read(scoreId);
+  if (!stored) {
+    sendEmpty(res, 404);
+    return;
+  }
+  sendJson(res, 200, midiPayload(stored));
+}
+
 async function handleHelper(req, res) {
   if (req.method === 'GET') {
     sendJson(res, 200, { helper: HELPER_MARK });
@@ -189,16 +217,23 @@ async function handleHelper(req, res) {
     return;
   }
   try {
+    const cached = typeof body.url === 'string' ? await library.findByUrl(body.url.trim()) : null;
+    if (cached) {
+      sendJson(res, 200, midiPayload(cached));
+      return;
+    }
     const result = await fetchScoreMidi(body.url, ac.signal);
     if (!result.ok) {
       sendJson(res, statusFor(result.error), { error: result.error });
       return;
     }
-    sendJson(res, 200, {
-      title: result.title,
+    await library.save({
       scoreId: result.scoreId,
-      midiBase64: Buffer.from(result.bytes).toString('base64'),
+      title: result.title,
+      sourceUrl: body.url.trim(),
+      bytes: result.bytes,
     });
+    sendJson(res, 200, midiPayload(result));
   } catch {
     if (!res.writableEnded) res.end();
   }
@@ -221,6 +256,18 @@ const server = http.createServer((req, res) => {
   }
   if (decoded === HELPER_PATH) {
     handleHelper(req, res).catch(() => {
+      if (!res.writableEnded) sendEmpty(res, 500);
+    });
+    return;
+  }
+  if (decoded === LIBRARY_PATH || decoded === `${LIBRARY_PATH}/`) {
+    handleLibrary(req, res, '').catch(() => {
+      if (!res.writableEnded) sendEmpty(res, 500);
+    });
+    return;
+  }
+  if (decoded.startsWith(`${LIBRARY_PATH}/`)) {
+    handleLibrary(req, res, decoded.slice(LIBRARY_PATH.length + 1)).catch(() => {
       if (!res.writableEnded) sendEmpty(res, 500);
     });
     return;

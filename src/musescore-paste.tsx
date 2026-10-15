@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { HELPER_ERRORS, HELPER_MARK, HELPER_PATH } from '../shared/musescore-contract.mjs';
+import { HELPER_ERRORS, HELPER_MARK, HELPER_PATH, LIBRARY_PATH } from '../shared/musescore-contract.mjs';
 import {
   applyProbe,
   beginProbe,
@@ -50,17 +50,33 @@ async function probeHelper(signal) {
   }
 }
 
-async function runPaste(request, deps) {
-  const { attempt, signal, url } = request;
+async function loadLibrary(signal) {
   try {
-    const response = await fetch(HELPER_PATH, {
-      method: 'POST',
+    const response = await fetch(LIBRARY_PATH, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal,
+    });
+    if (!response.ok) return [];
+    const body = await response.json();
+    if (!body || !Array.isArray(body.scores)) return [];
+    return body.scores.filter((row) => row && /^\d+$/.test(row.scoreId) && typeof row.title === 'string');
+  } catch {
+    return [];
+  }
+}
+
+async function runPaste(request, deps) {
+  const { attempt, signal, url, method = 'POST' } = request;
+  try {
+    const response = await fetch(method === 'GET' ? url : HELPER_PATH, {
+      method,
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
-      body: JSON.stringify({ url }),
+      body: method === 'GET' ? undefined : JSON.stringify({ url }),
       signal,
     });
     const type = response.headers.get('content-type') || '';
@@ -116,7 +132,34 @@ function statusLine(paste) {
   return null;
 }
 
-function PasteField({ paste, draft, darkMode, onDraft, onSubmit, onCheckAgain }) {
+function SavedLibrary({ scores, disabled, darkMode, onOpen }) {
+  if (!scores.length) return null;
+  const tone = darkMode ? 'text-stone-300' : 'text-stone-600';
+  return (
+    <div className="mt-4 space-y-2">
+      <p className={`text-xs font-bold uppercase tracking-wider ${tone}`}>Saved scores</p>
+      <div className="flex flex-col gap-2">
+        {scores.map((score) => (
+          <button
+            key={score.scoreId}
+            type="button"
+            disabled={disabled}
+            onClick={() => onOpen(score.scoreId)}
+            className={`rounded-xl border px-3 py-2 text-left text-xs font-semibold disabled:opacity-40 ${
+              darkMode
+                ? 'border-stone-700 bg-stone-950 text-stone-100'
+                : 'border-stone-200 bg-stone-50 text-stone-800'
+            }`}
+          >
+            {score.title}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PasteField({ paste, draft, scores, darkMode, onDraft, onSubmit, onCheckAgain, onOpenSaved }) {
   const tone = darkMode ? 'text-stone-300' : 'text-stone-600';
   if (paste.phase === 'probing') {
     return (
@@ -196,6 +239,12 @@ function PasteField({ paste, draft, darkMode, onDraft, onSubmit, onCheckAgain })
           Open in practice
         </button>
       </div>
+      <SavedLibrary
+        scores={scores}
+        disabled={paste.phase === 'fetching'}
+        darkMode={darkMode}
+        onOpen={onOpenSaved}
+      />
     </form>
   );
 }
@@ -203,6 +252,7 @@ function PasteField({ paste, draft, darkMode, onDraft, onSubmit, onCheckAgain })
 export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
   const [job, setJob] = useState(() => initialJob());
   const [draft, setDraft] = useState('');
+  const [scores, setScores] = useState([]);
   const jobRef = useRef(job);
   const readMidiRef = useRef(readMidi);
   const onOpenRef = useRef(onOpen);
@@ -237,6 +287,16 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     const found = await probeHelper(controller.signal);
     if (disposedRef.current || generation !== probeGen.current) return;
     commit(applyProbe(jobRef.current, found));
+    if (!found) {
+      setScores([]);
+      return;
+    }
+    setScores(await loadLibrary(controller.signal));
+  }
+
+  async function rememberLibrary() {
+    const listed = await loadLibrary();
+    if (!disposedRef.current) setScores(listed);
   }
 
   useEffect(() => {
@@ -261,6 +321,38 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     if (disposedRef.current) return;
     const settled = settlePaste(jobRef.current, result);
     commit(settled.job);
+    if (settled.opened) {
+      onOpenRef.current(settled.opened.song);
+      rememberLibrary();
+    }
+  }
+
+  async function openSaved(scoreId) {
+    const current = jobRef.current;
+    if (current.paste.phase === 'fetching' || current.paste.phase === 'probing' || current.paste.phase === 'helper-off') {
+      return;
+    }
+    const attempt = current.nextAttempt;
+    commit({
+      ...current,
+      paste: { phase: 'fetching', url: '', attempt },
+      nextAttempt: attempt + 1,
+    });
+    const signal = beginFetch();
+    const result = await runPaste(
+      { url: `${LIBRARY_PATH}/${scoreId}`, attempt, signal, method: 'GET' },
+      { readMidi: (bytes, filename) => readMidiRef.current(bytes, filename) },
+    );
+    if (disposedRef.current) return;
+    if (result.kind === 'helper-off') {
+      commit({
+        ...jobRef.current,
+        paste: { phase: 'failed', reason: { kind: 'no-midi' } },
+      });
+      return;
+    }
+    const settled = settlePaste(jobRef.current, result);
+    commit(settled.job);
     if (settled.opened) onOpenRef.current(settled.opened.song);
   }
 
@@ -276,10 +368,12 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
       <PasteField
         paste={job.paste}
         draft={draft}
+        scores={scores}
         darkMode={darkMode}
         onDraft={setDraft}
         onSubmit={submit}
         onCheckAgain={onCheckAgain}
+        onOpenSaved={openSaved}
       />
     ),
     cutLabel(songId) {

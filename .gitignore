@@ -1,6 +1,7 @@
 node_modules
 dist
 server/chrome-profile
+server/library-data
 design/chrome-dump.html
 dist-ssr
 *.local
