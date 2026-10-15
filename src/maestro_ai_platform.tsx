@@ -1274,8 +1274,7 @@ export function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid
     throw error;
   }
   parsedNotes.sort((a, b) => a.onset - b.onset || a.pitch - b.pitch);
-  const PRACTICE_NOTE_CAP = 96;
-  const keptNotes = parsedNotes.slice(0, PRACTICE_NOTE_CAP);
+  const keptNotes = parsedNotes;
   const cleanTitle = filename.replace(/\.(mid|midi)$/i, '');
 
   return {
@@ -2054,7 +2053,7 @@ export default function App() {
     darkMode,
     readMidi: readPracticeMidi,
     onOpen: (song) => {
-      setSongs((prev) => [song, ...prev]);
+      setSongs((prev) => [song, ...prev.filter((item) => item.id !== song.id)]);
       handleSelectSong(song.id, 'practice');
     },
   });

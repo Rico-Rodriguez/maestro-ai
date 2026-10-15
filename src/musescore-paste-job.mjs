@@ -84,5 +84,6 @@ export function beginProbe(job) {
 }
 
 export function practiceCutSentence(kept, dropped) {
-  return `Kept ${kept}. Dropped ${dropped}.`;
+  if (dropped > 0) return `Kept ${kept}. Dropped ${dropped}.`;
+  return `${kept} notes.`;
 }

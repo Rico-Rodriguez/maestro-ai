@@ -11,8 +11,9 @@ import {
 
 const FAIL_TEXT = {
   'bad-url': 'Paste a full MuseScore link. A bare id is not a score link.',
-  unavailable: 'That score is private, missing, or needs a login. This helper stores no login.',
-  'no-midi': 'MuseScore did not return MIDI for that score.',
+  unavailable: 'The helper could not open that MuseScore page.',
+  'no-midi': 'That score has no MIDI download.',
+  login: 'MuseScore sent a web page instead of a MIDI file. Sign in to MuseScore in the Chrome window the helper opened, then paste the link again.',
   empty: 'That MIDI file has no playable notes.',
   'timed-out': 'The helper did not answer. Try the link again.',
 };
@@ -83,10 +84,13 @@ async function runPaste(request, deps) {
       if (!bytes) return { attempt, kind: 'rejected', reason: { kind: 'no-midi' } };
       const read = deps.readMidi(bytes, `${body.title}.mid`);
       if (read.ok) {
+        const song = /^\d+$/.test(body.scoreId)
+          ? { ...read.song, id: `musescore:${body.scoreId}` }
+          : read.song;
         return {
           attempt,
           kind: 'ready',
-          opened: { song: read.song, kept: read.kept, dropped: read.dropped },
+          opened: { song, kept: read.kept, dropped: read.dropped },
         };
       }
       if (read.reason === 'empty') {
@@ -220,7 +224,7 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     fetchAbortRef.current?.abort();
     const controller = new AbortController();
     fetchAbortRef.current = controller;
-    const timer = setTimeout(() => controller.abort('timed-out'), 20000);
+    const timer = setTimeout(() => controller.abort('timed-out'), 45000);
     controller.signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
     return controller.signal;
   }

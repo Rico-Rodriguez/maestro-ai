@@ -1,5 +1,7 @@
 node_modules
 dist
+server/chrome-profile
+design/chrome-dump.html
 dist-ssr
 *.local
 *.tsbuildinfo
