@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useMuseScorePaste } from './musescore-paste';
 import {
   Music, Upload, Play, Pause, RotateCcw, Sliders, Mic, MicOff, Cpu, CheckCircle2,
   AlertTriangle, Sparkles, BookOpen, Layers, Volume2, VolumeX, Repeat, ChevronRight,
@@ -1296,6 +1297,16 @@ export function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid
   };
 }
 
+function readPracticeMidi(bytes, filename) {
+  try {
+    const opened = parseStandardMidiFile(bytes, filename);
+    return { ok: true, song: opened.song, kept: opened.kept, dropped: opened.dropped };
+  } catch (error) {
+    if (error && error.code === 'midi-empty') return { ok: false, reason: 'empty' };
+    return { ok: false, reason: 'bad' };
+  }
+}
+
 function parseMusicXMLString(xmlText, filename = 'Imported Score.musicxml') {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'application/xml');
@@ -2039,6 +2050,15 @@ export default function App() {
     setActiveTab(targetTab);
   };
 
+  const museScore = useMuseScorePaste({
+    darkMode,
+    readMidi: readPracticeMidi,
+    onOpen: (song) => {
+      setSongs((prev) => [song, ...prev]);
+      handleSelectSong(song.id, 'practice');
+    },
+  });
+
   // ============================================================================
   // 8. WEB MIDI API & COMPUTER KEYBOARD BINDINGS
   // ============================================================================
@@ -2765,6 +2785,11 @@ export default function App() {
                 </option>
               ))}
             </select>
+            {museScore.cutLabel(currentSong.id) ? (
+              <p className="px-1 text-xs font-semibold text-stone-600 dark:text-stone-300" aria-live="polite">
+                {museScore.cutLabel(currentSong.id)}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -3036,6 +3061,8 @@ export default function App() {
                 Supports `.mid`, `.musicxml`, `.pdf`, `.jpg`, `.png`, `.wav`, `.mp3`
               </span>
             </div>
+
+            {museScore.field}
 
             {importStatus && (
               <div className={`mt-4 p-3 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 ${

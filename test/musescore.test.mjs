@@ -3,6 +3,14 @@ import { createServer } from 'vite';
 import path from 'node:path';
 import test, { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  applyProbe,
+  beginProbe,
+  claimPaste,
+  initialJob,
+  practiceCutSentence,
+  settlePaste,
+} from '../src/musescore-paste-job.mjs';
 import { parseScoreUrl } from '../shared/musescore-contract.mjs';
 
 const SCORE = 'https://musescore.com/user/9292486/scores/2086216';
@@ -272,6 +280,59 @@ test('a page with no salt tries only the fallback', async () => {
     assert.deepEqual(calls.map((call) => call.url), [SCORE, JMUSE, 'https://cdn.example/score.mid']);
     assert.equal(calls[1].headers.Authorization, 'ae2b');
   });
+});
+
+test('claimPaste ignores a second submit while fetching', () => {
+  const idle = applyProbe(initialJob(), true);
+  const first = claimPaste(idle, 'https://musescore.com/user/1/scores/2');
+  const second = claimPaste(first.job, 'https://musescore.com/user/9/scores/9');
+  assert.equal(second.request, null);
+  assert.equal(second.job, first.job);
+  assert.deepEqual(first.request, {
+    url: 'https://musescore.com/user/1/scores/2',
+    attempt: 1,
+  });
+  assert.equal(first.job.nextAttempt, 2);
+});
+
+test('settlePaste ignores a late attempt', () => {
+  const idle = applyProbe(initialJob(), true);
+  const claimed = claimPaste(idle, 'https://musescore.com/user/1/scores/2');
+  const late = settlePaste(claimed.job, {
+    attempt: 99,
+    kind: 'ready',
+    opened: { song: { id: 'song-1', title: 'Late' }, kept: 1, dropped: 0 },
+  });
+  assert.equal(late.opened, null);
+  assert.equal(late.job, claimed.job);
+});
+
+test('settlePaste stores one receipt on the song', () => {
+  const idle = applyProbe(initialJob(), true);
+  const claimed = claimPaste(idle, 'https://musescore.com/user/1/scores/2');
+  const opened = { song: { id: 'song-1', title: 'Night' }, kept: 40, dropped: 0 };
+  const settled = settlePaste(claimed.job, { attempt: 1, kind: 'ready', opened });
+  assert.equal(settled.opened, opened);
+  assert.equal(settled.job.paste.receipt, settled.job.receipts['song-1']);
+  assert.deepEqual(settled.job.paste.receipt, {
+    songId: 'song-1',
+    title: 'Night',
+    kept: 40,
+    dropped: 0,
+  });
+  assert.equal(practiceCutSentence(40, 0), 'Kept 40. Dropped 0.');
+});
+
+test('applyProbe turns probing into idle or helper-off and leaves other phases', () => {
+  const probing = initialJob();
+  assert.deepEqual(applyProbe(probing, true).paste, { phase: 'idle' });
+  assert.deepEqual(applyProbe(probing, false).paste, { phase: 'helper-off' });
+  const idle = applyProbe(probing, true);
+  assert.equal(applyProbe(idle, false), idle);
+  const off = applyProbe(probing, false);
+  assert.equal(claimPaste(off, 'https://musescore.com/user/1/scores/2').job, off);
+  assert.deepEqual(beginProbe(off).paste, { phase: 'probing' });
+  assert.equal(beginProbe(idle), idle);
 });
 
 test('two failed jmuse replies stop after the fallback', async () => {
