@@ -1148,7 +1148,7 @@ const INITIAL_SONGS = [
 // 3. REAL BINARY MIDI (.MID) PARSER & MUSICXML EXPORTER
 // ============================================================================
 
-function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
+export function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
   const bytes = new Uint8Array(arrayBuffer);
   let pos = 0;
 
@@ -1178,7 +1178,11 @@ function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
   };
 
   const headerId = readStr(4);
-  if (headerId !== 'MThd') throw new Error('Invalid MIDI header (Expected MThd).');
+  if (headerId !== 'MThd') {
+    const error = new Error('Invalid MIDI header (Expected MThd).');
+    error.code = 'midi-bad';
+    throw error;
+  }
   const headerLen = readU32();
   const format = readU16();
   const numTracks = readU16();
@@ -1263,24 +1267,33 @@ function parseStandardMidiFile(arrayBuffer, filename = 'Imported Song.mid') {
     pos = trackEnd;
   }
 
-  if (parsedNotes.length === 0) throw new Error('No playable MIDI note events found in file.');
+  if (parsedNotes.length === 0) {
+    const error = new Error('No playable MIDI note events found in file.');
+    error.code = 'midi-empty';
+    throw error;
+  }
   parsedNotes.sort((a, b) => a.onset - b.onset || a.pitch - b.pitch);
-  const sliced = parsedNotes.slice(0, 96);
+  const PRACTICE_NOTE_CAP = 96;
+  const keptNotes = parsedNotes.slice(0, PRACTICE_NOTE_CAP);
   const cleanTitle = filename.replace(/\.(mid|midi)$/i, '');
 
-  return buildSongFromEvents({
-    id: `midi-${Date.now()}`,
-    title: cleanTitle,
-    composer: `MIDI Format ${format}`,
-    genre: 'Imported Score',
-    difficulty: sliced.length > 40 ? 'Intermediate' : 'Beginner',
-    tempo: Math.min(180, Math.max(50, tempoBpm)),
-    timeSignature: timeSig,
-    keySignature: 'C Major',
-    sourceFormat: 'Standard MIDI (.mid)',
-    license: 'User Authorized Import',
-    rawNotes: sliced
-  });
+  return {
+    song: buildSongFromEvents({
+      id: `midi-${Date.now()}`,
+      title: cleanTitle,
+      composer: `MIDI Format ${format}`,
+      genre: 'Imported Score',
+      difficulty: keptNotes.length > 40 ? 'Intermediate' : 'Beginner',
+      tempo: Math.min(180, Math.max(50, tempoBpm)),
+      timeSignature: timeSig,
+      keySignature: 'C Major',
+      sourceFormat: 'Standard MIDI (.mid)',
+      license: 'User Authorized Import',
+      rawNotes: keptNotes
+    }),
+    kept: keptNotes.length,
+    dropped: parsedNotes.length - keptNotes.length
+  };
 }
 
 function parseMusicXMLString(xmlText, filename = 'Imported Score.musicxml') {
@@ -2223,13 +2236,13 @@ export default function App() {
     try {
       if (ext === 'mid' || ext === 'midi') {
         const buf = await file.arrayBuffer();
-        const parsedSong = parseStandardMidiFile(buf, file.name);
-        setSongs(prev => [parsedSong, ...prev]);
-        handleSelectSong(parsedSong.id, 'practice');
+        const opened = parseStandardMidiFile(buf, file.name);
+        setSongs(prev => [opened.song, ...prev]);
+        handleSelectSong(opened.song.id, 'practice');
         setImportStatus({
           step: 4,
           success: true,
-          label: `Imported "${parsedSong.title}" (${parsedSong.events.length} notes). Ready to play!`
+          label: `Imported "${opened.song.title}" (${opened.song.events.length} notes). Ready to play!`
         });
       } else if (ext === 'musicxml' || ext === 'xml') {
         const text = await file.text();
