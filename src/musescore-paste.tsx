@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { HELPER_ERRORS, HELPER_MARK, HELPER_PATH, LIBRARY_PATH } from '../shared/musescore-contract.mjs';
-import {
-  HELPER_ORIGIN_KEY,
-  helperApiUrl,
-  helperCandidates,
-  parseHelperOrigin,
-} from './helper-endpoint.mjs';
+import { helperApiUrl, helperCandidates } from './helper-endpoint.mjs';
 import {
   applyProbe,
   beginProbe,
@@ -23,7 +18,7 @@ const FAIL_TEXT = {
   'timed-out': 'The helper did not answer. Try the link again.',
 };
 
-const OFF_TEXT = 'MuseScore paste is off on this page. Open Maestro from the phone helper on your Wi-Fi.';
+const OFF_TEXT = 'MuseScore paste is unavailable right now.';
 
 function midiBuffer(base64) {
   let binary;
@@ -37,22 +32,6 @@ function midiBuffer(base64) {
   if (bytes.length < 4) return null;
   if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'MThd') return null;
   return bytes.buffer;
-}
-
-function readStoredOrigin() {
-  try {
-    return window.localStorage.getItem(HELPER_ORIGIN_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
-function writeStoredOrigin(origin) {
-  try {
-    window.localStorage.setItem(HELPER_ORIGIN_KEY, origin);
-  } catch {
-    return;
-  }
 }
 
 async function probeHelper(url, signal) {
@@ -185,25 +164,12 @@ function SavedLibrary({ scores, disabled, darkMode, onOpen }) {
   );
 }
 
-function PasteField({
-  paste,
-  draft,
-  helperDraft,
-  pairNote,
-  scores,
-  darkMode,
-  onDraft,
-  onHelperDraft,
-  onSubmit,
-  onCheckAgain,
-  onUseHelper,
-  onOpenSaved,
-}) {
+function PasteField({ paste, draft, scores, darkMode, onDraft, onSubmit, onCheckAgain, onOpenSaved }) {
   const tone = darkMode ? 'text-stone-300' : 'text-stone-600';
   if (paste.phase === 'probing') {
     return (
       <p className={`mt-4 text-xs font-semibold ${tone}`} aria-live="polite">
-        Checking the phone helper.
+        Checking the score service.
       </p>
     );
   }
@@ -213,52 +179,17 @@ function PasteField({
         <p className={`text-xs font-semibold ${tone}`} aria-live="polite">
           {OFF_TEXT}
         </p>
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onUseHelper(helperDraft);
-          }}
+        <button
+          type="button"
+          onClick={onCheckAgain}
+          className={`px-3 py-2 rounded-xl border text-xs font-bold transition ${
+            darkMode
+              ? 'bg-stone-800 border-stone-700 text-stone-200'
+              : 'bg-stone-100 border-stone-200 text-stone-700 hover:bg-stone-200'
+          }`}
         >
-          <input
-            type="url"
-            inputMode="url"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder="https://your-helper.example"
-            aria-label="Helper address"
-            value={helperDraft}
-            onChange={(event) => onHelperDraft(event.target.value)}
-            className={`min-w-[16rem] flex-1 rounded-xl px-3 py-2 text-xs border focus:outline-none ${
-              darkMode
-                ? 'bg-stone-950 border-stone-800 text-stone-200 placeholder:text-stone-500'
-                : 'bg-stone-50 border-stone-200 text-stone-800'
-            }`}
-          />
-          <button
-            type="submit"
-            className="px-3 py-2 rounded-xl bg-orange-700 hover:bg-orange-600 text-white font-bold text-xs shadow-sm transition"
-          >
-            Use this helper
-          </button>
-          <button
-            type="button"
-            onClick={onCheckAgain}
-            className={`px-3 py-2 rounded-xl border text-xs font-bold transition ${
-              darkMode
-                ? 'bg-stone-800 border-stone-700 text-stone-200'
-                : 'bg-stone-100 border-stone-200 text-stone-700 hover:bg-stone-200'
-            }`}
-          >
-            Check again
-          </button>
-        </form>
-        {pairNote ? (
-          <p className={`text-xs font-semibold ${darkMode ? 'text-rose-300' : 'text-rose-600'}`} aria-live="polite">
-            {pairNote}
-          </p>
-        ) : null}
+          Check again
+        </button>
       </div>
     );
   }
@@ -326,8 +257,6 @@ function PasteField({
 export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
   const [job, setJob] = useState(() => initialJob());
   const [draft, setDraft] = useState('');
-  const [helperDraft, setHelperDraft] = useState('');
-  const [pairNote, setPairNote] = useState('');
   const [scores, setScores] = useState([]);
   const endpointRef = useRef('');
   const jobRef = useRef(job);
@@ -355,14 +284,13 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     return controller.signal;
   }
 
-  async function runProbe(preferred) {
+  async function runProbe() {
     const generation = probeGen.current + 1;
     probeGen.current = generation;
     probeAbortRef.current?.abort();
     const controller = new AbortController();
     probeAbortRef.current = controller;
-    const stored = preferred || readStoredOrigin();
-    const candidates = helperCandidates(window.location.origin, stored);
+    const candidates = helperCandidates(window.location.origin);
     let chosen = null;
     for (const origin of candidates) {
       const found = await probeHelper(helperApiUrl(origin, HELPER_PATH), controller.signal);
@@ -391,8 +319,6 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
 
   useEffect(() => {
     disposedRef.current = false;
-    const stored = readStoredOrigin();
-    if (stored) setHelperDraft(stored);
     runProbe();
     return () => {
       disposedRef.current = true;
@@ -463,23 +389,7 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     const next = beginProbe(jobRef.current);
     commit(next);
     if (next.paste.phase !== 'probing') return;
-    setPairNote('');
     runProbe();
-  }
-
-  function onUseHelper(raw) {
-    const origin = parseHelperOrigin(raw);
-    if (!origin) {
-      setPairNote('Use an https address, or http://127.0.0.1 with a port.');
-      return;
-    }
-    writeStoredOrigin(origin);
-    setHelperDraft(origin);
-    setPairNote('');
-    const next = beginProbe(jobRef.current);
-    commit(next);
-    if (next.paste.phase !== 'probing') return;
-    runProbe(origin);
   }
 
   return {
@@ -487,15 +397,11 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
       <PasteField
         paste={job.paste}
         draft={draft}
-        helperDraft={helperDraft}
-        pairNote={pairNote}
         scores={scores}
         darkMode={darkMode}
         onDraft={setDraft}
-        onHelperDraft={setHelperDraft}
         onSubmit={submit}
         onCheckAgain={onCheckAgain}
-        onUseHelper={onUseHelper}
         onOpenSaved={openSaved}
       />
     ),
