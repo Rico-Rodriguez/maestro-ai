@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { HELPER_ERRORS, HELPER_MARK, HELPER_PATH, LIBRARY_PATH } from '../shared/musescore-contract.mjs';
 import {
+  HELPER_ORIGIN_KEY,
+  helperApiUrl,
+  helperCandidates,
+  parseHelperOrigin,
+} from './helper-endpoint.mjs';
+import {
   applyProbe,
   beginProbe,
   claimPaste,
@@ -33,12 +39,29 @@ function midiBuffer(base64) {
   return bytes.buffer;
 }
 
-async function probeHelper(signal) {
+function readStoredOrigin() {
   try {
-    const response = await fetch(HELPER_PATH, {
+    return window.localStorage.getItem(HELPER_ORIGIN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function writeStoredOrigin(origin) {
+  try {
+    window.localStorage.setItem(HELPER_ORIGIN_KEY, origin);
+  } catch {
+    return;
+  }
+}
+
+async function probeHelper(url, signal) {
+  try {
+    const response = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       cache: 'no-store',
+      credentials: 'omit',
       signal,
     });
     const type = response.headers.get('content-type') || '';
@@ -50,11 +73,12 @@ async function probeHelper(signal) {
   }
 }
 
-async function loadLibrary(signal) {
+async function loadLibrary(url, signal) {
   try {
-    const response = await fetch(LIBRARY_PATH, {
+    const response = await fetch(url, {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
+      credentials: 'omit',
       signal,
     });
     if (!response.ok) return [];
@@ -67,15 +91,17 @@ async function loadLibrary(signal) {
 }
 
 async function runPaste(request, deps) {
-  const { attempt, signal, url, method = 'POST' } = request;
+  const { attempt, signal, url, method = 'POST', endpoint = '' } = request;
+  const target = method === 'GET' ? url : helperApiUrl(endpoint, HELPER_PATH);
   try {
-    const response = await fetch(method === 'GET' ? url : HELPER_PATH, {
+    const response = await fetch(target, {
       method,
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        ...(method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
       },
       cache: 'no-store',
+      credentials: 'omit',
       body: method === 'GET' ? undefined : JSON.stringify({ url }),
       signal,
     });
@@ -159,7 +185,20 @@ function SavedLibrary({ scores, disabled, darkMode, onOpen }) {
   );
 }
 
-function PasteField({ paste, draft, scores, darkMode, onDraft, onSubmit, onCheckAgain, onOpenSaved }) {
+function PasteField({
+  paste,
+  draft,
+  helperDraft,
+  pairNote,
+  scores,
+  darkMode,
+  onDraft,
+  onHelperDraft,
+  onSubmit,
+  onCheckAgain,
+  onUseHelper,
+  onOpenSaved,
+}) {
   const tone = darkMode ? 'text-stone-300' : 'text-stone-600';
   if (paste.phase === 'probing') {
     return (
@@ -174,17 +213,52 @@ function PasteField({ paste, draft, scores, darkMode, onDraft, onSubmit, onCheck
         <p className={`text-xs font-semibold ${tone}`} aria-live="polite">
           {OFF_TEXT}
         </p>
-        <button
-          type="button"
-          onClick={onCheckAgain}
-          className={`px-3 py-2 rounded-xl border text-xs font-bold transition ${
-            darkMode
-              ? 'bg-stone-800 border-stone-700 text-stone-200'
-              : 'bg-stone-100 border-stone-200 text-stone-700 hover:bg-stone-200'
-          }`}
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onUseHelper(helperDraft);
+          }}
         >
-          Check again
-        </button>
+          <input
+            type="url"
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="https://your-helper.example"
+            aria-label="Helper address"
+            value={helperDraft}
+            onChange={(event) => onHelperDraft(event.target.value)}
+            className={`min-w-[16rem] flex-1 rounded-xl px-3 py-2 text-xs border focus:outline-none ${
+              darkMode
+                ? 'bg-stone-950 border-stone-800 text-stone-200 placeholder:text-stone-500'
+                : 'bg-stone-50 border-stone-200 text-stone-800'
+            }`}
+          />
+          <button
+            type="submit"
+            className="px-3 py-2 rounded-xl bg-orange-700 hover:bg-orange-600 text-white font-bold text-xs shadow-sm transition"
+          >
+            Use this helper
+          </button>
+          <button
+            type="button"
+            onClick={onCheckAgain}
+            className={`px-3 py-2 rounded-xl border text-xs font-bold transition ${
+              darkMode
+                ? 'bg-stone-800 border-stone-700 text-stone-200'
+                : 'bg-stone-100 border-stone-200 text-stone-700 hover:bg-stone-200'
+            }`}
+          >
+            Check again
+          </button>
+        </form>
+        {pairNote ? (
+          <p className={`text-xs font-semibold ${darkMode ? 'text-rose-300' : 'text-rose-600'}`} aria-live="polite">
+            {pairNote}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -252,7 +326,10 @@ function PasteField({ paste, draft, scores, darkMode, onDraft, onSubmit, onCheck
 export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
   const [job, setJob] = useState(() => initialJob());
   const [draft, setDraft] = useState('');
+  const [helperDraft, setHelperDraft] = useState('');
+  const [pairNote, setPairNote] = useState('');
   const [scores, setScores] = useState([]);
+  const endpointRef = useRef('');
   const jobRef = useRef(job);
   const readMidiRef = useRef(readMidi);
   const onOpenRef = useRef(onOpen);
@@ -278,29 +355,44 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     return controller.signal;
   }
 
-  async function runProbe() {
+  async function runProbe(preferred) {
     const generation = probeGen.current + 1;
     probeGen.current = generation;
     probeAbortRef.current?.abort();
     const controller = new AbortController();
     probeAbortRef.current = controller;
-    const found = await probeHelper(controller.signal);
+    const stored = preferred || readStoredOrigin();
+    const candidates = helperCandidates(window.location.origin, stored);
+    let chosen = null;
+    for (const origin of candidates) {
+      const found = await probeHelper(helperApiUrl(origin, HELPER_PATH), controller.signal);
+      if (disposedRef.current || generation !== probeGen.current) return;
+      if (found) {
+        chosen = origin;
+        break;
+      }
+    }
     if (disposedRef.current || generation !== probeGen.current) return;
-    commit(applyProbe(jobRef.current, found));
-    if (!found) {
+    if (chosen === null) {
+      endpointRef.current = '';
+      commit(applyProbe(jobRef.current, false));
       setScores([]);
       return;
     }
-    setScores(await loadLibrary(controller.signal));
+    endpointRef.current = chosen;
+    commit(applyProbe(jobRef.current, true));
+    setScores(await loadLibrary(helperApiUrl(chosen, LIBRARY_PATH), controller.signal));
   }
 
   async function rememberLibrary() {
-    const listed = await loadLibrary();
+    const listed = await loadLibrary(helperApiUrl(endpointRef.current, LIBRARY_PATH));
     if (!disposedRef.current) setScores(listed);
   }
 
   useEffect(() => {
     disposedRef.current = false;
+    const stored = readStoredOrigin();
+    if (stored) setHelperDraft(stored);
     runProbe();
     return () => {
       disposedRef.current = true;
@@ -315,7 +407,12 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     if (!claim.request) return;
     const signal = beginFetch();
     const result = await runPaste(
-      { url: claim.request.url, attempt: claim.request.attempt, signal },
+      {
+        url: claim.request.url,
+        attempt: claim.request.attempt,
+        signal,
+        endpoint: endpointRef.current,
+      },
       { readMidi: (bytes, filename) => readMidiRef.current(bytes, filename) },
     );
     if (disposedRef.current) return;
@@ -340,7 +437,13 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     });
     const signal = beginFetch();
     const result = await runPaste(
-      { url: `${LIBRARY_PATH}/${scoreId}`, attempt, signal, method: 'GET' },
+      {
+        url: helperApiUrl(endpointRef.current, `${LIBRARY_PATH}/${scoreId}`),
+        attempt,
+        signal,
+        method: 'GET',
+        endpoint: endpointRef.current,
+      },
       { readMidi: (bytes, filename) => readMidiRef.current(bytes, filename) },
     );
     if (disposedRef.current) return;
@@ -360,7 +463,23 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     const next = beginProbe(jobRef.current);
     commit(next);
     if (next.paste.phase !== 'probing') return;
+    setPairNote('');
     runProbe();
+  }
+
+  function onUseHelper(raw) {
+    const origin = parseHelperOrigin(raw);
+    if (!origin) {
+      setPairNote('Use an https address, or http://127.0.0.1 with a port.');
+      return;
+    }
+    writeStoredOrigin(origin);
+    setHelperDraft(origin);
+    setPairNote('');
+    const next = beginProbe(jobRef.current);
+    commit(next);
+    if (next.paste.phase !== 'probing') return;
+    runProbe(origin);
   }
 
   return {
@@ -368,11 +487,15 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
       <PasteField
         paste={job.paste}
         draft={draft}
+        helperDraft={helperDraft}
+        pairNote={pairNote}
         scores={scores}
         darkMode={darkMode}
         onDraft={setDraft}
+        onHelperDraft={setHelperDraft}
         onSubmit={submit}
         onCheckAgain={onCheckAgain}
+        onUseHelper={onUseHelper}
         onOpenSaved={openSaved}
       />
     ),
