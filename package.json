@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "phone": "vite build && node server/phone.mjs",
     "test": "node --test"
   },
   "dependencies": {

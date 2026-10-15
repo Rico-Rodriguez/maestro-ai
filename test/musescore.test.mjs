@@ -5,6 +5,55 @@ import test, { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { parseScoreUrl } from '../shared/musescore-contract.mjs';
 
+const SCORE = 'https://musescore.com/user/9292486/scores/2086216';
+const VENDOR = 'https://musescore.com/static/public/build/musescore.2026/20/vendor.js';
+const APP_SCRIPT = 'https://musescore.com/static/public/build/musescore.2026/20/app.js';
+const JMUSE = 'https://musescore.com/api/jmuse?id=2086216&type=midi&index=0';
+const MIDI_BYTES = Uint8Array.from([0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06]);
+
+function scoreHtml() {
+  return [
+    '<meta content="musescore://score/2086216" property="al:ios:url">',
+    '<meta property="og:title" content="Rock &amp; Roll&#39;s">',
+    `<script src="${VENDOR}"></script>`,
+    `<script src="${APP_SCRIPT}"></script>`,
+  ].join('');
+}
+
+function installFetch(route) {
+  const calls = [];
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    const headers = init.headers || {};
+    calls.push({ url, headers });
+    const response = await route(url, headers);
+    return response ?? new Response('missing', { status: 599 });
+  };
+  return calls;
+}
+
+function assertUpstream(calls) {
+  for (const call of calls) {
+    assert.equal(call.headers['User-Agent'], 'MaestroPhone/1');
+    assert.equal(Object.hasOwn(call.headers, 'Cookie'), false);
+    if (!call.url.startsWith('https://musescore.com/api/jmuse')) {
+      assert.equal(Object.hasOwn(call.headers, 'Authorization'), false);
+    }
+  }
+}
+
+async function withFetch(route, run) {
+  const previous = globalThis.fetch;
+  const calls = installFetch(route);
+  const nonce = Math.random().toString(16).slice(2);
+  const loaded = await import(`../server/musescore.mjs?isolate=${nonce}`);
+  try {
+    return await run(calls, loaded.fetchScoreMidi);
+  } finally {
+    globalThis.fetch = previous;
+  }
+}
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let viteServer;
 let parseStandardMidiFile;
@@ -110,4 +159,131 @@ test('a header that is not MThd throws', async () => {
       && error.message === 'Invalid MIDI header (Expected MThd).'
       && error.code === 'midi-bad',
   );
+});
+
+test('fetchScoreMidi refuses a bad link before any request', async () => {
+  await withFetch(async () => new Response('no', { status: 500 }), async (calls, fetchScoreMidi) => {
+    const result = await fetchScoreMidi('nope', new AbortController().signal);
+    assert.deepEqual(result, { ok: false, error: 'bad-url' });
+    assert.deepEqual(calls, []);
+  });
+});
+
+test('a 403 score page is unavailable and is not requested again', async () => {
+  await withFetch(async () => new Response('blocked', { status: 403 }), async (calls, fetchScoreMidi) => {
+    const result = await fetchScoreMidi(SCORE, new AbortController().signal);
+    assert.deepEqual(result, { ok: false, error: 'unavailable' });
+    assert.deepEqual(calls.map((call) => call.url), [SCORE]);
+    assertUpstream(calls);
+  });
+});
+
+test('a failed discovered salt tries the fallback salt once', async () => {
+  await withFetch(async (url, headers) => {
+    if (url === SCORE) return new Response(scoreHtml(), { status: 200 });
+    if (url === VENDOR) return new Response('webpackChunk = [];', { status: 200 });
+    if (url === APP_SCRIPT) return new Response('var s = ("abcdef").substr(0, 4);', { status: 200 });
+    if (url === JMUSE && headers.Authorization === '62fc') return new Response('no', { status: 403 });
+    if (url === JMUSE && headers.Authorization === 'ae2b') {
+      return Response.json({ info: { url: 'https://cdn.example/score.mid' } });
+    }
+    if (url === 'https://cdn.example/score.mid') return new Response(MIDI_BYTES, { status: 200 });
+    return new Response('missing', { status: 599 });
+  }, async (calls, fetchScoreMidi) => {
+    const result = await fetchScoreMidi(SCORE, new AbortController().signal);
+    assert.equal(result.ok, true);
+    assert.equal(result.title, "Rock & Roll's");
+    assert.deepEqual(Array.from(result.bytes), Array.from(MIDI_BYTES));
+    assert.deepEqual(
+      calls.map((call) => call.url),
+      [SCORE, VENDOR, APP_SCRIPT, JMUSE, JMUSE, 'https://cdn.example/score.mid'],
+    );
+    assert.equal(calls[3].headers.Authorization, '62fc');
+    assert.equal(calls[4].headers.Authorization, 'ae2b');
+    assertUpstream(calls);
+  });
+});
+
+test('a later build script supplies the salt when the first chunk has none', async () => {
+  await withFetch(async (url, headers) => {
+    if (url === SCORE) return new Response(scoreHtml(), { status: 200 });
+    if (url === VENDOR) return new Response('webpackChunk = [];', { status: 200 });
+    if (url === APP_SCRIPT) return new Response('var s = ("abcdef").substr(0, 4);', { status: 200 });
+    if (url === JMUSE && headers.Authorization === '62fc') {
+      return Response.json({ info: { url: 'https://cdn.example/score.mid' } });
+    }
+    if (url === 'https://cdn.example/score.mid') return new Response(MIDI_BYTES, { status: 200 });
+    return new Response('missing', { status: 599 });
+  }, async (calls, fetchScoreMidi) => {
+    const result = await fetchScoreMidi(SCORE, new AbortController().signal);
+    assert.equal(result.ok, true);
+    assert.equal(result.title, "Rock & Roll's");
+    assert.deepEqual(Array.from(result.bytes), Array.from(MIDI_BYTES));
+    assert.deepEqual(calls.map((call) => call.url), [SCORE, VENDOR, APP_SCRIPT, JMUSE, 'https://cdn.example/score.mid']);
+    assert.equal(calls[3].headers.Authorization, '62fc');
+    assertUpstream(calls);
+  });
+});
+
+test('an info url that is not https does not leave the helper', async () => {
+  await withFetch(async (url) => {
+    if (url === SCORE) return new Response(scoreHtml(), { status: 200 });
+    if (url === VENDOR || url === APP_SCRIPT) return new Response('var s = ("abcdef").substr(0, 4);', { status: 200 });
+    if (url === JMUSE) return Response.json({ info: { url: 'http://cdn.example/score.mid' } });
+    return new Response('missing', { status: 599 });
+  }, async (calls, fetchScoreMidi) => {
+    const result = await fetchScoreMidi(SCORE, new AbortController().signal);
+    assert.deepEqual(result, { ok: false, error: 'no-midi' });
+    assert.equal(calls.filter((call) => call.url === JMUSE).length, 1);
+    assert.equal(calls.some((call) => call.url.startsWith('http://')), false);
+  });
+});
+
+test('a body that does not start with MThd is no-midi', async () => {
+  await withFetch(async (url) => {
+    if (url === SCORE) return new Response(scoreHtml(), { status: 200 });
+    if (url === VENDOR || url === APP_SCRIPT) return new Response('var s = ("abcdef").substr(0, 4);', { status: 200 });
+    if (url === JMUSE) return Response.json({ info: { url: 'https://cdn.example/score.mid' } });
+    if (url === 'https://cdn.example/score.mid') return new Response('HELLO', { status: 200 });
+    return new Response('missing', { status: 599 });
+  }, async (calls, fetchScoreMidi) => {
+    const result = await fetchScoreMidi(SCORE, new AbortController().signal);
+    assert.deepEqual(result, { ok: false, error: 'no-midi' });
+    assert.equal(calls.filter((call) => call.url === JMUSE).length, 1);
+  });
+});
+
+test('a page with no salt tries only the fallback', async () => {
+  const html = [
+    '<meta property="al:ios:url" content="musescore://score/2086216">',
+    '<meta content="Plain" property="og:title">',
+  ].join('');
+  await withFetch(async (url, headers) => {
+    if (url === SCORE) return new Response(html, { status: 200 });
+    if (url === JMUSE && headers.Authorization === 'ae2b') {
+      return Response.json({ info: { url: 'https://cdn.example/score.mid' } });
+    }
+    if (url === 'https://cdn.example/score.mid') return new Response(MIDI_BYTES, { status: 200 });
+    return new Response('extra', { status: 500 });
+  }, async (calls, fetchScoreMidi) => {
+    const result = await fetchScoreMidi(SCORE, new AbortController().signal);
+    assert.equal(result.ok, true);
+    assert.equal(result.title, 'Plain');
+    assert.deepEqual(calls.map((call) => call.url), [SCORE, JMUSE, 'https://cdn.example/score.mid']);
+    assert.equal(calls[1].headers.Authorization, 'ae2b');
+  });
+});
+
+test('two failed jmuse replies stop after the fallback', async () => {
+  await withFetch(async (url) => {
+    if (url === SCORE) return new Response(scoreHtml(), { status: 200 });
+    if (url === VENDOR || url === APP_SCRIPT) return new Response('var s = ("abcdef").substr(0, 4);', { status: 200 });
+    if (url === JMUSE) return new Response('no', { status: 403 });
+    return new Response('extra', { status: 500 });
+  }, async (calls, fetchScoreMidi) => {
+    const result = await fetchScoreMidi(SCORE, new AbortController().signal);
+    assert.deepEqual(result, { ok: false, error: 'unavailable' });
+    const jmuse = calls.filter((call) => call.url === JMUSE);
+    assert.deepEqual(jmuse.map((call) => call.headers.Authorization), ['62fc', 'ae2b']);
+  });
 });
