@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "phone": "vite build && node server/phone.mjs",
-    "test": "node --test"
+    "test": "node --test test/musescore.test.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

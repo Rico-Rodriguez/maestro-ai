@@ -12,8 +12,7 @@ import {
 const FAIL_TEXT = {
   'bad-url': 'Paste a full MuseScore link. A bare id is not a score link.',
   unavailable: 'The helper could not open that MuseScore page.',
-  'no-midi': 'That score has no MIDI download.',
-  login: 'MuseScore sent a web page instead of a MIDI file. Sign in to MuseScore in the Chrome window the helper opened, then paste the link again.',
+  'no-midi': 'MuseScore did not return a MIDI file for that link.',
   empty: 'That MIDI file has no playable notes.',
   'timed-out': 'The helper did not answer. Try the link again.',
 };

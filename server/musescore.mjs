@@ -18,7 +18,6 @@ export async function fetchScoreMidi(rawUrl, signal, readPage = readScoreInChrom
     return { ok: false, error: 'unavailable' };
   }
   if (!page || page.kind === 'unavailable') return { ok: false, error: 'unavailable' };
-  if (page.kind === 'login') return { ok: false, error: 'login' };
   if (page.kind !== 'midi') return { ok: false, error: 'no-midi' };
   return {
     ok: true,

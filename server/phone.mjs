@@ -13,7 +13,6 @@ const HTTP_STATUS = {
   'bad-url': 400,
   unavailable: 404,
   'no-midi': 422,
-  login: 409,
 };
 
 for (const code of HELPER_ERRORS) {

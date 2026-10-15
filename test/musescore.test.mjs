@@ -12,7 +12,7 @@ import {
   settlePaste,
 } from '../src/musescore-paste-job.mjs';
 import { parseScoreUrl } from '../shared/musescore-contract.mjs';
-import { classifyDownload } from '../server/chrome-score.mjs';
+import { classifyDownload, midiAuthorization } from '../server/chrome-score.mjs';
 import { fetchScoreMidi } from '../server/musescore.mjs';
 
 const SCORE = 'https://musescore.com/user/30544023/scores/6261339';
@@ -158,13 +158,8 @@ test('a MIDI body from the score page is the practice file', async () => {
   assert.equal(classifyDownload(result.bytes), 'midi');
 });
 
-test('an HTML download is a login refusal', async () => {
-  const result = await fetchScoreMidi(SCORE, new AbortController().signal, pageReader({
-    kind: 'login',
-    title: 'Minuet in G Major',
-    scoreId: '6261339',
-  }));
-  assert.deepEqual(result, { ok: false, error: 'login' });
+test('the public token matches the score page request', () => {
+  assert.equal(midiAuthorization('6261339'), 'ed63');
 });
 
 test('a score with no MIDI link is no-midi', async () => {

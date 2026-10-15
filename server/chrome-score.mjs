@@ -1,11 +1,12 @@
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const PORT = 9477;
-const PROFILE = join(dirname(fileURLToPath(import.meta.url)), 'chrome-profile');
+const PROFILE = join(homedir(), 'AppData', 'Local', 'maestro-phone', 'chrome');
 
 let chromeProcess = null;
 
@@ -82,6 +83,35 @@ async function scoreTab() {
   return tabs?.find((tab) => tab.type === 'page' && tab.webSocketDebuggerUrl) ?? null;
 }
 
+const TOKEN_SUFFIX = ',%!),';
+
+export function midiAuthorization(scoreId) {
+  return createHash('md5').update(`${scoreId}midi0${TOKEN_SUFFIX}`).digest('hex').slice(0, 4);
+}
+
+const READ_SCORE = `(() => {
+  const score = window.UGAPP && window.UGAPP.store && window.UGAPP.store.page && window.UGAPP.store.page.data && window.UGAPP.store.page.data.score;
+  if (!score || score.id == null) return { ready: false };
+  return { ready: true, title: String(score.title || ''), scoreId: String(score.id) };
+})()`;
+
+function readMidiSource(scoreId, token) {
+  return `(async () => {
+    const response = await fetch('/api/jmuse?id=${scoreId}&type=midi&index=0', { headers: { Authorization: '${token}' } });
+    const text = await response.text();
+    let info = '';
+    try { info = JSON.parse(text)?.info?.url || ''; } catch { info = ''; }
+    if (!info) return { ok: false };
+    const file = await fetch(info);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return { ok: true, base64: btoa(binary) };
+  })()`;
+}
+
 export async function readScoreInChrome(pageUrl, signal) {
   throwIfAborted(signal);
   await ensureChrome();
@@ -100,41 +130,19 @@ export async function readScoreInChrome(pageUrl, signal) {
     if (report?.ready) break;
     await delay(500);
   }
-  if (!report?.ready) return { kind: 'unavailable' };
-  if (!/^\d+$/.test(report.scoreId || '')) return { kind: 'unavailable' };
-  if (report.kind === 'no-midi') {
+  if (!report?.ready || !/^\d+$/.test(report.scoreId || '')) return { kind: 'unavailable' };
+  const file = await cdp(tab.webSocketDebuggerUrl, 'Runtime.evaluate', {
+    expression: readMidiSource(report.scoreId, midiAuthorization(report.scoreId)),
+    awaitPromise: true,
+    returnByValue: true,
+  });
+  if (!file?.ok) return { kind: 'no-midi', title: report.title, scoreId: report.scoreId };
+  const bytes = Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0));
+  if (classifyDownload(bytes) !== 'midi') {
     return { kind: 'no-midi', title: report.title, scoreId: report.scoreId };
   }
-  const bytes = Uint8Array.from(atob(report.base64), (char) => char.charCodeAt(0));
-  if (classifyDownload(bytes) === 'midi') {
-    return { kind: 'midi', title: report.title, scoreId: report.scoreId, bytes };
-  }
-  return { kind: 'login', title: report.title, scoreId: report.scoreId };
+  return { kind: 'midi', title: report.title, scoreId: report.scoreId, bytes };
 }
-
-const READ_SCORE = `(async () => {
-  const data = window.UGAPP && window.UGAPP.store && window.UGAPP.store.page && window.UGAPP.store.page.data;
-  const score = data && data.score;
-  if (!score || score.id == null) return { ready: false };
-  const list = Array.isArray(data.type_download_list) ? data.type_download_list : [];
-  const midi = list.find((item) => item && item.type === 'mid' && typeof item.authorized_url === 'string');
-  if (!midi) {
-    return { ready: true, kind: 'no-midi', title: String(score.title || ''), scoreId: String(score.id) };
-  }
-  const response = await fetch(midi.authorized_url);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return {
-    ready: true,
-    kind: 'file',
-    title: String(score.title || ''),
-    scoreId: String(score.id),
-    base64: btoa(binary),
-  };
-})()`;
 
 export function classifyDownload(bytes) {
   if (
