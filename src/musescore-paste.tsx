@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { HELPER_ERRORS, HELPER_MARK, HELPER_PATH, LIBRARY_PATH } from '../shared/musescore-contract.mjs';
+import { helperApiUrl, helperCandidates } from './helper-endpoint.mjs';
 import {
   applyProbe,
   beginProbe,
@@ -17,7 +18,7 @@ const FAIL_TEXT = {
   'timed-out': 'The helper did not answer. Try the link again.',
 };
 
-const OFF_TEXT = 'MuseScore paste is off on this page. Open Maestro from the phone helper on your Wi-Fi.';
+const OFF_TEXT = 'MuseScore paste is unavailable right now.';
 
 function midiBuffer(base64) {
   let binary;
@@ -33,12 +34,13 @@ function midiBuffer(base64) {
   return bytes.buffer;
 }
 
-async function probeHelper(signal) {
+async function probeHelper(url, signal) {
   try {
-    const response = await fetch(HELPER_PATH, {
+    const response = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       cache: 'no-store',
+      credentials: 'omit',
       signal,
     });
     const type = response.headers.get('content-type') || '';
@@ -50,11 +52,12 @@ async function probeHelper(signal) {
   }
 }
 
-async function loadLibrary(signal) {
+async function loadLibrary(url, signal) {
   try {
-    const response = await fetch(LIBRARY_PATH, {
+    const response = await fetch(url, {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
+      credentials: 'omit',
       signal,
     });
     if (!response.ok) return [];
@@ -67,15 +70,17 @@ async function loadLibrary(signal) {
 }
 
 async function runPaste(request, deps) {
-  const { attempt, signal, url, method = 'POST' } = request;
+  const { attempt, signal, url, method = 'POST', endpoint = '' } = request;
+  const target = method === 'GET' ? url : helperApiUrl(endpoint, HELPER_PATH);
   try {
-    const response = await fetch(method === 'GET' ? url : HELPER_PATH, {
+    const response = await fetch(target, {
       method,
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        ...(method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
       },
       cache: 'no-store',
+      credentials: 'omit',
       body: method === 'GET' ? undefined : JSON.stringify({ url }),
       signal,
     });
@@ -164,7 +169,7 @@ function PasteField({ paste, draft, scores, darkMode, onDraft, onSubmit, onCheck
   if (paste.phase === 'probing') {
     return (
       <p className={`mt-4 text-xs font-semibold ${tone}`} aria-live="polite">
-        Checking the phone helper.
+        Checking the score service.
       </p>
     );
   }
@@ -253,6 +258,7 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
   const [job, setJob] = useState(() => initialJob());
   const [draft, setDraft] = useState('');
   const [scores, setScores] = useState([]);
+  const endpointRef = useRef('');
   const jobRef = useRef(job);
   const readMidiRef = useRef(readMidi);
   const onOpenRef = useRef(onOpen);
@@ -284,18 +290,30 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     probeAbortRef.current?.abort();
     const controller = new AbortController();
     probeAbortRef.current = controller;
-    const found = await probeHelper(controller.signal);
+    const candidates = helperCandidates(window.location.origin);
+    let chosen = null;
+    for (const origin of candidates) {
+      const found = await probeHelper(helperApiUrl(origin, HELPER_PATH), controller.signal);
+      if (disposedRef.current || generation !== probeGen.current) return;
+      if (found) {
+        chosen = origin;
+        break;
+      }
+    }
     if (disposedRef.current || generation !== probeGen.current) return;
-    commit(applyProbe(jobRef.current, found));
-    if (!found) {
+    if (chosen === null) {
+      endpointRef.current = '';
+      commit(applyProbe(jobRef.current, false));
       setScores([]);
       return;
     }
-    setScores(await loadLibrary(controller.signal));
+    endpointRef.current = chosen;
+    commit(applyProbe(jobRef.current, true));
+    setScores(await loadLibrary(helperApiUrl(chosen, LIBRARY_PATH), controller.signal));
   }
 
   async function rememberLibrary() {
-    const listed = await loadLibrary();
+    const listed = await loadLibrary(helperApiUrl(endpointRef.current, LIBRARY_PATH));
     if (!disposedRef.current) setScores(listed);
   }
 
@@ -315,7 +333,12 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     if (!claim.request) return;
     const signal = beginFetch();
     const result = await runPaste(
-      { url: claim.request.url, attempt: claim.request.attempt, signal },
+      {
+        url: claim.request.url,
+        attempt: claim.request.attempt,
+        signal,
+        endpoint: endpointRef.current,
+      },
       { readMidi: (bytes, filename) => readMidiRef.current(bytes, filename) },
     );
     if (disposedRef.current) return;
@@ -340,7 +363,13 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     });
     const signal = beginFetch();
     const result = await runPaste(
-      { url: `${LIBRARY_PATH}/${scoreId}`, attempt, signal, method: 'GET' },
+      {
+        url: helperApiUrl(endpointRef.current, `${LIBRARY_PATH}/${scoreId}`),
+        attempt,
+        signal,
+        method: 'GET',
+        endpoint: endpointRef.current,
+      },
       { readMidi: (bytes, filename) => readMidiRef.current(bytes, filename) },
     );
     if (disposedRef.current) return;

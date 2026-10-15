@@ -1,0 +1,19 @@
+name = "maestro-ai"
+main = "worker/index.js"
+compatibility_date = "2026-10-14"
+compatibility_flags = ["nodejs_compat"]
+
+[browser]
+binding = "BROWSER"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "maestro-scores"
+database_id = "52a6a906-45ed-41d2-8dce-08ba6aa300be"
+migrations_dir = "worker/migrations"

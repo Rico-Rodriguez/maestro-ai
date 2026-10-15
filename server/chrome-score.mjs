@@ -1,8 +1,10 @@
-import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { midiAuthorization } from './score-http.mjs';
+
+export { midiAuthorization };
 
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const PORT = 9477;
@@ -81,12 +83,6 @@ function cdp(wsUrl, method, params) {
 async function scoreTab() {
   const tabs = await debuggerTabs();
   return tabs?.find((tab) => tab.type === 'page' && tab.webSocketDebuggerUrl) ?? null;
-}
-
-const TOKEN_SUFFIX = ',%!),';
-
-export function midiAuthorization(scoreId) {
-  return createHash('md5').update(`${scoreId}midi0${TOKEN_SUFFIX}`).digest('hex').slice(0, 4);
 }
 
 const READ_SCORE = `(() => {

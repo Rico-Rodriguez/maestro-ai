@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { APP_BASE, HELPER_ERRORS, HELPER_MARK, HELPER_PATH, LIBRARY_PATH } from '../shared/musescore-contract.mjs';
+import { APP_BASE, HELPER_ERRORS, HELPER_MARK, HELPER_PATH, LIBRARY_PATH, PAGES_ORIGIN } from '../shared/musescore-contract.mjs';
 import { fetchScoreMidi } from './musescore.mjs';
 import { createLibrary } from './library.mjs';
 
@@ -239,6 +239,15 @@ async function handleHelper(req, res) {
   }
 }
 
+function writeCors(req, res) {
+  if (req.headers.origin !== PAGES_ORIGIN) return;
+  res.setHeader('Access-Control-Allow-Origin', PAGES_ORIGIN);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type');
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  res.setHeader('Vary', 'Origin');
+}
+
 function requestPath(req) {
   const raw = req.url || '/';
   const query = raw.indexOf('?');
@@ -246,6 +255,11 @@ function requestPath(req) {
 }
 
 const server = http.createServer((req, res) => {
+  writeCors(req, res);
+  if (req.method === 'OPTIONS') {
+    sendEmpty(res, 204);
+    return;
+  }
   const pathname = requestPath(req);
   let decoded = pathname;
   try {
@@ -277,8 +291,13 @@ const server = http.createServer((req, res) => {
   });
 });
 
+export { server };
+
+const invokedDirectly = process.argv[1]
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
 const port = Number(process.env.PORT) || 4173;
-server.listen(port, '0.0.0.0', () => {
+if (invokedDirectly) server.listen(port, '0.0.0.0', () => {
   const hosts = new Set(['127.0.0.1']);
   for (const entries of Object.values(os.networkInterfaces())) {
     for (const entry of entries ?? []) {

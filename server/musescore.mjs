@@ -1,7 +1,7 @@
 import { parseScoreUrl } from '../shared/musescore-contract.mjs';
-import { readScoreInChrome } from './chrome-score.mjs';
+import { readScoreHttp } from './score-http.mjs';
 
-export async function fetchScoreMidi(rawUrl, signal, readPage = readScoreInChrome) {
+export async function fetchScoreMidi(rawUrl, signal, readPage = readScoreHttp) {
   const scoreUrl = parseScoreUrl(rawUrl);
   if (!scoreUrl) return { ok: false, error: 'bad-url' };
   if (signal?.aborted) {

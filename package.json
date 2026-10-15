@@ -8,9 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "phone": "vite build && node server/phone.mjs",
-    "test": "node --test test/musescore.test.mjs test/library.test.mjs"
+    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs"
   },
   "dependencies": {
+    "@cloudflare/puppeteer": "^1.4.0",
     "lucide-react": "^1.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
