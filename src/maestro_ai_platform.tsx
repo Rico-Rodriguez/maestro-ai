@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useMuseScorePaste } from './musescore-paste';
 import {
+  groupStaffEvents,
+  layoutStaffGroup,
+  octaveShiftForWindow,
+} from './staff-layout.mjs';
+import { MaestroAudioEngine, isIosLike } from './poteto-audio.mjs';
+import {
+  PRACTICE_MODES,
+  practiceModeMeta,
+  formatNextChip,
+  chordCanAdvance,
+  notesPassedBy,
+  micShouldAdvanceScore,
+  midiStatusLine,
+  midiShortStatus,
+} from './practice-session.mjs';
+import {
   Music, Upload, Play, Pause, RotateCcw, Sliders, Mic, MicOff, Cpu, CheckCircle2,
   AlertTriangle, Sparkles, BookOpen, Layers, Volume2, VolumeX, Repeat, ChevronRight,
   ChevronLeft, Activity, Award, FileText, Download, Eye, Wrench, ShieldCheck,
@@ -1394,352 +1410,8 @@ function exportToMusicXML(song) {
 }
 
 // ============================================================================
-// 4. WEBAUDIO POLYPHONIC SYNTHESIZER & AUTOCORRELATION MIC PITCH TRACKER
+// 4. AUDIO ENGINE (DESKTOP SAMPLES + IOS POTETO MODE)
 // ============================================================================
-
-const SALAMANDER_SAMPLE_MAP = {
-  24: 'C1.mp3', 27: 'Ds1.mp3', 30: 'Fs1.mp3', 33: 'A1.mp3',
-  36: 'C2.mp3', 39: 'Ds2.mp3', 42: 'Fs2.mp3', 45: 'A2.mp3',
-  48: 'C3.mp3', 51: 'Ds3.mp3', 54: 'Fs3.mp3', 57: 'A3.mp3',
-  60: 'C4.mp3', 63: 'Ds4.mp3', 66: 'Fs4.mp3', 69: 'A4.mp3',
-  72: 'C5.mp3', 75: 'Ds5.mp3', 78: 'Fs5.mp3', 81: 'A5.mp3',
-  84: 'C6.mp3', 87: 'Ds6.mp3', 90: 'Fs6.mp3', 93: 'A6.mp3',
-  96: 'C7.mp3'
-};
-const SALAMANDER_BASE_URL = 'https://tonejs.github.io/audio/salamander/';
-
-class MaestroAudioEngine {
-  constructor() {
-    this.ctx = null;
-    this.instrument = 'grand-piano';
-    this.volume = 0.85;
-    this.micStream = null;
-    this.analyser = null;
-    this.micRaf = null;
-    this.compressor = null;
-    this.reverbNode = null;
-    this.hammerBuffer = null;
-    this.sampleBuffers = new Map();
-    this.samplesLoading = false;
-    this.samplesLoadedCount = 0;
-    this.onSampleStatusChange = null;
-  }
-
-  init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioCtx();
-
-      // Master Dynamics Compressor + Concert Hall Ambience Reverb
-      this.compressor = this.ctx.createDynamicsCompressor();
-      this.compressor.threshold.value = -14;
-      this.compressor.knee.value = 16;
-      this.compressor.ratio.value = 3.0;
-      this.compressor.attack.value = 0.002;
-      this.compressor.release.value = 0.25;
-
-      this.reverbNode = this.createSoundboardReverb(this.ctx);
-      const reverbGain = this.ctx.createGain();
-      reverbGain.gain.value = 0.18;
-
-      this.compressor.connect(this.ctx.destination);
-      this.compressor.connect(this.reverbNode);
-      this.reverbNode.connect(reverbGain);
-      reverbGain.connect(this.ctx.destination);
-
-      this.hammerBuffer = this.createHammerNoiseBuffer(this.ctx);
-      this.preloadAcousticSamples();
-    }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-    return this.ctx;
-  }
-
-  async preloadAcousticSamples() {
-    if (this.samplesLoading || this.sampleBuffers.size > 0) return;
-    this.samplesLoading = true;
-    const entries = Object.entries(SALAMANDER_SAMPLE_MAP);
-
-    // Prioritize middle register (C3-C5) first so immediate playing uses real samples right away
-    const sortedEntries = [...entries].sort(
-      (a, b) => Math.abs(parseInt(a[0], 10) - 60) - Math.abs(parseInt(b[0], 10) - 60)
-    );
-
-    await Promise.allSettled(
-      sortedEntries.map(async ([midiStr, file]) => {
-        try {
-          const res = await fetch(`${SALAMANDER_BASE_URL}${file}`);
-          if (!res.ok) return;
-          const arrayBuf = await res.arrayBuffer();
-          const audioBuf = await this.ctx.decodeAudioData(arrayBuf);
-          this.sampleBuffers.set(parseInt(midiStr, 10), audioBuf);
-          this.samplesLoadedCount = this.sampleBuffers.size;
-          if (this.onSampleStatusChange) {
-            this.onSampleStatusChange(this.samplesLoadedCount, entries.length);
-          }
-        } catch (err) {
-          // Silently fall back to physical modeling if offline
-        }
-      })
-    );
-  }
-
-  findClosestSample(midi) {
-    if (this.sampleBuffers.size === 0) return null;
-    let closestMidi = null;
-    let minDiff = Infinity;
-    for (const sampleMidi of this.sampleBuffers.keys()) {
-      const diff = Math.abs(midi - sampleMidi);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closestMidi = sampleMidi;
-      }
-    }
-    if (closestMidi === null) return null;
-    return {
-      baseMidi: closestMidi,
-      buffer: this.sampleBuffers.get(closestMidi)
-    };
-  }
-
-  createSoundboardReverb(ctx) {
-    const length = Math.floor(ctx.sampleRate * 1.65);
-    const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const data = impulse.getChannelData(ch);
-      for (let i = 0; i < length; i++) {
-        const decay = Math.exp(-i / (ctx.sampleRate * 0.42));
-        data[i] = (Math.random() * 2 - 1) * decay * 0.45;
-      }
-    }
-    const convolver = ctx.createConvolver();
-    convolver.buffer = impulse;
-    return convolver;
-  }
-
-  createHammerNoiseBuffer(ctx) {
-    const length = Math.floor(ctx.sampleRate * 0.035);
-    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i++) {
-      const env = Math.exp(-i / (ctx.sampleRate * 0.006));
-      data[i] = (Math.random() * 2 - 1) * env;
-    }
-    return buffer;
-  }
-
-  playNote(midi, durationSec = 0.65, velocity = 90) {
-    const ctx = this.init();
-    const now = ctx.currentTime;
-    const freq = midiToFrequency(midi);
-    const normVel = Math.max(0.18, Math.min(1.0, velocity / 127));
-
-    // 1. REAL ACOUSTIC CONCERT GRAND PIANO (Multi-Sampled Steinway Model B)
-    if (this.instrument === 'grand-piano') {
-      const sampleMatch = this.findClosestSample(midi);
-      if (sampleMatch) {
-        const src = ctx.createBufferSource();
-        src.buffer = sampleMatch.buffer;
-        // Exact equal-tempered pitch interpolation from nearest recorded minor-third key
-        src.playbackRate.setValueAtTime(Math.pow(2, (midi - sampleMatch.baseMidi) / 12), now);
-
-        // Velocity-sensitive lowpass filter (soft keystrokes sound warm/mellow, hard strikes sound crisp)
-        const velFilter = ctx.createBiquadFilter();
-        velFilter.type = 'lowpass';
-        const cutoffHz = Math.min(18000, 1400 + Math.pow(normVel, 1.5) * 14500);
-        velFilter.frequency.setValueAtTime(cutoffHz, now);
-
-        // Natural piano damper release envelope (lets strings ring authentically)
-        const registerRing = Math.max(0.85, Math.min(2.4, (92 - midi) / 28));
-        const holdTime = Math.max(durationSec, 0.55) * registerRing;
-        const releaseTime = 0.45 * registerRing;
-
-        const envGain = ctx.createGain();
-        const targetGain = normVel * this.volume * 0.95;
-        envGain.gain.setValueAtTime(0.0001, now);
-        envGain.gain.linearRampToValueAtTime(targetGain, now + 0.003);
-        envGain.gain.setValueAtTime(targetGain, now + holdTime * 0.65);
-        envGain.gain.exponentialRampToValueAtTime(0.0001, now + holdTime + releaseTime);
-
-        src.connect(velFilter);
-        velFilter.connect(envGain);
-        envGain.connect(this.compressor);
-
-        src.start(now);
-        src.stop(now + holdTime + releaseTime + 0.05);
-        return;
-      }
-    }
-
-    // 2. FALLBACK / SECONDARY INSTRUMENTS (Electric Rhodes, Chamber Strings, or Offline Piano)
-    const peakGain = normVel * this.volume * 0.42;
-    const registerDecayScale = Math.max(0.45, Math.min(1.9, (88 - midi) / 36));
-    const effectiveSustain = Math.max(durationSec, 0.42) * registerDecayScale;
-
-    const noteBus = ctx.createGain();
-    noteBus.connect(this.compressor);
-
-    const bodyFilter = ctx.createBiquadFilter();
-    bodyFilter.type = 'lowpass';
-    const initialCutoff = Math.min(12000, freq * (3.8 + normVel * 4.5));
-    const tailCutoff = Math.max(280, freq * 1.4);
-    bodyFilter.frequency.setValueAtTime(initialCutoff, now);
-    bodyFilter.frequency.exponentialRampToValueAtTime(tailCutoff, now + Math.min(0.85, effectiveSustain * 0.7));
-    bodyFilter.Q.value = 0.65;
-    bodyFilter.connect(noteBus);
-
-    if (this.instrument === 'electric-rhodes') {
-      const fund = ctx.createOscillator();
-      const tine = ctx.createOscillator();
-      const tineGain = ctx.createGain();
-      fund.type = 'sine';
-      tine.type = 'sine';
-      fund.frequency.setValueAtTime(freq, now);
-      tine.frequency.setValueAtTime(freq * 7, now);
-      tineGain.gain.setValueAtTime(0.15 * normVel, now);
-      tineGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
-      fund.connect(bodyFilter);
-      tine.connect(tineGain);
-      tineGain.connect(bodyFilter);
-      fund.start(now);
-      tine.start(now);
-      fund.stop(now + effectiveSustain + 0.3);
-      tine.stop(now + 0.22);
-    } else if (this.instrument === 'warm-strings') {
-      [-6, 0, 6].forEach((det) => {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(freq, now);
-        osc.detune.setValueAtTime(det, now);
-        g.gain.value = 0.24;
-        osc.connect(g);
-        g.connect(bodyFilter);
-        osc.start(now);
-        osc.stop(now + effectiveSustain + 0.35);
-      });
-    } else {
-      // Warm acoustic string fallback while real Steinway samples finish downloading
-      const partials = [
-        { ratio: 1.0, amp: 1.0, type: 'sine', detune: -1.2 },
-        { ratio: 1.0, amp: 0.65, type: 'triangle', detune: 1.2 },
-        { ratio: 2.0005, amp: 0.28, type: 'sine', detune: 0.4 },
-        { ratio: 3.0015, amp: 0.11, type: 'sine', detune: -0.8 }
-      ];
-      partials.forEach((p, idx) => {
-        const partialFreq = freq * p.ratio;
-        if (partialFreq > ctx.sampleRate * 0.45) return;
-        const osc = ctx.createOscillator();
-        const pGain = ctx.createGain();
-        osc.type = p.type;
-        osc.frequency.setValueAtTime(partialFreq, now);
-        osc.detune.setValueAtTime(p.detune, now);
-        const partialDecay = effectiveSustain / (1 + idx * 0.5);
-        pGain.gain.setValueAtTime(p.amp, now);
-        pGain.gain.exponentialRampToValueAtTime(0.001, now + partialDecay + 0.25);
-        osc.connect(pGain);
-        pGain.connect(bodyFilter);
-        osc.start(now);
-        osc.stop(now + partialDecay + 0.28);
-      });
-    }
-
-    const attackSec = this.instrument === 'warm-strings' ? 0.065 : 0.005;
-    noteBus.gain.setValueAtTime(0.0001, now);
-    noteBus.gain.linearRampToValueAtTime(peakGain, now + attackSec);
-    noteBus.gain.exponentialRampToValueAtTime(peakGain * 0.55, now + attackSec + 0.09);
-    noteBus.gain.exponentialRampToValueAtTime(0.0001, now + effectiveSustain + 0.32);
-  }
-
-  playMetronomeClick(isDownbeat = false) {
-    const ctx = this.init();
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(isDownbeat ? 1150 : 780, now);
-    gain.gain.setValueAtTime(0.18 * this.volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.06);
-  }
-
-  async startMicrophone(onPitchDetected) {
-    const ctx = this.init();
-    this.micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false }
-    });
-    const source = ctx.createMediaStreamSource(this.micStream);
-    this.analyser = ctx.createAnalyser();
-    this.analyser.fftSize = 2048;
-    source.connect(this.analyser);
-
-    const buffer = new Float32Array(this.analyser.fftSize);
-    const loop = () => {
-      if (!this.analyser) return;
-      this.analyser.getFloatTimeDomainData(buffer);
-      const freq = this.autoCorrelate(buffer, ctx.sampleRate);
-      if (freq > 0) {
-        const pitchInfo = frequencyToMidi(freq);
-        if (pitchInfo) onPitchDetected(pitchInfo);
-      } else {
-        onPitchDetected(null);
-      }
-      this.micRaf = requestAnimationFrame(loop);
-    };
-    this.micRaf = requestAnimationFrame(loop);
-  }
-
-  stopMicrophone() {
-    if (this.micRaf) cancelAnimationFrame(this.micRaf);
-    if (this.micStream) {
-      this.micStream.getTracks().forEach(t => t.stop());
-      this.micStream = null;
-    }
-    this.analyser = null;
-  }
-
-  autoCorrelate(buf, sampleRate) {
-    let size = buf.length;
-    let rms = 0;
-    for (let i = 0; i < size; i++) rms += buf[i] * buf[i];
-    rms = Math.sqrt(rms / size);
-    if (rms < 0.018) return -1;
-
-    let r1 = 0, r2 = size - 1, thres = 0.2;
-    for (let i = 0; i < size / 2; i++) {
-      if (Math.abs(buf[i]) < thres) { r1 = i; break; }
-    }
-    for (let i = 1; i < size / 2; i++) {
-      if (Math.abs(buf[size - i]) < thres) { r2 = size - i; break; }
-    }
-
-    const trimmed = buf.slice(r1, r2);
-    size = trimmed.length;
-    const c = new Float32Array(size);
-    for (let i = 0; i < size; i++) {
-      for (let j = 0; j < size - i; j++) {
-        c[i] = c[i] + trimmed[j] * trimmed[j + i];
-      }
-    }
-
-    let d = 0;
-    while (d < size - 1 && c[d] > c[d + 1]) d++;
-    let maxval = -1, maxpos = -1;
-    for (let i = d; i < size; i++) {
-      if (c[i] > maxval) {
-        maxval = c[i];
-        maxpos = i;
-      }
-    }
-    if (maxpos <= 0) return -1;
-    return sampleRate / maxpos;
-  }
-}
 
 const audioEngine = new MaestroAudioEngine();
 
@@ -1762,6 +1434,9 @@ export default function App() {
   const [keyboardRangeMode, setKeyboardRangeMode] = useState('compact'); // 'compact' (C3-C5) | 'full' (C2-C6)
   const [octaveShift, setOctaveShift] = useState(0); // Shift compact keyboard up/down
   const [samplesReadyCount, setSamplesReadyCount] = useState(0);
+  const [soundReady, setSoundReady] = useState(false);
+  const [soundStalled, setSoundStalled] = useState(false);
+  const [armSound, setArmSound] = useState(false);
 
   useEffect(() => {
     const checkViewport = () => {
@@ -1772,13 +1447,33 @@ export default function App() {
     checkViewport();
     window.addEventListener('resize', checkViewport);
 
-    // Preload real acoustic Steinway Grand Piano samples immediately
     audioEngine.onSampleStatusChange = (loaded) => {
       setSamplesReadyCount(loaded);
     };
-    audioEngine.init();
+    audioEngine.onStatus = (status) => {
+      setSoundReady((prev) => (prev === status.running ? prev : status.running));
+      setSoundStalled((prev) => (prev === status.stalled ? prev : status.stalled));
+    };
+    audioEngine.preloadAcousticSamples();
 
-    return () => window.removeEventListener('resize', checkViewport);
+    const unlock = () => {
+      audioEngine.unlockFromGesture();
+    };
+    window.addEventListener('pointerdown', unlock, true);
+    window.addEventListener('touchend', unlock, true);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && audioEngine.ctx && audioEngine.ctx.state !== 'running') {
+        audioEngine.ctx.resume().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      window.removeEventListener('resize', checkViewport);
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('touchend', unlock, true);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const currentSong = useMemo(
@@ -1804,7 +1499,7 @@ export default function App() {
   const [evaluatedEvents, setEvaluatedEvents] = useState({});
   const [liveToast, setLiveToast] = useState({
     status: 'idle',
-    text: 'Tap the highlighted keys below (or use your MIDI keyboard / computer keys Q–P) to advance the score.'
+    text: ''
   });
   const [sessionStats, setSessionStats] = useState({
     hits: 18,
@@ -1818,10 +1513,9 @@ export default function App() {
 
   // Hardware & Microphone Connections
   const [midiDevices, setMidiDevices] = useState([]);
-  const [midiSupported, setMidiSupported] = useState(false);
+  const [midiAccess, setMidiAccess] = useState('unknown');
   const [micActive, setMicActive] = useState(false);
   const [detectedMicPitch, setDetectedMicPitch] = useState(null);
-  const [lastMidiPacket, setLastMidiPacket] = useState(null);
 
   // OMR Cleanup Studio State
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -1835,6 +1529,20 @@ export default function App() {
   const lastMetronomeBeatRef = useRef(-1);
   const fallingCanvasRef = useRef(null);
   const notationScrollRef = useRef(null);
+  const beatRef = useRef(0);
+  const modeRef = useRef('wait');
+  const eventsRef = useRef([]);
+  const evaluatedRef = useRef({});
+  const tempoRef = useRef(120);
+  const metronomeRef = useRef(false);
+  const loopRef = useRef({ enabled: false, startMeasure: 1, endMeasure: 2 });
+  const beatsRef = useRef(4);
+  const totalBeatsRef = useRef(16);
+  const timeSigBeatsRef = useRef(4);
+  const playingRef = useRef(false);
+  const noteInputRef = useRef(() => {});
+  const noteReleaseRef = useRef(() => {});
+  const audioWatchRef = useRef({ lastTime: -1, stalls: 0 });
 
   const activeEvents = useMemo(() => {
     return currentSong.events.filter(ev => {
@@ -1860,21 +1568,53 @@ export default function App() {
     return unplayed.filter(ev => Math.abs(ev.onset - nextOnset) < 0.15);
   }, [activeEvents, evaluatedEvents, currentBeat]);
 
-  // Auto-scroll notation container smoothly as playhead advances
+  useEffect(() => {
+    if (keyboardRangeMode !== 'compact') return;
+    const next = octaveShiftForWindow(expectedPlayheadEvents.map((ev) => ev.pitch), octaveShift);
+    if (next !== octaveShift) setOctaveShift(next);
+  }, [expectedPlayheadEvents, keyboardRangeMode, octaveShift]);
+
+  modeRef.current = practiceMode;
+  eventsRef.current = activeEvents;
+  tempoRef.current = currentSong.tempo * tempoScale;
+  metronomeRef.current = metronomeOn;
+  loopRef.current = loopRange;
+  beatsRef.current = beatsPerMeasure;
+  totalBeatsRef.current = totalSongBeats;
+  timeSigBeatsRef.current = currentSong.timeSignature[0];
+  playingRef.current = isPlaying;
+
+  const movePlayhead = (beat, clearEvals = false) => {
+    beatRef.current = beat;
+    setCurrentBeat(beat);
+    if (clearEvals) {
+      evaluatedRef.current = {};
+      setEvaluatedEvents({});
+      playedSynthIdsRef.current.clear();
+    }
+  };
+
+  // Auto-scroll the staff only. On a phone, smooth scrolling this strip also shifts the page.
   useEffect(() => {
     const container = notationScrollRef.current;
     if (!container) return;
     const playheadPx = 88 + currentBeat * 56;
     const targetScroll = Math.max(0, playheadPx - container.clientWidth * 0.38);
-    container.scrollTo({ left: targetScroll, behavior: 'smooth' });
+    const coarse = window.matchMedia('(max-width: 767px), (pointer: coarse)').matches;
+    container.scrollTo({ left: targetScroll, behavior: coarse ? 'auto' : 'smooth' });
   }, [ Math.floor(currentBeat * 2) ]);
 
   // ============================================================================
   // 6. REAL-TIME SCORE FOLLOWING & ALIGNMENT ENGINE
   // ============================================================================
 
-  const handleUserNoteInput = useCallback((midiPitch, velocity = 90, source = 'touch') => {
-    audioEngine.playNote(midiPitch, 0.45, velocity);
+  const handleUserNoteInput = useCallback((midiPitch, velocity = 90) => {
+    const heard = audioEngine.playNote(midiPitch, 0.45, velocity);
+    if (!heard) {
+      window.setTimeout(() => {
+        if (audioEngine.ctx?.state !== 'running') setArmSound(true);
+      }, 500);
+    }
 
     setActivePressedNotes(prev => {
       const next = new Set(prev);
@@ -1882,21 +1622,26 @@ export default function App() {
       return next;
     });
 
-    const windowToleranceBeats = practiceMode === 'wait' ? 1.6 : 0.65;
-    const candidateEvents = activeEvents.filter(
-      ev => !evaluatedEvents[ev.id] && Math.abs(ev.onset - currentBeat) <= windowToleranceBeats
+    const mode = modeRef.current;
+    const events = eventsRef.current;
+    const beat = beatRef.current;
+    const evaluated = evaluatedRef.current;
+    const windowToleranceBeats = mode === 'wait' ? 1.6 : 0.65;
+    const candidateEvents = events.filter(
+      ev => !evaluated[ev.id] && Math.abs(ev.onset - beat) <= windowToleranceBeats
     );
 
     const matchedEvent = candidateEvents.find(ev => ev.pitch === midiPitch);
 
     if (matchedEvent) {
-      const beatDiff = currentBeat - matchedEvent.onset;
-      const msDiff = Math.round((beatDiff * 60000) / (currentSong.tempo * tempoScale));
-
-      setEvaluatedEvents(prev => ({
-        ...prev,
+      const beatDiff = beat - matchedEvent.onset;
+      const msDiff = Math.round((beatDiff * 60000) / (tempoRef.current || 1));
+      const nextEval = {
+        ...evaluated,
         [matchedEvent.id]: { status: 'hit', deltaMs: msDiff }
-      }));
+      };
+      evaluatedRef.current = nextEval;
+      setEvaluatedEvents(nextEval);
 
       setSessionStats(prev => ({
         ...prev,
@@ -1907,33 +1652,32 @@ export default function App() {
 
       setLiveToast({
         status: 'hit',
-        text: `Great! ${matchedEvent.pitchName} (Finger ${matchedEvent.finger}) · ${
-          practiceMode === 'wait' ? 'Advancing Score' : `${msDiff >= 0 ? '+' : ''}${msDiff}ms`
-        }`
+        text: mode === 'wait'
+          ? `Got ${matchedEvent.pitchName}`
+          : `${msDiff >= 0 ? '+' : ''}${msDiff} ms · ${matchedEvent.pitchName}`
       });
 
-      if (practiceMode === 'wait') {
-        const chordPeers = activeEvents.filter(
-          ev => Math.abs(ev.onset - matchedEvent.onset) < 0.12 && ev.id !== matchedEvent.id
-        );
-        const allPeersDone = chordPeers.every(p => evaluatedEvents[p.id]);
-        if (allPeersDone) {
-          const futureEvents = activeEvents.filter(ev => ev.onset > matchedEvent.onset + 0.08);
-          if (futureEvents.length > 0) {
-            setCurrentBeat(futureEvents[0].onset);
-          } else {
-            setCurrentBeat(0);
-            setEvaluatedEvents({});
-            setLiveToast({
-              status: 'hit',
-              text: 'Piece completed! Looping back to Measure 1.'
-            });
-          }
+      if (mode === 'wait' && chordCanAdvance(events, nextEval, matchedEvent)) {
+        const futureEvents = events.filter(ev => ev.onset > matchedEvent.onset + 0.08);
+        if (futureEvents.length > 0) {
+          beatRef.current = futureEvents[0].onset;
+          setCurrentBeat(futureEvents[0].onset);
+        } else {
+          beatRef.current = 0;
+          setCurrentBeat(0);
+          evaluatedRef.current = {};
+          setEvaluatedEvents({});
+          playedSynthIdsRef.current.clear();
+          setLiveToast({
+            status: 'hit',
+            text: 'Done. Back to bar 1.'
+          });
         }
       }
-    } else if (expectedPlayheadEvents.length > 0) {
-      const targetNames = expectedPlayheadEvents.map(e => e.pitchName).join(' + ');
-      const curMeasure = Math.floor(currentBeat / beatsPerMeasure) + 1;
+    } else {
+      const unplayed = events.filter(ev => !evaluated[ev.id] && ev.onset >= beat - 0.35);
+      if (unplayed.length === 0) return;
+      const curMeasure = Math.floor(beat / (beatsRef.current || 4)) + 1;
       setSessionStats(prev => ({
         ...prev,
         misses: prev.misses + 1,
@@ -1945,10 +1689,10 @@ export default function App() {
       }));
       setLiveToast({
         status: 'miss',
-        text: `Played ${midiToPitchName(midiPitch)} — Look for highlighted ${targetNames} in Measure ${curMeasure}`
+        text: `Wrong note · bar ${curMeasure}`
       });
     }
-  }, [activeEvents, evaluatedEvents, currentBeat, practiceMode, currentSong.tempo, tempoScale, expectedPlayheadEvents, beatsPerMeasure]);
+  }, []);
 
   const handleUserNoteRelease = useCallback((midiPitch) => {
     setActivePressedNotes(prev => {
@@ -1958,6 +1702,24 @@ export default function App() {
     });
   }, []);
 
+  noteInputRef.current = handleUserNoteInput;
+  noteReleaseRef.current = handleUserNoteRelease;
+
+  const armTransport = () => {
+    if (playingRef.current && !soundStalled && !audioEngine.stalled) {
+      setIsPlaying(false);
+      return;
+    }
+    const pending = audioEngine.unlockFromGesture();
+    setSoundStalled(false);
+    setIsPlaying(true);
+    pending.then((ok) => {
+      setSoundReady(Boolean(ok));
+      setArmSound(!ok);
+      if (!ok) setSoundStalled(true);
+    });
+  };
+
   // ============================================================================
   // 7. MASTER TRANSPORT & 60FPS ANIMATION LOOP
   // ============================================================================
@@ -1966,70 +1728,117 @@ export default function App() {
     if (!isPlaying) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       lastFrameTimeRef.current = null;
-      return;
+      return undefined;
     }
 
-    const effectiveBpm = currentSong.tempo * tempoScale;
-    const beatsPerSecond = effectiveBpm / 60;
+    audioWatchRef.current = { lastTime: -1, stalls: 0 };
 
     const tick = (timestamp) => {
       if (!lastFrameTimeRef.current) lastFrameTimeRef.current = timestamp;
-      // Cap dtSec to 0.08s so browser tab switches or frame hiccups never skip or cluster notes
       const dtSec = Math.min(0.08, (timestamp - lastFrameTimeRef.current) / 1000);
       lastFrameTimeRef.current = timestamp;
 
-      setCurrentBeat(prevBeat => {
-        if (practiceMode === 'wait') {
-          const blockingNote = activeEvents.find(
-            ev => !evaluatedEvents[ev.id] && ev.onset >= prevBeat - 0.05 && ev.onset <= prevBeat + dtSec * beatsPerSecond
-          );
-          if (blockingNote) {
-            return blockingNote.onset;
-          }
-        }
+      const events = eventsRef.current;
+      const mode = modeRef.current;
+      const beatsPerSecond = (tempoRef.current || 1) / 60;
+      const prevBeat = beatRef.current;
+      let nextBeat = prevBeat + dtSec * beatsPerSecond;
 
-        let nextBeat = prevBeat + dtSec * beatsPerSecond;
+      if (mode === 'wait') {
+        const blockingNote = events.find(
+          (ev) => !evaluatedRef.current[ev.id] && ev.onset >= prevBeat - 0.05 && ev.onset <= nextBeat
+        );
+        if (blockingNote) nextBeat = blockingNote.onset;
+      }
 
-        const beatFloor = Math.floor(nextBeat);
-        if (metronomeOn && beatFloor !== lastMetronomeBeatRef.current) {
-          lastMetronomeBeatRef.current = beatFloor;
-          const isDownbeat = (beatFloor % currentSong.timeSignature[0]) === 0;
-          audioEngine.playMetronomeClick(isDownbeat);
-        }
+      const beatFloor = Math.floor(nextBeat);
+      if (metronomeRef.current && beatFloor !== lastMetronomeBeatRef.current && nextBeat > prevBeat) {
+        lastMetronomeBeatRef.current = beatFloor;
+        audioEngine.playMetronomeClick((beatFloor % timeSigBeatsRef.current) === 0);
+      }
 
-        activeEvents.forEach(ev => {
+      if (mode === 'autoplay' || mode === 'continuous') {
+        const heard = [];
+        events.forEach((ev) => {
           if (
             ev.onset >= prevBeat - 0.001 &&
             ev.onset < nextBeat &&
             !playedSynthIdsRef.current.has(ev.id)
           ) {
-            if (practiceMode === 'autoplay') {
-              playedSynthIdsRef.current.add(ev.id);
-              const durSec = (ev.duration / beatsPerSecond);
-              audioEngine.playNote(ev.pitch, durSec, ev.velocity);
-              setEvaluatedEvents(old => ({ ...old, [ev.id]: { status: 'hit', deltaMs: 0 } }));
-            }
+            playedSynthIdsRef.current.add(ev.id);
+            const durSec = beatsPerSecond > 0 ? ev.duration / beatsPerSecond : 0.5;
+            const velocity = mode === 'continuous' ? Math.round((ev.velocity || 80) * 0.62) : ev.velocity;
+            audioEngine.playNote(ev.pitch, durSec, velocity);
+            if (mode === 'autoplay') heard.push(ev.id);
           }
         });
-
-        const loopStartBeat = (loopRange.startMeasure - 1) * beatsPerMeasure;
-        const loopEndBeat = loopRange.endMeasure * beatsPerMeasure;
-
-        if (loopRange.enabled && nextBeat >= loopEndBeat) {
-          playedSynthIdsRef.current.clear();
-          setEvaluatedEvents({});
-          return loopStartBeat;
+        if (heard.length) {
+          const nextEval = { ...evaluatedRef.current };
+          heard.forEach((id) => {
+            nextEval[id] = { status: 'hit', deltaMs: 0 };
+          });
+          evaluatedRef.current = nextEval;
+          setEvaluatedEvents(nextEval);
         }
 
-        if (nextBeat >= totalSongBeats) {
-          playedSynthIdsRef.current.clear();
-          setEvaluatedEvents({});
-          return 0;
+        if (audioEngine.unlocked) {
+          const ctx = audioEngine.ctx;
+          const watch = audioWatchRef.current;
+          const advanced = ctx ? ctx.currentTime - watch.lastTime : 0;
+          if (!ctx || ctx.state !== 'running') {
+            watch.stalls += 1;
+          } else if (watch.lastTime >= 0 && advanced >= 0 && advanced < 0.0005) {
+            watch.stalls += 1;
+          } else {
+            watch.stalls = 0;
+          }
+          watch.lastTime = ctx ? ctx.currentTime : -1;
+          if (watch.stalls >= 45 && !audioEngine.stalled) audioEngine.noteStall();
         }
+      }
 
-        return nextBeat;
-      });
+      const loop = loopRef.current;
+      const loopStartBeat = (loop.startMeasure - 1) * beatsRef.current;
+      const loopEndBeat = loop.endMeasure * beatsRef.current;
+      let wrapped = false;
+      if (loop.enabled && nextBeat >= loopEndBeat) {
+        playedSynthIdsRef.current.clear();
+        evaluatedRef.current = {};
+        setEvaluatedEvents({});
+        nextBeat = loopStartBeat;
+        wrapped = true;
+      } else if (nextBeat >= totalBeatsRef.current) {
+        playedSynthIdsRef.current.clear();
+        evaluatedRef.current = {};
+        setEvaluatedEvents({});
+        nextBeat = 0;
+        wrapped = true;
+      }
 
+      if (!wrapped && mode === 'continuous') {
+        const late = notesPassedBy(events, evaluatedRef.current, nextBeat, 0.8);
+        if (late.length) {
+          const nextEval = { ...evaluatedRef.current };
+          late.forEach((ev) => {
+            nextEval[ev.id] = { status: 'miss', deltaMs: null };
+          });
+          evaluatedRef.current = nextEval;
+          setEvaluatedEvents(nextEval);
+          const measure = Math.floor(nextBeat / (beatsRef.current || 4)) + 1;
+          setSessionStats((prev) => ({
+            ...prev,
+            misses: prev.misses + late.length,
+            streak: 0,
+            struggleMeasures: {
+              ...prev.struggleMeasures,
+              [measure]: (prev.struggleMeasures[measure] || 0) + late.length,
+            },
+          }));
+        }
+      }
+
+      beatRef.current = nextBeat;
+      if (Math.abs(nextBeat - prevBeat) > 0.0001) setCurrentBeat(nextBeat);
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -2037,14 +1846,12 @@ export default function App() {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isPlaying, currentSong, tempoScale, practiceMode, activeEvents, evaluatedEvents, metronomeOn, loopRange, beatsPerMeasure, totalSongBeats]);
+  }, [isPlaying]);
 
   const handleSelectSong = (songId, targetTab = 'practice') => {
     setIsPlaying(false);
     setSelectedSongId(songId);
-    setCurrentBeat(0);
-    setEvaluatedEvents({});
-    playedSynthIdsRef.current.clear();
+    movePlayhead(0, true);
     setSelectedEventId(null);
     setActiveTab(targetTab);
   };
@@ -2062,56 +1869,78 @@ export default function App() {
   // 8. WEB MIDI API & COMPUTER KEYBOARD BINDINGS
   // ============================================================================
 
-  useEffect(() => {
-    if (navigator.requestMIDIAccess) {
-      setMidiSupported(true);
-      navigator.requestMIDIAccess().then((midiAccess) => {
-        const updateDevices = () => {
-          const inputs = Array.from(midiAccess.inputs.values());
-          setMidiDevices(inputs.map(i => ({
-            id: i.id,
-            name: i.name || 'USB/BLE MIDI Instrument',
-            manufacturer: i.manufacturer || 'Generic MIDI',
-            state: i.state
-          })));
+  const midiAccessRef = useRef(null);
 
-          inputs.forEach(input => {
-            input.onmidimessage = (msg) => {
-              const [status, data1, data2] = msg.data;
-              const cmd = status & 0xf0;
-              setLastMidiPacket({ status: `0x${status.toString(16)}`, note: data1, velocity: data2 });
-              if (cmd === 0x90 && data2 > 0) {
-                handleUserNoteInput(data1, data2, 'midi');
-              } else if (cmd === 0x80 || (cmd === 0x90 && data2 === 0)) {
-                handleUserNoteRelease(data1);
-              }
-            };
-          });
-        };
-
-        updateDevices();
-        midiAccess.onstatechange = updateDevices;
-      }).catch(() => {
-        setMidiSupported(false);
-      });
+  const connectMidi = useCallback(() => {
+    if (!navigator.requestMIDIAccess) {
+      setMidiAccess('missing');
+      return;
     }
-  }, [handleUserNoteInput, handleUserNoteRelease]);
+    navigator.requestMIDIAccess({ sysex: false }).then((access) => {
+      midiAccessRef.current = access;
+      setMidiAccess('ready');
+      const updateDevices = () => {
+        const inputs = Array.from(access.inputs.values());
+        setMidiDevices(inputs.map((input) => ({
+          id: input.id,
+          name: input.name || 'MIDI keyboard',
+          manufacturer: input.manufacturer || 'Generic MIDI',
+          state: input.state
+        })));
+        inputs.forEach((input) => {
+          input.onmidimessage = (msg) => {
+            const [status, data1, data2] = msg.data;
+            const cmd = status & 0xf0;
+            if (cmd === 0x90 && data2 > 0) noteInputRef.current(data1, data2, 'midi');
+            else if (cmd === 0x80 || (cmd === 0x90 && data2 === 0)) noteReleaseRef.current(data1);
+          };
+        });
+      };
+      updateDevices();
+      access.onstatechange = updateDevices;
+    }).catch((err) => {
+      const denied = err?.name === 'SecurityError' || err?.name === 'NotAllowedError';
+      setMidiAccess(denied ? 'denied' : 'missing');
+    });
+  }, []);
+
+  useEffect(() => {
+    connectMidi();
+    return () => {
+      const access = midiAccessRef.current;
+      if (!access) return;
+      access.onstatechange = null;
+      access.inputs.forEach((input) => {
+        input.onmidimessage = null;
+      });
+    };
+  }, [connectMidi]);
 
   useEffect(() => {
     const down = (e) => {
       if (e.repeat || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
       if (e.code === 'Space') {
         e.preventDefault();
-        audioEngine.init();
-        setIsPlaying(p => !p);
+        if (playingRef.current && !audioEngine.stalled) {
+          setIsPlaying(false);
+          return;
+        }
+        const pending = audioEngine.unlockFromGesture();
+        setSoundStalled(false);
+        setIsPlaying(true);
+        pending.then((ok) => {
+          setSoundReady(Boolean(ok));
+          setArmSound(!ok);
+          if (!ok) setSoundStalled(true);
+        });
         return;
       }
       const midi = KEYBOARD_TO_MIDI[e.key.toLowerCase()];
-      if (midi) handleUserNoteInput(midi, 92, 'kbd');
+      if (midi) noteInputRef.current(midi, 92, 'kbd');
     };
     const up = (e) => {
       const midi = KEYBOARD_TO_MIDI[e.key.toLowerCase()];
-      if (midi) handleUserNoteRelease(midi);
+      if (midi) noteReleaseRef.current(midi);
     };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
@@ -2119,37 +1948,43 @@ export default function App() {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [handleUserNoteInput, handleUserNoteRelease]);
+  }, []);
 
-  const toggleMicrophone = async () => {
+  const toggleMicrophone = () => {
     if (micActive) {
       audioEngine.stopMicrophone();
       setMicActive(false);
       setDetectedMicPitch(null);
-    } else {
-      try {
-        let lastTriggeredMidi = null;
-        let lastTriggerTime = 0;
-        await audioEngine.startMicrophone((pitchInfo) => {
-          setDetectedMicPitch(pitchInfo);
-          if (pitchInfo && Math.abs(pitchInfo.centsOff) < 35) {
-            const now = performance.now();
-            if (pitchInfo.midi !== lastTriggeredMidi || now - lastTriggerTime > 420) {
-              lastTriggeredMidi = pitchInfo.midi;
-              lastTriggerTime = now;
-              handleUserNoteInput(pitchInfo.midi, 82, 'mic');
-              setTimeout(() => handleUserNoteRelease(pitchInfo.midi), 300);
-            }
-          }
-        });
-        setMicActive(true);
-      } catch (err) {
-        setLiveToast({
-          status: 'miss',
-          text: 'Microphone access was blocked by your browser settings.'
-        });
-      }
+      return;
     }
+    let lastTriggeredMidi = null;
+    let lastTriggerTime = 0;
+    audioEngine.startMicrophone((pitchInfo) => {
+      setDetectedMicPitch(pitchInfo);
+      if (!pitchInfo || Math.abs(pitchInfo.centsOff) >= 35) return;
+      if (!micShouldAdvanceScore(modeRef.current, playingRef.current)) return;
+      const now = performance.now();
+      if (pitchInfo.midi === lastTriggeredMidi && now - lastTriggerTime <= 420) return;
+      lastTriggeredMidi = pitchInfo.midi;
+      lastTriggerTime = now;
+      noteInputRef.current(pitchInfo.midi, 82, 'mic');
+      setTimeout(() => noteReleaseRef.current(pitchInfo.midi), 300);
+    }).then(() => {
+      setMicActive(true);
+    }).catch((err) => {
+      const blocked = err?.name === 'NotAllowedError' || err?.name === 'SecurityError';
+      const missing = err?.name === 'NotFoundError';
+      setLiveToast({
+        status: 'miss',
+        text: !window.isSecureContext
+          ? 'The mic needs a secure https page.'
+          : missing
+            ? 'No microphone found on this device.'
+            : blocked
+              ? 'Microphone blocked. Allow the mic in browser settings.'
+              : 'Microphone access was blocked by the browser.'
+      });
+    });
   };
 
   // ============================================================================
@@ -2191,53 +2026,54 @@ export default function App() {
       }
     };
 
-    const lookaheadBeats = 5;
+    const lookaheadBeats = 4;
     const pixelsPerBeat = height / lookaheadBeats;
 
-    for (let b = Math.floor(currentBeat); b <= currentBeat + lookaheadBeats; b++) {
+    whiteKeys.forEach((_, index) => {
+      if (index % 2 === 0) {
+        ctx.fillStyle = darkMode ? 'rgba(255,255,255,0.025)' : 'rgba(28,25,23,0.035)';
+        ctx.fillRect(index * whiteKeyWidth, 0, whiteKeyWidth, height);
+      }
+    });
+
+    for (let b = Math.ceil(currentBeat); b <= currentBeat + lookaheadBeats; b += 1) {
+      if (b % beatsPerMeasure !== 0) continue;
       const y = height - (b - currentBeat) * pixelsPerBeat;
-      const isMeasureLine = b % beatsPerMeasure === 0;
-      ctx.strokeStyle = isMeasureLine
-        ? (darkMode ? 'rgba(217, 119, 6, 0.35)' : 'rgba(180, 83, 9, 0.25)')
-        : (darkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(120, 113, 108, 0.12)');
-      ctx.lineWidth = isMeasureLine ? 1.5 : 1;
+      ctx.strokeStyle = darkMode ? 'rgba(217, 119, 6, 0.28)' : 'rgba(180, 83, 9, 0.18)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
       ctx.stroke();
     }
 
+    ctx.strokeStyle = darkMode ? 'rgba(251, 146, 60, 0.85)' : 'rgba(194, 65, 12, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, height - 1);
+    ctx.lineTo(width, height - 1);
+    ctx.stroke();
+
     activeEvents.forEach(ev => {
-      if (ev.onset + ev.duration < currentBeat - 0.2 || ev.onset > currentBeat + lookaheadBeats) return;
+      if (ev.onset + ev.duration < currentBeat - 0.15 || ev.onset > currentBeat + lookaheadBeats) return;
       if (ev.pitch < minMidi || ev.pitch > maxMidi) return;
 
       const { x, w } = getKeyXAndWidth(ev.pitch);
+      const inset = Math.max(2, Math.min(5, w * 0.16));
       const noteBottomY = height - (ev.onset - currentBeat) * pixelsPerBeat;
-      const noteHeight = Math.max(18, ev.duration * pixelsPerBeat - 4);
+      const noteHeight = Math.max(6, ev.duration * pixelsPerBeat - 3);
       const noteTopY = noteBottomY - noteHeight;
+      const imminent = Math.abs(ev.onset - currentBeat) < 0.35 && !evaluatedEvents[ev.id];
 
       const evalState = evaluatedEvents[ev.id];
-      const isRightHand = ev.hand === 'R';
-
-      if (evalState?.status === 'hit') {
-        ctx.fillStyle = '#059669';
-      } else if (ev.confidence < 0.85 && !ev.verified) {
-        ctx.fillStyle = '#d97706';
-      } else if (isRightHand) {
-        ctx.fillStyle = '#c2410c'; // Conservatory Terracotta for Right Hand
-      } else {
-        ctx.fillStyle = '#0369a1'; // Deep Teal/Ocean for Left Hand
-      }
+      if (evalState?.status === 'hit') ctx.fillStyle = '#059669';
+      else if (evalState?.status === 'miss') ctx.fillStyle = '#be123c';
+      else if (ev.hand === 'R') ctx.fillStyle = imminent ? '#ea580c' : 'rgba(194, 65, 12, 0.82)';
+      else ctx.fillStyle = imminent ? '#0284c7' : 'rgba(3, 105, 161, 0.82)';
 
       ctx.beginPath();
-      ctx.roundRect(x, noteTopY, w, noteHeight, 6);
+      ctx.roundRect(x + inset, noteTopY, Math.max(4, w - inset * 2), noteHeight, 3);
       ctx.fill();
-
-      if (noteHeight >= 20 && w >= 18) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px system-ui, sans-serif';
-        ctx.fillText(`${ev.pitchName}`, x + 4, noteBottomY - 5);
-      }
     });
   }, [currentBeat, activeEvents, evaluatedEvents, beatsPerMeasure, viewLayout, activeTab, keyboardMidiBounds, darkMode]);
 
@@ -2378,19 +2214,21 @@ export default function App() {
     return (
       <div className={`w-full select-none border-t ${darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-900 border-stone-300'}`}>
         {/* Compact Octave Switcher Bar for Mobile & Tablet */}
-        <div className="flex items-center justify-between px-3 py-1.5 bg-stone-900 text-stone-300 text-xs border-b border-stone-800">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-orange-600 inline-block" /> Right Hand
+        <div className="flex items-center justify-between gap-2 px-2 h-8 overflow-hidden bg-stone-900 text-stone-300 text-[11px] border-b border-stone-800">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex items-center gap-1 shrink-0 font-medium">
+              <span className="w-2 h-2 rounded-full bg-orange-600 inline-block" /> R
             </span>
-            <span className="flex items-center gap-1.5 font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block" /> Left Hand
+            <span className="flex items-center gap-1 shrink-0 font-medium">
+              <span className="w-2 h-2 rounded-full bg-sky-600 inline-block" /> L
             </span>
-            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold pl-2 border-l border-stone-700">
-              <Volume2 className="w-3.5 h-3.5" />
-              {samplesReadyCount > 0
-                ? `Steinway Grand Samples (${samplesReadyCount}/25 Loaded)`
-                : 'Loading Acoustic Grand Samples...'}
+            <span className="hidden md:flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold pl-2 border-l border-stone-700 truncate">
+              <Volume2 className="w-3.5 h-3.5 shrink-0" />
+              {audioEngine.potetoMode || audioEngine.forcePotato
+                ? 'Simple phone piano'
+                : samplesReadyCount > 0
+                  ? `Piano samples ${samplesReadyCount}/25`
+                  : 'Loading piano samples'}
             </span>
           </div>
 
@@ -2419,8 +2257,9 @@ export default function App() {
             <button
               onClick={() => setKeyboardRangeMode(m => m === 'compact' ? 'full' : 'compact')}
               className="px-2.5 py-1 rounded-md bg-stone-800 hover:bg-stone-700 text-stone-200 text-[11px] font-semibold"
+              title={keyboardRangeMode === 'compact' ? 'Show all 49 keys' : 'Show 25 larger keys'}
             >
-              {keyboardRangeMode === 'compact' ? '25 Keys (Touch)' : '49 Keys (Full)'}
+              {keyboardRangeMode === 'compact' ? 'Full' : '25 keys'}
             </button>
           </div>
         </div>
@@ -2528,7 +2367,7 @@ export default function App() {
     return (
       <div
         ref={notationScrollRef}
-        className={`w-full overflow-x-auto rounded-2xl border shadow-inner transition-colors ${
+        className={`w-full overflow-x-auto overscroll-x-contain rounded-2xl border shadow-inner transition-colors ${
           darkMode
             ? 'bg-stone-900/95 border-stone-800'
             : 'bg-[#fcfaf5] border-stone-300/90'
@@ -2620,102 +2459,108 @@ export default function App() {
             </g>
           )}
 
-          {/* Engraved Noteheads, Stems, Beams & Fingering */}
-          {activeEvents.map((ev) => {
-            const clef = ev.hand === 'R' ? 'treble' : 'bass';
-            const stepOffset = getStaffYOffset(ev.pitch, clef, ev.preferFlats);
+          {/* Engraved chords: seconds step aside so noteheads do not pile up */}
+          {groupStaffEvents(activeEvents).map((group) => {
+            const clef = group.hand === 'R' ? 'treble' : 'bass';
             const baseBottomY = clef === 'treble' ? trebleBottomY : bassBottomY;
-            const cy = baseBottomY - stepOffset * 5;
-            const cx = leftMargin + ev.onset * beatPx + 18;
-
-            const evalState = evaluatedEvents[ev.id];
-            const isSelected = selectedEventId === ev.id;
-            const isUncertain = ev.confidence < 0.85 && !ev.verified;
-            const isHollow = ev.duration >= 2;
-
-            let noteColor = ev.hand === 'R'
-              ? (darkMode ? '#fb923c' : '#c2410c')
-              : (darkMode ? '#38bdf8' : '#0369a1');
-            if (evalState?.status === 'hit') noteColor = '#059669';
-            if (isUncertain) noteColor = '#d97706';
-            if (isSelected) noteColor = '#e11d48';
-
-            const needsLedger = stepOffset <= -2 || stepOffset >= 10;
+            const prepared = group.notes.map((ev) => ({
+              ...ev,
+              stepOffset: getStaffYOffset(ev.pitch, clef, ev.preferFlats),
+            }));
+            const layout = layoutStaffGroup(prepared);
+            const baseX = leftMargin + group.onset * beatPx + 18;
+            const drawn = layout.notes.map((note) => ({
+              ...note,
+              cx: baseX + note.dx,
+              cy: baseBottomY - note.stepOffset * 5,
+            }));
+            const showStem = drawn.some((note) => note.duration < 4);
+            const top = Math.min(...drawn.map((note) => note.cy));
+            const bottom = Math.max(...drawn.map((note) => note.cy));
+            const stemX = baseX + layout.stemX;
+            const fingerColor = darkMode ? '#a8a29e' : '#57534e';
 
             return (
-              <g
-                key={ev.id}
-                onClick={() => {
-                  setSelectedEventId(ev.id);
-                  audioEngine.playNote(ev.pitch, 0.4, ev.velocity);
-                  if (!interactiveCleanup) setCurrentBeat(ev.onset);
-                }}
-                className="cursor-pointer"
-              >
-                {isUncertain && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={14}
-                    fill="rgba(217, 119, 6, 0.16)"
-                    stroke="#d97706"
-                    strokeDasharray="3 2"
-                  />
-                )}
-
-                {needsLedger && (
+              <g key={`${group.hand}-${group.onset}`}>
+                {showStem && (
                   <line
-                    x1={cx - 11}
-                    y1={cy}
-                    x2={cx + 11}
-                    y2={cy}
-                    stroke={clefFill}
-                    strokeWidth={1.5}
+                    x1={stemX}
+                    y1={layout.stemUp ? top - 18 : top}
+                    x2={stemX}
+                    y2={layout.stemUp ? bottom : bottom + 18}
+                    stroke={drawn[0] && evaluatedEvents[drawn[0].id]?.status === 'hit' ? '#059669' : (group.hand === 'R' ? (darkMode ? '#fb923c' : '#c2410c') : (darkMode ? '#38bdf8' : '#0369a1'))}
+                    strokeWidth={1.6}
                   />
                 )}
+                {drawn.map((ev) => {
+                  const evalState = evaluatedEvents[ev.id];
+                  const isSelected = selectedEventId === ev.id;
+                  const isUncertain = ev.confidence < 0.85 && !ev.verified;
+                  const isHollow = ev.duration >= 2;
+                  let noteColor = ev.hand === 'R'
+                    ? (darkMode ? '#fb923c' : '#c2410c')
+                    : (darkMode ? '#38bdf8' : '#0369a1');
+                  if (isUncertain && !evalState) noteColor = '#d97706';
+                  if (evalState?.status === 'hit') noteColor = '#059669';
+                  if (evalState?.status === 'miss') noteColor = '#be123c';
+                  if (isSelected) noteColor = '#e11d48';
+                  const needsLedger = ev.stepOffset <= -2 || ev.stepOffset >= 10;
+                  const accidentalX = ev.cx - 14 - ev.accidentalLane * 9;
 
-                {ev.alter === 1 && (
-                  <text x={cx - 18} y={cy + 4} fill={noteColor} fontSize="13" fontWeight="bold">♯</text>
-                )}
-                {ev.alter === -1 && (
-                  <text x={cx - 18} y={cy + 4} fill={noteColor} fontSize="14" fontWeight="bold">♭</text>
-                )}
-
-                <ellipse
-                  cx={cx}
-                  cy={cy}
-                  rx={6.4}
-                  ry={4.8}
-                  transform={`rotate(-18 ${cx} ${cy})`}
-                  fill={isHollow ? (darkMode ? '#1c1917' : '#fcfaf5') : noteColor}
-                  stroke={noteColor}
-                  strokeWidth={2}
-                />
-
-                {ev.duration === 1.5 && (
-                  <circle cx={cx + 10} cy={cy - 2} r={2.2} fill={noteColor} />
-                )}
-
-                {ev.duration < 4 && (
-                  <line
-                    x1={stepOffset >= 4 ? cx - 5.5 : cx + 5.5}
-                    y1={cy}
-                    x2={stepOffset >= 4 ? cx - 5.5 : cx + 5.5}
-                    y2={stepOffset >= 4 ? cy + 28 : cy - 28}
-                    stroke={noteColor}
-                    strokeWidth={1.8}
-                  />
-                )}
-
-                <text
-                  x={cx - 3.5}
-                  y={clef === 'treble' ? cy - 11 : cy + 16}
-                  fill={darkMode ? '#a8a29e' : '#57534e'}
-                  fontSize="9.5"
-                  fontWeight="700"
-                >
-                  {ev.finger}
-                </text>
+                  return (
+                    <g
+                      key={ev.id}
+                      onClick={() => {
+                        setSelectedEventId(ev.id);
+                        audioEngine.playNote(ev.pitch, 0.4, ev.velocity);
+                        if (!interactiveCleanup) movePlayhead(ev.onset);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      {needsLedger && (
+                        <line
+                          x1={ev.cx - 10}
+                          y1={ev.cy}
+                          x2={ev.cx + 10}
+                          y2={ev.cy}
+                          stroke={clefFill}
+                          strokeWidth={1.4}
+                        />
+                      )}
+                      {ev.alter === 1 && (
+                        <text x={accidentalX} y={ev.cy + 4} fill={noteColor} fontSize="12" fontWeight="bold">♯</text>
+                      )}
+                      {ev.alter === -1 && (
+                        <text x={accidentalX} y={ev.cy + 4} fill={noteColor} fontSize="13" fontWeight="bold">♭</text>
+                      )}
+                      <ellipse
+                        cx={ev.cx}
+                        cy={ev.cy}
+                        rx={6.2}
+                        ry={4.5}
+                        transform={`rotate(-18 ${ev.cx} ${ev.cy})`}
+                        fill={isHollow ? (darkMode ? '#1c1917' : '#fcfaf5') : noteColor}
+                        stroke={noteColor}
+                        strokeWidth={1.7}
+                      />
+                      {ev.duration === 1.5 && (
+                        <circle cx={ev.cx + 11} cy={ev.cy - 2} r={1.8} fill={noteColor} />
+                      )}
+                      {ev.finger != null && (
+                        <text
+                          x={ev.cx}
+                          y={clef === 'treble' ? ev.cy - 13 : ev.cy + 15}
+                          fill={fingerColor}
+                          fontSize="8"
+                          fontWeight="700"
+                          textAnchor="middle"
+                        >
+                          {ev.finger}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
               </g>
             );
           })}
@@ -2728,51 +2573,59 @@ export default function App() {
   // 13. VIEW 1: INTERACTIVE PRACTICE STUDIO (CLEAN, FOCUSED, MOBILE-READY)
   // ============================================================================
 
-  const renderPracticeView = () => (
-    <div className="flex flex-col gap-3 w-full max-w-full overflow-hidden">
-      {}
-      {/* Compact Primary Transport & Mode Bar */}
-      <div className={`rounded-2xl border p-2.5 sm:p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 shadow-sm w-full max-w-full ${
+  const renderPracticeView = () => {
+    const modeMeta = practiceModeMeta(practiceMode);
+    const playLabel = soundStalled ? 'Sound' : isPlaying ? 'Pause' : 'Play';
+    const guidance = soundStalled
+      ? 'Sound stalled. Tap Play to start it again.'
+      : armSound && !soundReady
+        ? 'Sound is off. Tap Play to turn it on.'
+        : liveToast.status === 'idle'
+          ? (isPlaying && practiceMode === 'autoplay' ? 'Listening.' : modeMeta.idle)
+          : liveToast.text;
+    const handChoices = [
+      { id: 'BOTH', short: 'Both', long: 'Both' },
+      { id: 'R', short: 'R', long: 'Right' },
+      { id: 'L', short: 'L', long: 'Left' }
+    ];
+
+    return (
+    <div className="flex flex-col gap-2 w-full max-w-full overflow-hidden" style={{ overflowAnchor: 'none' }}>
+      <div className={`rounded-2xl border p-2 sm:p-3 flex flex-col gap-1.5 shadow-sm w-full max-w-full ${
         darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200/90'
       }`}>
-        {/* Top Row on Mobile: Play / Restart + Fluid Truncated Song Selector */}
-        <div className="flex items-center gap-2 w-full md:w-auto min-w-0">
+        <div className="flex items-center gap-2 w-full min-w-0">
           <button
-            onClick={() => {
-              audioEngine.init();
-              setIsPlaying(p => !p);
-            }}
-            className={`shrink-0 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-sm ${
-              isPlaying
+            onClick={armTransport}
+            className={`shrink-0 h-10 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-sm ${
+              playLabel === 'Pause'
                 ? 'bg-amber-500 hover:bg-amber-400 text-stone-950'
                 : 'bg-orange-700 hover:bg-orange-600 text-white'
             }`}
           >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            <span>{isPlaying ? 'Pause' : 'Play'}</span>
+            {playLabel === 'Pause' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            <span>{playLabel}</span>
           </button>
 
           <button
             onClick={() => {
               setIsPlaying(false);
-              setCurrentBeat(loopRange.enabled ? (loopRange.startMeasure - 1) * beatsPerMeasure : 0);
-              setEvaluatedEvents({});
-              playedSynthIdsRef.current.clear();
+              movePlayhead(loopRange.enabled ? (loopRange.startMeasure - 1) * beatsPerMeasure : 0, true);
             }}
-            className={`shrink-0 p-2.5 rounded-xl border transition ${
+            className={`shrink-0 h-10 w-10 rounded-xl border transition flex items-center justify-center ${
               darkMode ? 'bg-stone-800 border-stone-700 text-stone-300' : 'bg-stone-100 border-stone-200 text-stone-700 hover:bg-stone-200'
             }`}
-            title="Restart from Measure 1"
+            title="Restart from bar 1"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
 
-          <div className="flex-1 min-w-0 md:max-w-xs lg:max-w-md">
+          <div className="flex-1 min-w-0">
             <select
               value={currentSong.id}
               onChange={(e) => handleSelectSong(e.target.value, 'practice')}
               aria-label="Select Song"
-              className={`w-full truncate rounded-xl px-2.5 py-2 text-base sm:text-sm font-bold border focus:outline-none ${
+              className={`w-full truncate rounded-xl px-2.5 h-10 text-base sm:text-sm font-bold border focus:outline-none ${
                 darkMode
                   ? 'bg-stone-950 border-stone-800 text-stone-100'
                   : 'bg-stone-50 border-stone-200 text-stone-900'
@@ -2785,31 +2638,35 @@ export default function App() {
               ))}
             </select>
             {museScore.cutLabel(currentSong.id) ? (
-              <p className="px-1 text-xs font-semibold text-stone-600 dark:text-stone-300" aria-live="polite">
+              <p className="px-1 h-4 truncate text-xs font-semibold text-stone-600 dark:text-stone-300" aria-live="polite">
                 {museScore.cutLabel(currentSong.id)}
               </p>
             ) : null}
           </div>
         </div>
 
-        {/* Second Row on Mobile: Practice Mode Pill Selector + BPM Drawer Button */}
-        <div className="flex items-center justify-between md:justify-end gap-2 w-full md:w-auto">
-          <div className={`flex flex-1 md:flex-initial rounded-xl p-1 text-xs font-semibold border ${
-            darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-100 border-stone-200'
-          }`}>
-            {[
-              { id: 'wait', label: 'Wait' },
-              { id: 'continuous', label: 'Tempo' },
-              { id: 'autoplay', label: 'Listen' }
-            ].map(mode => (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 min-w-0">
+          <div
+            className={`flex flex-1 min-w-0 rounded-xl p-0.5 text-xs font-semibold border ${
+              darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-100 border-stone-200'
+            }`}
+            role="group"
+            aria-label="Practice mode"
+          >
+            {PRACTICE_MODES.map(mode => (
               <button
                 key={mode.id}
+                type="button"
+                title={mode.hint}
+                aria-pressed={practiceMode === mode.id}
                 onClick={() => {
                   setPracticeMode(mode.id);
+                  evaluatedRef.current = {};
                   setEvaluatedEvents({});
                   playedSynthIdsRef.current.clear();
+                  setLiveToast({ status: 'idle', text: '' });
                 }}
-                className={`flex-1 md:flex-initial px-2.5 sm:px-3 py-1.5 rounded-lg transition text-center whitespace-nowrap ${
+                className={`flex-1 min-w-0 px-2 sm:px-3 py-1.5 rounded-lg transition text-center whitespace-nowrap ${
                   practiceMode === mode.id
                     ? (darkMode ? 'bg-orange-700 text-white' : 'bg-white text-stone-900 shadow-sm')
                     : (darkMode ? 'text-stone-400 hover:text-stone-200' : 'text-stone-600 hover:text-stone-900')
@@ -2820,43 +2677,44 @@ export default function App() {
             ))}
           </div>
 
-          {/* Quick Hand & Settings Drawer Toggle */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className={`hidden lg:flex rounded-xl p-1 text-xs font-semibold border ${
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className={`flex flex-1 sm:flex-none rounded-xl p-0.5 text-xs font-semibold border ${
               darkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-100 border-stone-200'
             }`}>
-              {[
-                { id: 'BOTH', label: 'Both Hands' },
-                { id: 'R', label: 'Right' },
-                { id: 'L', label: 'Left' }
-              ].map(h => (
+              {handChoices.map(h => (
                 <button
                   key={h.id}
+                  type="button"
                   onClick={() => setHandFilter(h.id)}
-                  className={`px-2.5 py-1.5 rounded-lg transition ${
+                  className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg transition ${
                     handFilter === h.id
                       ? (darkMode ? 'bg-stone-800 text-orange-400' : 'bg-white text-orange-700 shadow-sm')
                       : 'text-stone-500'
                   }`}
                 >
-                  {h.label}
+                  <span className="sm:hidden">{h.short}</span>
+                  <span className="hidden sm:inline">{h.long}</span>
                 </button>
               ))}
             </div>
 
             <button
               onClick={() => setShowPracticeSettings(s => !s)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition whitespace-nowrap ${
+              className={`shrink-0 h-9 px-2.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition whitespace-nowrap ${
                 showPracticeSettings || loopRange.enabled || metronomeOn
                   ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300'
                   : (darkMode ? 'bg-stone-950 border-stone-800 text-stone-300' : 'bg-stone-100 border-stone-200 text-stone-700')
               }`}
             >
               <Sliders className="w-3.5 h-3.5" />
-              <span>{Math.round(currentSong.tempo * tempoScale)} BPM</span>
+              <span className="tabular-nums inline-block w-7 text-right">{Math.round(currentSong.tempo * tempoScale)}</span>
+              <span>BPM</span>
             </button>
           </div>
         </div>
+        <p className="h-10 overflow-hidden px-0.5 text-[11px] sm:text-xs leading-5 text-stone-500 dark:text-stone-400">
+          {modeMeta.hint}
+        </p>
       </div>
 
       {/* Collapsible Tempo, Loop, View Layout & Voice Drawer (Prevents Mobile Clutter) */}
@@ -2942,51 +2800,75 @@ export default function App() {
               <option value="warm-strings">Chamber Strings</option>
             </select>
           </div>
+
+          <div className="sm:col-span-2 lg:col-span-4 flex flex-col gap-1.5 border-t border-stone-200 dark:border-stone-800 pt-2">
+            <span className="font-bold text-stone-500 uppercase tracking-wider text-[10px]">Listening</span>
+            <p className="text-[11px] leading-snug text-stone-600 dark:text-stone-300">
+              {midiStatusLine({ access: midiAccess, devices: midiDevices })}
+              {' '}
+              The mic hears one note at a time and can move Wait or Tempo. It stays quiet during Listen so the speaker is not graded.
+              {isIosLike() ? ' iPhone uses a simple piano so the song still sounds when Safari shows the speaker icon.' : ''}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={connectMidi}
+                className="px-3 py-1.5 rounded-lg font-bold bg-stone-800 text-white"
+              >
+                Connect MIDI
+              </button>
+              <button
+                type="button"
+                onClick={toggleMicrophone}
+                className={`px-3 py-1.5 rounded-lg font-bold text-white ${
+                  micActive ? 'bg-rose-600' : 'bg-emerald-600'
+                }`}
+              >
+                {micActive ? 'Stop mic' : 'Use mic'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Subtle Real-Time Guidance Bar */}
-      <div className={`px-4 py-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm ${
-        liveToast.status === 'hit'
+      <div className={`h-10 px-2.5 sm:px-3 rounded-xl border flex items-center gap-2 overflow-hidden text-xs ${
+        soundStalled || (armSound && !soundReady)
+          ? (darkMode ? 'bg-amber-950/40 border-amber-700/50 text-amber-100' : 'bg-amber-50 border-amber-200 text-amber-950')
+          : liveToast.status === 'hit'
           ? (darkMode ? 'bg-emerald-950/40 border-emerald-700/50 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-900')
           : liveToast.status === 'miss'
           ? (darkMode ? 'bg-rose-950/40 border-rose-700/50 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-900')
           : (darkMode ? 'bg-stone-900 border-stone-800 text-stone-300' : 'bg-stone-100/90 border-stone-200 text-stone-700')
       }`}>
-        <div className="flex items-center gap-2 font-medium">
-          <span className={`w-2 h-2 rounded-full ${
-            liveToast.status === 'hit' ? 'bg-emerald-500' : liveToast.status === 'miss' ? 'bg-rose-500' : 'bg-orange-500'
-          }`} />
-          <span>{liveToast.text}</span>
-        </div>
-
-        <div className="flex items-center gap-3 text-xs font-semibold">
-          {expectedPlayheadEvents.length > 0 && (
-            <span className={`px-2.5 py-0.5 rounded-full border ${
-              darkMode ? 'bg-stone-950 border-stone-700 text-orange-300' : 'bg-white border-stone-300 text-orange-800'
-            }`}>
-              Play: {expectedPlayheadEvents.map(e => `${e.pitchName} (F${e.finger})`).join(' + ')}
-            </span>
-          )}
-          <span className="font-mono text-emerald-600 dark:text-emerald-400">{sessionStats.hits} Hits</span>
-          <span className="font-mono text-amber-600 dark:text-amber-400">{sessionStats.streak} Streak</span>
-        </div>
+        <span className={`w-2 h-2 shrink-0 rounded-full ${
+          liveToast.status === 'hit' ? 'bg-emerald-500' : liveToast.status === 'miss' ? 'bg-rose-500' : 'bg-orange-500'
+        }`} />
+        <p className="min-w-0 flex-1 truncate font-medium">{guidance}</p>
+        <span className="shrink-0 w-16 sm:w-24 truncate text-right text-[11px] font-semibold tabular-nums text-orange-800 dark:text-orange-300">
+          {formatNextChip(expectedPlayheadEvents, isMobileView)}
+        </span>
+        <span className="shrink-0 w-14 truncate text-right text-[11px] font-mono font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+          {sessionStats.hits} Hits
+        </span>
+        <span className="shrink-0 w-[4.25rem] truncate text-right text-[11px] font-mono font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+          {sessionStats.streak} Streak
+        </span>
       </div>
 
       {/* Synchronized Sheet Music Stage */}
       {(viewLayout === 'notation' || viewLayout === 'combined') && (
         <div>
-          <div className="flex items-center justify-between mb-1.5 px-1 text-xs">
-            <span className="font-semibold text-stone-500 dark:text-stone-400">
-              {currentSong.composer} · {currentSong.keySignature} · Measure {Math.floor(currentBeat / beatsPerMeasure) + 1}
+          <div className="flex items-center justify-between gap-2 mb-1.5 px-1 h-5 overflow-hidden text-xs">
+            <span className="truncate font-semibold text-stone-500 dark:text-stone-400">
+              {currentSong.composer} · {currentSong.keySignature} · Bar {Math.floor(currentBeat / beatsPerMeasure) + 1}
             </span>
             {uncertainEventsCount > 0 && (
               <button
                 onClick={() => setActiveTab('cleanup')}
-                className="text-amber-600 dark:text-amber-400 hover:underline font-semibold flex items-center gap-1"
+                className="shrink-0 text-amber-600 dark:text-amber-400 hover:underline font-semibold flex items-center gap-1"
               >
                 <AlertTriangle className="w-3.5 h-3.5" />
-                {uncertainEventsCount} OMR notes to verify →
+                {uncertainEventsCount} to check
               </button>
             )}
           </div>
@@ -3011,7 +2893,8 @@ export default function App() {
         {renderInteractiveKeyboard()}
       </div>
     </div>
-  );
+    );
+  };
 
   // ============================================================================
   // 14. VIEW 2: REPERTOIRE & UNIVERSAL IMPORT
@@ -3554,7 +3437,7 @@ export default function App() {
                 setLoopRange({ enabled: true, startMeasure: m, endMeasure: m });
                 setTempoScale(0.75);
                 setHandFilter('R');
-                setCurrentBeat((m - 1) * beatsPerMeasure);
+                movePlayhead((m - 1) * beatsPerMeasure);
                 setActiveTab('practice');
               }}
               className="px-4 py-2.5 rounded-xl bg-orange-700 hover:bg-orange-600 text-white text-xs font-bold shadow-sm"
@@ -3579,14 +3462,22 @@ export default function App() {
               <div>
                 <div className="font-bold">USB / BLE MIDI</div>
                 <div className="text-stone-500">
-                  {midiDevices.length > 0 ? midiDevices[0].name : midiSupported ? 'Ready (Plug & Play)' : 'Browser Restricted'}
+                  {midiShortStatus({ access: midiAccess, devices: midiDevices })}
                 </div>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                midiDevices.length > 0 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-stone-200 dark:bg-stone-800 text-stone-500'
-              }`}>
-                {midiDevices.length > 0 ? 'Connected' : 'Standby'}
-              </span>
+              {midiDevices.length > 0 ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-500">
+                  Connected
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={connectMidi}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-orange-700 text-white"
+                >
+                  Connect
+                </button>
+              )}
             </div>
 
             <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
@@ -3625,7 +3516,7 @@ export default function App() {
   ];
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans pb-16 md:pb-0 transition-colors ${
+    <div className={`min-h-screen flex flex-col font-sans pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0 transition-colors ${
       darkMode ? 'bg-stone-950 text-stone-100' : 'bg-[#f6f3ec] text-stone-900'
     }`}>
       {/* Clean Conservatory Header */}
@@ -3685,8 +3576,8 @@ export default function App() {
             title="Toggle Live Acoustic Microphone Listening"
           >
             {micActive ? <Mic className="w-3.5 h-3.5 animate-pulse" /> : <MicOff className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">
-              {detectedMicPitch ? detectedMicPitch.name : micActive ? 'Listening' : 'Mic Off'}
+            <span className="hidden sm:inline w-12 text-left">
+              {micActive ? 'Mic on' : 'Mic'}
             </span>
           </button>
 
@@ -3711,7 +3602,7 @@ export default function App() {
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t px-2 py-1.5 grid grid-cols-4 gap-1 backdrop-blur-md ${
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-4 gap-1 backdrop-blur-md ${
         darkMode ? 'bg-stone-900/95 border-stone-800' : 'bg-[#fcfaf5]/95 border-stone-200'
       }`}>
         {navItems.map(item => {
