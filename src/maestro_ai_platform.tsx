@@ -1529,6 +1529,8 @@ export default function App() {
   const lastMetronomeBeatRef = useRef(-1);
   const fallingCanvasRef = useRef(null);
   const notationScrollRef = useRef(null);
+  const notationFollowRef = useRef(true);
+  const notationResumeRef = useRef(null);
   const beatRef = useRef(0);
   const modeRef = useRef('wait');
   const eventsRef = useRef([]);
@@ -1594,15 +1596,27 @@ export default function App() {
     }
   };
 
-  // Auto-scroll the staff only. On a phone, smooth scrolling this strip also shifts the page.
+  const pauseNotationFollow = () => {
+    notationFollowRef.current = false;
+    if (notationResumeRef.current) clearTimeout(notationResumeRef.current);
+    notationResumeRef.current = setTimeout(() => {
+      notationFollowRef.current = true;
+    }, 700);
+  };
+
+  // Move the staff with the playhead. Assigning scrollLeft each frame glides;
+  // scrollTo({ behavior: 'smooth' }) restarts every half beat and stutters.
   useEffect(() => {
     const container = notationScrollRef.current;
-    if (!container) return;
+    if (!container || !notationFollowRef.current) return;
     const playheadPx = 88 + currentBeat * 56;
     const targetScroll = Math.max(0, playheadPx - container.clientWidth * 0.38);
-    const coarse = window.matchMedia('(max-width: 767px), (pointer: coarse)').matches;
-    container.scrollTo({ left: targetScroll, behavior: coarse ? 'auto' : 'smooth' });
-  }, [ Math.floor(currentBeat * 2) ]);
+    if (!isPlaying) {
+      const viewRight = container.scrollLeft + container.clientWidth;
+      if (playheadPx > container.scrollLeft + 32 && playheadPx < viewRight - 48) return;
+    }
+    container.scrollLeft = targetScroll;
+  }, [currentBeat, isPlaying]);
 
   // ============================================================================
   // 6. REAL-TIME SCORE FOLLOWING & ALIGNMENT ENGINE
@@ -2367,7 +2381,10 @@ export default function App() {
     return (
       <div
         ref={notationScrollRef}
-        className={`w-full overflow-x-auto overscroll-x-contain rounded-2xl border shadow-inner transition-colors ${
+        onPointerDown={pauseNotationFollow}
+        onWheel={pauseNotationFollow}
+        style={{ scrollBehavior: 'auto' }}
+        className={`w-full overflow-x-auto overscroll-x-contain touch-pan-x rounded-2xl border shadow-inner transition-colors ${
           darkMode
             ? 'bg-stone-900/95 border-stone-800'
             : 'bg-[#fcfaf5] border-stone-300/90'
