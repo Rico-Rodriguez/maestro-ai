@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "phone": "vite build && node server/phone.mjs",
-    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs test/practice-session.test.mjs"
+    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs test/practice-session.test.mjs test/score-pdf.test.mjs"
   },
   "dependencies": {
     "@cloudflare/puppeteer": "^1.4.0",

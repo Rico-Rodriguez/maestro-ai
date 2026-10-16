@@ -137,34 +137,7 @@ function statusLine(paste) {
   return null;
 }
 
-function SavedLibrary({ scores, disabled, darkMode, onOpen }) {
-  if (!scores.length) return null;
-  const tone = darkMode ? 'text-stone-300' : 'text-stone-600';
-  return (
-    <div className="mt-4 space-y-2">
-      <p className={`text-xs font-bold uppercase tracking-wider ${tone}`}>Saved scores</p>
-      <div className="flex flex-col gap-2">
-        {scores.map((score) => (
-          <button
-            key={score.scoreId}
-            type="button"
-            disabled={disabled}
-            onClick={() => onOpen(score.scoreId)}
-            className={`rounded-xl border px-3 py-2 text-left text-xs font-semibold disabled:opacity-40 ${
-              darkMode
-                ? 'border-stone-700 bg-stone-950 text-stone-100'
-                : 'border-stone-200 bg-stone-50 text-stone-800'
-            }`}
-          >
-            {score.title}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PasteField({ paste, draft, scores, darkMode, onDraft, onSubmit, onCheckAgain, onOpenSaved }) {
+function PasteField({ paste, draft, darkMode, onDraft, onSubmit, onCheckAgain }) {
   const tone = darkMode ? 'text-stone-300' : 'text-stone-600';
   if (paste.phase === 'probing') {
     return (
@@ -244,12 +217,6 @@ function PasteField({ paste, draft, scores, darkMode, onDraft, onSubmit, onCheck
           Open in practice
         </button>
       </div>
-      <SavedLibrary
-        scores={scores}
-        disabled={paste.phase === 'fetching'}
-        darkMode={darkMode}
-        onOpen={onOpenSaved}
-      />
     </form>
   );
 }
@@ -264,6 +231,7 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
   const onOpenRef = useRef(onOpen);
   const disposedRef = useRef(false);
   const fetchAbortRef = useRef(null);
+  const readAbortRef = useRef(null);
   const probeAbortRef = useRef(null);
   const probeGen = useRef(0);
 
@@ -324,6 +292,7 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
       disposedRef.current = true;
       probeAbortRef.current?.abort();
       fetchAbortRef.current?.abort('left');
+      readAbortRef.current?.abort('left');
     };
   }, []);
 
@@ -385,6 +354,27 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
     if (settled.opened) onOpenRef.current(settled.opened.song);
   }
 
+  async function loadScore(scoreId) {
+    if (!/^\d+$/.test(scoreId) || !endpointRef.current) return null;
+    readAbortRef.current?.abort();
+    const controller = new AbortController();
+    readAbortRef.current = controller;
+    const timer = setTimeout(() => controller.abort('timed-out'), 45000);
+    const result = await runPaste(
+      {
+        url: helperApiUrl(endpointRef.current, `${LIBRARY_PATH}/${scoreId}`),
+        attempt: jobRef.current.nextAttempt,
+        signal: controller.signal,
+        method: 'GET',
+        endpoint: endpointRef.current,
+      },
+      { readMidi: (bytes, filename) => readMidiRef.current(bytes, filename) },
+    );
+    clearTimeout(timer);
+    if (disposedRef.current || result.kind !== 'ready') return null;
+    return result.opened.song;
+  }
+
   function onCheckAgain() {
     const next = beginProbe(jobRef.current);
     commit(next);
@@ -397,14 +387,22 @@ export function useMuseScorePaste({ darkMode, readMidi, onOpen }) {
       <PasteField
         paste={job.paste}
         draft={draft}
-        scores={scores}
         darkMode={darkMode}
         onDraft={setDraft}
         onSubmit={submit}
         onCheckAgain={onCheckAgain}
-        onOpenSaved={openSaved}
       />
     ),
+    scores,
+    libraryStatus: job.paste.phase === 'probing'
+      ? 'checking'
+      : job.paste.phase === 'helper-off'
+        ? 'off'
+        : 'ready',
+    busy: job.paste.phase === 'fetching' || job.paste.phase === 'probing',
+    notice: statusLine(job.paste),
+    openSaved,
+    loadScore,
     cutLabel(songId) {
       const receipt = job.receipts[songId];
       if (!receipt) return null;
