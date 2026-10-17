@@ -38,6 +38,18 @@ export function isIosLike(nav = typeof navigator === 'undefined' ? undefined : n
   return nav.platform === 'MacIntel' && (nav.maxTouchPoints || 0) > 1;
 }
 
+export function isCapacitorNative() {
+  const cap = globalThis.Capacitor;
+  return Boolean(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
+}
+
+// Safari on iPhone keeps the short oscillator. The Capacitor app plays the
+// bundled Salamander samples, same as the desktop site.
+export function usesSimplePiano(nav) {
+  if (isCapacitorNative()) return false;
+  return isIosLike(nav);
+}
+
 export function audioSessionType({ recording = false } = {}) {
   return recording ? 'play-and-record' : 'playback';
 }
@@ -146,7 +158,7 @@ export class MaestroAudioEngine {
     this.samplesLoadedCount = 0;
     this.onSampleStatusChange = null;
     this.onStatus = null;
-    this.potetoMode = isIosLike();
+    this.potetoMode = usesSimplePiano();
     this.forcePotato = false;
     this.unlocked = false;
     this.stalled = false;
@@ -171,7 +183,7 @@ export class MaestroAudioEngine {
   noteStall() {
     if (this.stalled) return;
     this.stalled = true;
-    this.forcePotato = true;
+    if (!isCapacitorNative()) this.forcePotato = true;
     this.unlocked = false;
     this.emitStatus();
   }
@@ -203,14 +215,14 @@ export class MaestroAudioEngine {
   }
 
   ensureContext() {
-    if (isIosLike()) this.potetoMode = true;
+    this.potetoMode = usesSimplePiano();
     if (this.ctx && this.ctx.state !== 'closed') return this.ctx;
     this.primeSession(false);
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) throw new Error('Web Audio is unavailable');
     this.ctx = new AudioCtx({ latencyHint: 'interactive' });
 
-    if (this.potetoMode || this.forcePotato) {
+    if (this.potetoMode || this.forcePotato || isCapacitorNative()) {
       this.output = this.ctx.destination;
     } else {
       this.compressor = this.ctx.createDynamicsCompressor();
@@ -278,10 +290,11 @@ export class MaestroAudioEngine {
   }
 
   unlockFromGesture() {
-    if (isIosLike()) this.potetoMode = true;
+    this.potetoMode = usesSimplePiano();
+    this.preloadAcousticSamples();
     this.primeSession(false);
     if (this.stalled) {
-      this.forcePotato = true;
+      if (!isCapacitorNative()) this.forcePotato = true;
       this.stalled = false;
       this.closeContext();
     }
@@ -319,7 +332,8 @@ export class MaestroAudioEngine {
   }
 
   async preloadAcousticSamples() {
-    if (this.potetoMode || this.forcePotato || this.fetchStarted) return;
+    this.potetoMode = usesSimplePiano();
+    if (this.potetoMode || (this.forcePotato && !isCapacitorNative()) || this.fetchStarted) return;
     this.fetchStarted = true;
     const entries = Object.entries(SALAMANDER_SAMPLE_MAP);
     await Promise.allSettled(entries.map(async ([midiStr, file]) => {
@@ -333,7 +347,7 @@ export class MaestroAudioEngine {
   }
 
   async decodeQueuedSamples() {
-    if (this.potetoMode || this.forcePotato || !this.ctx || this.ctx.state !== 'running') return;
+    if (this.potetoMode || (this.forcePotato && !isCapacitorNative()) || !this.ctx || this.ctx.state !== 'running') return;
     if (this.decoding) {
       this.decodeAgain = true;
       return;
@@ -544,7 +558,7 @@ export class MaestroAudioEngine {
   }
 
   playNote(midi, durationSec = 0.65, velocity = 90) {
-    if (isIosLike()) this.potetoMode = true;
+    this.potetoMode = usesSimplePiano();
     let ctx;
     try {
       ctx = this.ensureContext();
@@ -553,14 +567,14 @@ export class MaestroAudioEngine {
     }
     if (ctx.state !== 'running') ctx.resume().catch(() => {});
     try {
-      if (this.forcePotato || (this.potetoMode && this.instrument === 'grand-piano')) {
+      if (!isCapacitorNative() && (this.forcePotato || (this.potetoMode && this.instrument === 'grand-piano'))) {
         this.playPotato(ctx, midi, durationSec, velocity);
         return ctx.state === 'running';
       }
       if (this.instrument === 'grand-piano') {
         const sample = this.findClosestSample(midi);
         if (sample && sample.buffer.length > 8) {
-          this.playSample(ctx, sample, midi, durationSec, velocity, false);
+          this.playSample(ctx, sample, midi, durationSec, velocity, isCapacitorNative());
           return ctx.state === 'running';
         }
       }
@@ -602,7 +616,7 @@ export class MaestroAudioEngine {
       error.name = 'NotFoundError';
       throw error;
     }
-    if (isIosLike()) this.potetoMode = true;
+    this.potetoMode = usesSimplePiano();
     await this.primeSession(true);
     const streamPromise = navigator.mediaDevices.getUserMedia({
       audio: {

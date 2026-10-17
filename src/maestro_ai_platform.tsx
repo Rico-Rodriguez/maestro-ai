@@ -6,7 +6,7 @@ import {
   layoutStaffGroup,
   octaveShiftForWindow,
 } from './staff-layout.mjs';
-import { MaestroAudioEngine, isIosLike } from './poteto-audio.mjs';
+import { MaestroAudioEngine, usesSimplePiano } from './poteto-audio.mjs';
 import {
   PRACTICE_MODES,
   practiceModeMeta,
@@ -1932,7 +1932,7 @@ export default function App() {
               {midiStatusLine({ access: midiAccess, devices: midiDevices })}
               {' '}
               The mic hears one note at a time and can move Wait or Tempo. It stays quiet during Listen so the speaker is not graded.
-              {isIosLike() ? ' iPhone uses a simple piano so the song still sounds when Safari shows the speaker icon.' : ''}
+              {usesSimplePiano() ? ' iPhone uses a simple piano so the song still sounds when Safari shows the speaker icon.' : ''}
             </p>
             <div className="flex items-center gap-2">
               <button
