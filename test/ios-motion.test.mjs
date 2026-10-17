@@ -2,11 +2,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { shouldDecodeSamples } from '../src/poteto-audio.mjs';
 import { iosIndexHtml } from '../src/ios-viewport.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
+  STAFF_BEAT_PX,
+  STAFF_LEFT,
   applyTouchChord,
+  beatFromStaffScroll,
   cappedDevicePixelRatio,
   nextExpectedOnset,
   paintFallingNotes,
+  scrollForBeat,
   shouldPublishBeat,
 } from '../src/ios-motion.mjs';
 
@@ -110,4 +117,46 @@ test('falling notes for two seconds of frames stay cheap without a react render'
   }
   const elapsed = performance.now() - started;
   assert.ok(elapsed < 200, `paint took ${elapsed.toFixed(1)} ms`);
+});
+
+test('scrolling the staff lands on that beat and does not jump back', () => {
+  const width = 390;
+  const totalBeats = 64;
+  const scrollWidth = STAFF_LEFT + totalBeats * STAFF_BEAT_PX + 140;
+  assert.equal(beatFromStaffScroll({
+    scrollLeft: 0,
+    clientWidth: width,
+    scrollWidth,
+    totalBeats,
+  }), 0);
+  for (const beat of [2, 4, 8, 12, 20]) {
+    const left = scrollForBeat(beat, width);
+    const back = beatFromStaffScroll({
+      scrollLeft: left,
+      clientWidth: width,
+      scrollWidth,
+      totalBeats,
+    });
+    assert.ok(Math.abs(back - beat) < 0.02, `beat ${beat} came back as ${back}`);
+  }
+  assert.equal(beatFromStaffScroll({
+    scrollLeft: scrollWidth - width,
+    clientWidth: width,
+    scrollWidth,
+    totalBeats,
+  }), totalBeats);
+});
+
+test('the iOS playhead is a layer above the staff, not a child of the svg', () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const source = fs.readFileSync(path.join(root, 'src', 'maestro_ai_platform.tsx'), 'utf8');
+  const svgStart = source.indexOf('<svg');
+  const svgEnd = source.indexOf('</svg>', svgStart);
+  const playhead = source.indexOf('className="ios-playhead"');
+  assert.ok(svgStart > 0 && svgEnd > svgStart);
+  assert.ok(playhead > svgEnd, 'playhead div is inside the svg and will not paint');
+  assert.match(source, /ios-staff-stage/);
+  const css = fs.readFileSync(path.join(root, 'src', 'index.css'), 'utf8');
+  assert.match(css, /\.ios-playhead[\s\S]*z-index:\s*4/);
+  assert.match(css, /\.ios-staff-stage[\s\S]*position:\s*relative/);
 });

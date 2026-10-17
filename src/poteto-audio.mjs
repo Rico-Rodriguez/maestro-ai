@@ -1,3 +1,14 @@
+import {
+  GRAND_MANIFEST,
+  GRAND_NOTE_COUNT,
+  grandReleaseSeconds,
+  grandSampleJobs,
+  layerForVelocity,
+  nearestByMidi,
+  nearestGrandNote,
+  pianoOutputRoute,
+} from './grand-piano.mjs';
+
 // Poteto mode keeps iPhone and iPad sound on a short, direct path.
 // Safari can show the tab speaker icon while Web Audio is still silent:
 // the context was opened before a tap, the silent switch treats Web Audio
@@ -198,6 +209,9 @@ export class MaestroAudioEngine {
     this.silentEl = null;
     this.voices = [];
     this.liveBuffers = new Map();
+    this.heldNotes = new Map();
+    this.sustainedNotes = new Set();
+    this.sustainDown = false;
     // AppDelegate already opened playback. A later tap must not set the
     // session up again; setActive on every touch blocks the main thread.
     this.primedRecording = isCapacitorNative() ? false : null;
@@ -245,6 +259,9 @@ export class MaestroAudioEngine {
     this.output = null;
     this.compressor = null;
     this.reverbNode = null;
+    this.reverbGain = null;
+    this.heldNotes.clear();
+    this.sustainedNotes.clear();
     if (!isCapacitorNative()) {
       this.sampleBuffers.clear();
       this.samplesLoadedCount = 0;
@@ -258,7 +275,10 @@ export class MaestroAudioEngine {
       ctx.onstatechange = null;
       ctx.close().catch(() => {});
     }
-    this.onSampleStatusChange?.(this.samplesLoadedCount, SAMPLE_COUNT);
+    this.onSampleStatusChange?.(
+      this.samplesLoadedCount,
+      isCapacitorNative() ? GRAND_NOTE_COUNT : SAMPLE_COUNT,
+    );
   }
 
   ensureContext() {
@@ -269,8 +289,13 @@ export class MaestroAudioEngine {
     if (!AudioCtx) throw new Error('Web Audio is unavailable');
     const native = isCapacitorNative();
     this.ctx = new AudioCtx({ latencyHint: native ? 0.01 : 'interactive' });
+    const route = pianoOutputRoute({
+      native,
+      potetoMode: this.potetoMode,
+      forcePotato: this.forcePotato,
+    });
 
-    if (this.potetoMode || this.forcePotato || isCapacitorNative()) {
+    if (route === 'direct') {
       this.output = this.ctx.destination;
     } else {
       this.compressor = this.ctx.createDynamicsCompressor();
@@ -279,13 +304,22 @@ export class MaestroAudioEngine {
       this.compressor.ratio.value = 3;
       this.compressor.attack.value = 0.002;
       this.compressor.release.value = 0.25;
-      this.reverbNode = this.createSoundboardReverb(this.ctx);
-      const reverbGain = this.ctx.createGain();
-      reverbGain.gain.value = 0.18;
+      this.reverbGain = this.ctx.createGain();
+      this.reverbGain.gain.value = route === 'hall' ? 0.24 : 0.18;
+      if (route === 'hall') {
+        this.reverbNode = this.ctx.createConvolver();
+        const seed = this.ctx.createBuffer(2, 32, this.ctx.sampleRate);
+        this.reverbNode.buffer = seed;
+        this.attachHall();
+      } else {
+        this.reverbNode = this.createSoundboardReverb(this.ctx);
+      }
       this.compressor.connect(this.ctx.destination);
-      this.compressor.connect(this.reverbNode);
-      this.reverbNode.connect(reverbGain);
-      reverbGain.connect(this.ctx.destination);
+      try {
+        this.compressor.connect(this.reverbNode);
+        this.reverbNode.connect(this.reverbGain);
+        this.reverbGain.connect(this.ctx.destination);
+      } catch { /* the dry compressor path still reaches the speakers */ }
       this.output = this.compressor;
     }
 
@@ -390,6 +424,10 @@ export class MaestroAudioEngine {
 
   async preloadAcousticSamples() {
     this.potetoMode = usesSimplePiano();
+    if (isCapacitorNative()) {
+      await this.preloadGrandSamples();
+      return;
+    }
     if (this.potetoMode || (this.forcePotato && !isCapacitorNative()) || this.fetchStarted) return;
     this.fetchStarted = true;
     const entries = Object.entries(SALAMANDER_SAMPLE_MAP);
@@ -400,6 +438,20 @@ export class MaestroAudioEngine {
         this.encodedSamples.set(parseInt(midiStr, 10), await res.arrayBuffer());
         this.decodeQueuedSamples();
       } catch { /* oscillator fallback covers a failed sample */ }
+    }));
+  }
+
+  async preloadGrandSamples() {
+    if (this.fetchStarted) return;
+    this.fetchStarted = true;
+    const jobs = grandSampleJobs(GRAND_MANIFEST);
+    await Promise.allSettled(jobs.map(async (job) => {
+      try {
+        const res = await fetch(`${GRAND_MANIFEST.baseUrl}${job.file}`);
+        if (!res.ok) return;
+        this.encodedSamples.set(job.key, await res.arrayBuffer());
+        this.decodeQueuedSamples();
+      } catch { /* a missing layer falls back to the nearest one */ }
     }));
   }
 
@@ -416,29 +468,92 @@ export class MaestroAudioEngine {
       return;
     }
     this.decoding = true;
+    if (native) await this.decodeGrandQueue();
+    else await this.decodeSalamanderQueue();
+    this.decoding = false;
+    if (this.decodeAgain) {
+      this.decodeAgain = false;
+      this.decodeQueuedSamples();
+    }
+  }
+
+  async decodeSalamanderQueue() {
     const ctx = this.ctx;
     const pending = [...this.encodedSamples.entries()].sort(
       (a, b) => Math.abs(a[0] - 60) - Math.abs(b[0] - 60)
     );
     for (const [midi, encoded] of pending) {
       if (this.sampleBuffers.has(midi)) continue;
-      if (!native && this.ctx !== ctx) continue;
+      if (this.ctx !== ctx) continue;
       try {
-        const audioBuf = native
-          ? await decodeSampleBuffer(encoded, null)
-          : await ctx.decodeAudioData(encoded.slice(0));
+        const audioBuf = await ctx.decodeAudioData(encoded.slice(0));
         if (!audioBuf || audioBuf.length < 8) continue;
-        if (!native && this.ctx !== ctx) continue;
+        if (this.ctx !== ctx) continue;
         this.sampleBuffers.set(midi, audioBuf);
         this.samplesLoadedCount = this.sampleBuffers.size;
         this.onSampleStatusChange?.(this.samplesLoadedCount, SAMPLE_COUNT);
       } catch { /* keep the modeled piano for this key */ }
     }
-    this.decoding = false;
-    if (this.decodeAgain) {
-      this.decodeAgain = false;
-      this.decodeQueuedSamples();
+  }
+
+  async decodeGrandQueue() {
+    const jobs = grandSampleJobs(GRAND_MANIFEST);
+    for (const job of jobs) {
+      if (this.sampleBuffers.has(job.key)) continue;
+      const encoded = this.encodedSamples.get(job.key);
+      if (!encoded) continue;
+      try {
+        const audioBuf = await decodeSampleBuffer(encoded, null);
+        if (!audioBuf || audioBuf.length < 8) continue;
+        this.sampleBuffers.set(job.key, audioBuf);
+        if (job.note) {
+          this.samplesLoadedCount += 1;
+          this.onSampleStatusChange?.(this.samplesLoadedCount, GRAND_NOTE_COUNT);
+        }
+        if (job.key === 'hall') this.attachHall();
+      } catch { /* the nearest decoded layer covers this note */ }
     }
+  }
+
+  bufferFor(key) {
+    const ctx = this.ctx;
+    const cached = this.liveBuffers.get(key);
+    if (cached && cached.ctx === ctx) return cached.buffer;
+    const offline = this.sampleBuffers.get(key);
+    if (!offline) return null;
+    if (!ctx || ctx.state === 'closed' || typeof ctx.createBuffer !== 'function') return offline;
+    const live = adoptBuffer(ctx, offline);
+    this.liveBuffers.set(key, { ctx, buffer: live });
+    return live;
+  }
+
+  attachHall() {
+    if (!this.reverbNode || typeof this.reverbNode.buffer === 'undefined') return;
+    const buffer = this.bufferFor('hall');
+    if (!buffer) return;
+    try { this.reverbNode.buffer = buffer; } catch { /* dry piano keeps playing */ }
+  }
+
+  findGrand(midi, velocity) {
+    const choice = layerForVelocity(velocity, GRAND_MANIFEST.layers);
+    const note = nearestGrandNote(midi, GRAND_MANIFEST.notes);
+    if (!note) return null;
+    const order = [choice.index];
+    for (let index = 0; index < note.files.length; index += 1) {
+      if (index !== choice.index) order.push(index);
+    }
+    for (const index of order) {
+      const key = `n:${note.midi}:${index}`;
+      const buffer = this.bufferFor(key);
+      if (buffer && buffer.length > 8) {
+        return {
+          buffer,
+          baseMidi: note.midi,
+          layerGain: index === choice.index ? choice.gain : 0.9,
+        };
+      }
+    }
+    return null;
   }
 
   findClosestSample(midi) {
@@ -473,7 +588,7 @@ export class MaestroAudioEngine {
 
   trackVoice(node) {
     this.voices.push(node);
-    const cap = this.potetoMode || this.forcePotato ? 16 : 32;
+    const cap = this.potetoMode || this.forcePotato ? 16 : (isCapacitorNative() ? 48 : 32);
     while (this.voices.length > cap) {
       const old = this.voices.shift();
       try { old.stop(); } catch { /* already ended */ }
@@ -635,6 +750,155 @@ export class MaestroAudioEngine {
     noteBus.gain.linearRampToValueAtTime(0.0001, now + effectiveSustain + 0.32);
   }
 
+  playKeyedSample(kind, midi, when, amp) {
+    const table = kind === 'h' ? GRAND_MANIFEST.resonance : GRAND_MANIFEST.releases;
+    const entry = nearestByMidi(midi, table);
+    if (!entry || !this.ctx) return;
+    const buffer = this.bufferFor(`${kind}:${entry.midi}`);
+    if (!buffer || buffer.length < 8) return;
+    const start = Math.max(when, this.ctx.currentTime);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const rate = Math.pow(2, (midi - entry.midi) / 12);
+    src.playbackRate.setValueAtTime(Number.isFinite(rate) && rate > 0 ? rate : 1, start);
+    const gain = this.ctx.createGain();
+    const peak = Math.max(0.0002, amp * this.volume);
+    const tail = kind === 'h' ? 1.5 : 0.32;
+    gain.gain.setValueAtTime(peak, start);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + tail);
+    src.connect(gain);
+    gain.connect(this.output || this.ctx.destination);
+    src.start(start);
+    src.stop(start + tail + 0.05);
+    this.trackVoice(src);
+  }
+
+  playPedalNoise(down) {
+    if (!this.ctx) return;
+    const buffer = this.bufferFor(down ? 'pedalD' : 'pedalU');
+    if (!buffer || buffer.length < 8) return;
+    const now = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.32 * this.volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + (down ? 0.9 : 0.45));
+    src.connect(gain);
+    gain.connect(this.output || this.ctx.destination);
+    src.start(now);
+    src.stop(now + (down ? 1.05 : 0.55));
+    this.trackVoice(src);
+  }
+
+  quickStop(voice) {
+    if (!voice || voice.released || !this.ctx) return;
+    voice.released = true;
+    const now = this.ctx.currentTime;
+    try {
+      voice.gain.gain.cancelScheduledValues(now);
+      const level = Math.max(0.0002, voice.gain.gain.value || voice.peak || 0.0002);
+      voice.gain.gain.setValueAtTime(level, now);
+      voice.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02);
+      voice.src.stop(now + 0.03);
+    } catch { /* the string was already gone */ }
+  }
+
+  scheduleRelease(voice, when, kind) {
+    if (!voice || voice.released || !this.ctx) return;
+    voice.released = true;
+    const start = Math.max(when, this.ctx.currentTime);
+    const releaseSec = Math.max(0.08, voice.releaseSec || 0.4);
+    try {
+      voice.gain.gain.cancelScheduledValues(start);
+      voice.gain.gain.setValueAtTime(Math.max(0.0002, voice.peak), start);
+      voice.gain.gain.exponentialRampToValueAtTime(0.0001, start + releaseSec);
+      voice.src.stop(start + releaseSec + 0.04);
+    } catch { /* already stopped */ }
+    this.playKeyedSample(kind, voice.midi, start, kind === 'h' ? 0.26 : 0.4);
+  }
+
+  stealVoice(midi) {
+    const held = this.heldNotes.get(midi);
+    if (held) {
+      this.heldNotes.delete(midi);
+      this.quickStop(held);
+    }
+    for (const voice of this.sustainedNotes) {
+      if (voice.midi !== midi) continue;
+      this.sustainedNotes.delete(voice);
+      this.quickStop(voice);
+    }
+  }
+
+  playGrandNote(ctx, midi, durationSec, velocity) {
+    const found = this.findGrand(midi, velocity);
+    if (!found) {
+      this.playModeled(ctx, midi, Math.max(0.2, Number(durationSec) || 0.45), velocity);
+      return;
+    }
+    this.stealVoice(midi);
+    const now = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = found.buffer;
+    const rate = Math.pow(2, (midi - found.baseMidi) / 12);
+    src.playbackRate.setValueAtTime(Number.isFinite(rate) && rate > 0 ? rate : 1, now);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    const norm = Math.max(0, Math.min(1, (Number(velocity) || 0) / 127));
+    filter.frequency.setValueAtTime(Math.min(18000, 9000 + norm * 8000), now);
+    filter.Q.value = 0.5;
+    const gain = ctx.createGain();
+    const peak = Math.max(0.0002, this.volume * found.layerGain);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(peak, now + 0.004);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.output || ctx.destination);
+    src.start(now);
+    const voice = {
+      midi,
+      src,
+      gain,
+      peak,
+      releaseSec: grandReleaseSeconds(midi),
+      released: false,
+    };
+    this.trackVoice(src);
+    const held = !(Number(durationSec) > 0);
+    if (held) {
+      this.heldNotes.set(midi, voice);
+      return;
+    }
+    this.scheduleRelease(voice, now + Math.max(0.05, Number(durationSec)), 'r');
+  }
+
+  releaseNote(midi) {
+    if (!isCapacitorNative()) return;
+    const voice = this.heldNotes.get(midi);
+    if (!voice) return;
+    this.heldNotes.delete(midi);
+    if (!this.ctx) return;
+    if (this.sustainDown) {
+      this.sustainedNotes.add(voice);
+      this.playKeyedSample('h', midi, this.ctx.currentTime, 0.22);
+      return;
+    }
+    this.scheduleRelease(voice, this.ctx.currentTime, 'r');
+  }
+
+  setSustain(down) {
+    if (!isCapacitorNative()) return;
+    const next = Boolean(down);
+    if (next === this.sustainDown) return;
+    this.sustainDown = next;
+    if (!this.ctx) return;
+    this.playPedalNoise(next);
+    if (next) return;
+    const now = this.ctx.currentTime;
+    for (const voice of this.sustainedNotes) this.scheduleRelease(voice, now, 'r');
+    this.sustainedNotes.clear();
+  }
+
   playNote(midi, durationSec = 0.65, velocity = 90) {
     this.potetoMode = usesSimplePiano();
     let ctx;
@@ -649,10 +913,14 @@ export class MaestroAudioEngine {
         this.playPotato(ctx, midi, durationSec, velocity);
         return ctx.state === 'running';
       }
+      if (this.instrument === 'grand-piano' && isCapacitorNative()) {
+        this.playGrandNote(ctx, midi, durationSec, velocity);
+        return ctx.state === 'running';
+      }
       if (this.instrument === 'grand-piano') {
         const sample = this.findClosestSample(midi);
         if (sample && sample.buffer.length > 8) {
-          this.playSample(ctx, sample, midi, durationSec, velocity, isCapacitorNative());
+          this.playSample(ctx, sample, midi, durationSec, velocity, false);
           return ctx.state === 'running';
         }
       }

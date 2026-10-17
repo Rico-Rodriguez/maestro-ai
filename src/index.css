@@ -62,7 +62,7 @@ html.ios-app .ios-key-down {
   transform: translateY(2px);
 }
 
-html.ios-app .ios-staff {
+html.ios-app .ios-staff-stage {
   position: relative;
 }
 
@@ -75,7 +75,7 @@ html.ios-app .ios-playhead {
   background: #059669;
   border-radius: 2px;
   pointer-events: none;
-  z-index: 2;
+  z-index: 4;
   will-change: transform;
 }
 

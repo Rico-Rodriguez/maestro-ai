@@ -1,5 +1,29 @@
 const BLACK_PITCH = new Set([1, 3, 6, 8, 10]);
 
+export const STAFF_LEFT = 88;
+export const STAFF_BEAT_PX = 56;
+export const STAFF_ANCHOR = 0.38;
+
+export function scrollForBeat(beat, clientWidth) {
+  const width = Number(clientWidth) || 0;
+  const playheadPx = STAFF_LEFT + (Number(beat) || 0) * STAFF_BEAT_PX;
+  return Math.max(0, playheadPx - width * STAFF_ANCHOR);
+}
+
+export function beatFromStaffScroll({ scrollLeft, clientWidth, scrollWidth, totalBeats }) {
+  const left = Math.max(0, Number(scrollLeft) || 0);
+  const width = Math.max(0, Number(clientWidth) || 0);
+  const full = Math.max(0, Number(scrollWidth) || 0);
+  const total = Number.isFinite(totalBeats) ? Math.max(0, totalBeats) : 0;
+  if (left <= 0.5) return 0;
+  const maxScroll = Math.max(0, full - width);
+  if (maxScroll > 1 && left >= maxScroll - 0.5) return total;
+  const playheadPx = left + width * STAFF_ANCHOR;
+  const beat = (playheadPx - STAFF_LEFT) / STAFF_BEAT_PX;
+  if (!Number.isFinite(beat)) return 0;
+  return Math.max(0, Math.min(total, beat));
+}
+
 export function cappedDevicePixelRatio(dpr, cap = 2) {
   const value = Number(dpr);
   if (!Number.isFinite(value) || value <= 0) return 1;

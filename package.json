@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:ios": "VITE_IOS_SHELL=1 vite build --base ./",
+    "build:ios": "VITE_IOS_SHELL=1 vite build --base ./ && node scripts/copy-ios-audio.mjs",
     "preview": "vite preview",
     "phone": "vite build && node server/phone.mjs",
-    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs test/practice-session.test.mjs test/score-pdf.test.mjs test/ios-shell.test.mjs test/ios-motion.test.mjs test/ios-tap.test.mjs"
+    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs test/practice-session.test.mjs test/score-pdf.test.mjs test/ios-shell.test.mjs test/ios-motion.test.mjs test/ios-tap.test.mjs test/grand-piano.test.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",
