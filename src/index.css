@@ -14,3 +14,78 @@ body {
   background-color: #020617;
   color: #f8fafc;
 }
+
+html.ios-app,
+html.ios-app body {
+  background-color: #f6f3ec;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+html.ios-app input,
+html.ios-app textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+html.ios-app .shadow-sm,
+html.ios-app .shadow,
+html.ios-app .shadow-md,
+html.ios-app .shadow-lg,
+html.ios-app .shadow-inner,
+html.ios-app .shadow-2xl,
+html.ios-app .backdrop-blur-md {
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html.ios-app .transition,
+html.ios-app .transition-transform,
+html.ios-app .transition-colors,
+html.ios-app .transition-all {
+  transition: none !important;
+}
+
+html.ios-app .ios-keyboard {
+  touch-action: none;
+}
+
+html.ios-app .ios-key-down {
+  background-color: #34d399 !important;
+  border-color: #059669 !important;
+  color: #0c0a09 !important;
+  transform: translateY(2px);
+}
+
+html.ios-app .ios-staff {
+  position: relative;
+}
+
+html.ios-app .ios-playhead {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  width: 2.5px;
+  height: 178px;
+  background: #059669;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 2;
+  will-change: transform;
+}
+
+html.ios-app .ios-playhead::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #059669;
+}

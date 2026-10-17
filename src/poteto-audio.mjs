@@ -50,6 +50,39 @@ export function usesSimplePiano(nav) {
   return isIosLike(nav);
 }
 
+export function shouldDecodeSamples({ potetoMode, forcePotato, native, contextState }) {
+  if (potetoMode || (forcePotato && !native)) return false;
+  if (native) return true;
+  return contextState === 'running';
+}
+
+export async function decodeSampleBuffer(encoded, liveContext) {
+  const copy = encoded.slice(0);
+  if (liveContext && typeof liveContext.decodeAudioData === 'function') {
+    return liveContext.decodeAudioData(copy);
+  }
+  const Offline = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
+  if (typeof Offline !== 'function') return null;
+  try {
+    return await new Offline(1, 1, 44100).decodeAudioData(copy);
+  } catch {
+    return null;
+  }
+}
+
+function adoptBuffer(ctx, buffer) {
+  if (!ctx || !buffer || typeof ctx.createBuffer !== 'function') return buffer;
+  try {
+    const copy = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+      copy.copyToChannel(buffer.getChannelData(channel), channel);
+    }
+    return copy;
+  } catch {
+    return buffer;
+  }
+}
+
 export function audioSessionType({ recording = false } = {}) {
   return recording ? 'play-and-record' : 'playback';
 }
@@ -164,6 +197,11 @@ export class MaestroAudioEngine {
     this.stalled = false;
     this.silentEl = null;
     this.voices = [];
+    this.liveBuffers = new Map();
+    globalThis.__maestroResumeAudio = () => {
+      this.primeSession(Boolean(this.micStream));
+      if (this.ctx && this.ctx.state !== 'closed') this.ctx.resume().catch(() => {});
+    };
   }
 
   statusSnapshot() {
@@ -201,17 +239,20 @@ export class MaestroAudioEngine {
     this.output = null;
     this.compressor = null;
     this.reverbNode = null;
-    this.sampleBuffers.clear();
-    this.samplesLoadedCount = 0;
+    if (!isCapacitorNative()) {
+      this.sampleBuffers.clear();
+      this.samplesLoadedCount = 0;
+    }
     this.decoding = false;
     this.voices = [];
+    this.liveBuffers.clear();
     this.unlocked = false;
     if (this.analyser) this.analyser = null;
     if (ctx && ctx.state !== 'closed') {
       ctx.onstatechange = null;
       ctx.close().catch(() => {});
     }
-    this.onSampleStatusChange?.(0, SAMPLE_COUNT);
+    this.onSampleStatusChange?.(this.samplesLoadedCount, SAMPLE_COUNT);
   }
 
   ensureContext() {
@@ -220,7 +261,8 @@ export class MaestroAudioEngine {
     this.primeSession(false);
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) throw new Error('Web Audio is unavailable');
-    this.ctx = new AudioCtx({ latencyHint: 'interactive' });
+    const native = isCapacitorNative();
+    this.ctx = new AudioCtx({ latencyHint: native ? 0.01 : 'interactive' });
 
     if (this.potetoMode || this.forcePotato || isCapacitorNative()) {
       this.output = this.ctx.destination;
@@ -341,13 +383,19 @@ export class MaestroAudioEngine {
         const res = await fetch(`${SALAMANDER_BASE_URL}${file}`);
         if (!res.ok) return;
         this.encodedSamples.set(parseInt(midiStr, 10), await res.arrayBuffer());
-        if (this.ctx && this.ctx.state === 'running') this.decodeQueuedSamples();
+        this.decodeQueuedSamples();
       } catch { /* oscillator fallback covers a failed sample */ }
     }));
   }
 
   async decodeQueuedSamples() {
-    if (this.potetoMode || (this.forcePotato && !isCapacitorNative()) || !this.ctx || this.ctx.state !== 'running') return;
+    const native = isCapacitorNative();
+    if (!shouldDecodeSamples({
+      potetoMode: this.potetoMode,
+      forcePotato: this.forcePotato,
+      native,
+      contextState: this.ctx?.state,
+    })) return;
     if (this.decoding) {
       this.decodeAgain = true;
       return;
@@ -358,10 +406,14 @@ export class MaestroAudioEngine {
       (a, b) => Math.abs(a[0] - 60) - Math.abs(b[0] - 60)
     );
     for (const [midi, encoded] of pending) {
-      if (this.ctx !== ctx || this.sampleBuffers.has(midi)) continue;
+      if (this.sampleBuffers.has(midi)) continue;
+      if (!native && this.ctx !== ctx) continue;
       try {
-        const audioBuf = await ctx.decodeAudioData(encoded.slice(0));
-        if (!audioBuf || audioBuf.length < 8 || this.ctx !== ctx) continue;
+        const audioBuf = native
+          ? await decodeSampleBuffer(encoded, null)
+          : await ctx.decodeAudioData(encoded.slice(0));
+        if (!audioBuf || audioBuf.length < 8) continue;
+        if (!native && this.ctx !== ctx) continue;
         this.sampleBuffers.set(midi, audioBuf);
         this.samplesLoadedCount = this.sampleBuffers.size;
         this.onSampleStatusChange?.(this.samplesLoadedCount, SAMPLE_COUNT);
@@ -447,8 +499,19 @@ export class MaestroAudioEngine {
   playSample(ctx, sampleMatch, midi, durationSec, velocity, direct) {
     const now = ctx.currentTime;
     const normVel = Math.max(0.18, Math.min(1, velocity / 127));
+    let buffer = sampleMatch.buffer;
+    if (direct) {
+      const cacheKey = `${midi}:${sampleMatch.baseMidi}`;
+      const cached = this.liveBuffers.get(cacheKey);
+      if (cached && cached.ctx === ctx) {
+        buffer = cached.buffer;
+      } else {
+        buffer = adoptBuffer(ctx, buffer);
+        this.liveBuffers.set(cacheKey, { ctx, buffer });
+      }
+    }
     const src = ctx.createBufferSource();
-    src.buffer = sampleMatch.buffer;
+    src.buffer = buffer;
     const rate = Math.pow(2, (midi - sampleMatch.baseMidi) / 12);
     src.playbackRate.setValueAtTime(Number.isFinite(rate) && rate > 0 ? rate : 1, now);
     const gain = ctx.createGain();

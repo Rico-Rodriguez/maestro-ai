@@ -17,6 +17,12 @@ enum MaestroAudioSession {
         } else {
             try session.setCategory(.playback, mode: .default, options: [])
         }
+        // A short hardware buffer keeps the piano close to the finger.
+        // A device that rejects it still keeps the playback category.
+        do {
+            try session.setPreferredSampleRate(48_000)
+            try session.setPreferredIOBufferDuration(0.005)
+        } catch {}
         try session.setActive(true)
     }
 }
@@ -225,11 +231,63 @@ public class MaestroMidiPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
+@objc(MaestroAppPlugin)
+public class MaestroAppPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "MaestroAppPlugin"
+    public let jsName = "MaestroApp"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "setIdleDisabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "shareFile", returnType: CAPPluginReturnPromise)
+    ]
+
+    @objc func setIdleDisabled(_ call: CAPPluginCall) {
+        let disabled = call.getBool("disabled") ?? false
+        DispatchQueue.main.async {
+            UIApplication.shared.isIdleTimerDisabled = disabled
+            call.resolve()
+        }
+    }
+
+    @objc func shareFile(_ call: CAPPluginCall) {
+        let filename = call.getString("filename") ?? "Maestro.pdf"
+        let base64 = call.getString("base64") ?? ""
+        guard let data = Data(base64Encoded: base64), !data.isEmpty else {
+            call.reject("Nothing to share")
+            return
+        }
+        let safeName = filename.replacingOccurrences(of: "/", with: "-")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(safeName)
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            call.reject(error.localizedDescription)
+            return
+        }
+        DispatchQueue.main.async {
+            guard let controller = self.bridge?.viewController else {
+                call.reject("No view")
+                return
+            }
+            let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            if let popover = activity.popoverPresentationController {
+                popover.sourceView = controller.view
+                popover.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY, width: 1, height: 1)
+            }
+            controller.present(activity, animated: true)
+            call.resolve()
+        }
+    }
+}
+
 @objc(MaestroBridgeViewController)
 class MaestroBridgeViewController: CAPBridgeViewController {
+    private var interruptionObserver: NSObjectProtocol?
+
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(MaestroAudioPlugin())
         bridge?.registerPluginInstance(MaestroMidiPlugin())
+        bridge?.registerPluginInstance(MaestroAppPlugin())
+        observeAudioInterruptions()
     }
 
     override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
@@ -239,9 +297,46 @@ class MaestroBridgeViewController: CAPBridgeViewController {
         return configuration
     }
 
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        configureWebViewChrome()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        configureWebViewChrome()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         publishSafeArea()
+    }
+
+    private func configureWebViewChrome() {
+        guard let webView else { return }
+        webView.allowsLinkPreview = false
+        webView.allowsBackForwardNavigationGestures = false
+        webView.isOpaque = true
+        webView.backgroundColor = UIColor(red: 246.0 / 255.0, green: 243.0 / 255.0, blue: 236.0 / 255.0, alpha: 1)
+        webView.scrollView.bounces = false
+        webView.scrollView.alwaysBounceVertical = false
+        webView.scrollView.alwaysBounceHorizontal = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+    }
+
+    private func observeAudioInterruptions() {
+        if interruptionObserver != nil { return }
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] note in
+            let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let type = raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:))
+            guard type == .ended else { return }
+            try? MaestroAudioSession.apply(recording: false)
+            self?.webView?.evaluateJavaScript("window.__maestroResumeAudio && window.__maestroResumeAudio()", completionHandler: nil)
+        }
     }
 
     private func publishSafeArea() {

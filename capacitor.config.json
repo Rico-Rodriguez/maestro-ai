@@ -6,7 +6,8 @@
   "ios": {
     "contentInset": "never",
     "backgroundColor": "#f6f3ec",
-    "scrollEnabled": true
+    "scrollEnabled": true,
+    "allowsLinkPreview": false
   },
   "server": {
     "hostname": "localhost"

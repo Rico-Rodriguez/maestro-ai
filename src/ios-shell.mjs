@@ -1,9 +1,11 @@
 import { Capacitor, CapacitorHttp, SystemBars, SystemBarsStyle, registerPlugin } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { SCORE_ORIGIN } from '../shared/musescore-contract.mjs';
 import { nativeHttpToResponse, shouldUseNativeScoreFetch } from './score-fetch.mjs';
 
 const MaestroAudio = registerPlugin('MaestroAudio');
 const MaestroMidi = registerPlugin('MaestroMidi');
+const MaestroApp = registerPlugin('MaestroApp');
 
 function headerMap(input, init) {
   const headers = {};
@@ -150,4 +152,15 @@ export async function installNativeShell() {
   try {
     await installMidiPolyfill();
   } catch { /* the Connect button reports MIDI as unavailable */ }
+  globalThis.__maestroHaptic = (style) => {
+    const impact = style === 'MEDIUM' ? ImpactStyle.Medium : ImpactStyle.Light;
+    Haptics.impact({ style: impact }).catch(() => {});
+  };
+  globalThis.__maestroIdle = (disabled) => MaestroApp.setIdleDisabled({
+    disabled: Boolean(disabled),
+  }).catch(() => {});
+  globalThis.__maestroShareFile = (payload) => MaestroApp.shareFile(payload).then(() => true, () => false);
+  try {
+    await globalThis.__maestroIdle(true);
+  } catch { /* the practice screen still works if the screen dims */ }
 }

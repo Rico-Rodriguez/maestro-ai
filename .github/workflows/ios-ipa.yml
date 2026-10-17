@@ -30,7 +30,15 @@ jobs:
         run: npm ci
 
       - name: Build the iOS web bundle
-        run: npm run build:ios
+        run: |
+          set -euo pipefail
+          npm run build:ios
+          find dist/assets -name '*.js' -print0 | while IFS= read -r -d '' js; do
+            if grep -q 'MASTER TRANSPORT' "$js"; then
+              echo "iOS bundle is not minified: $js" >&2
+              exit 1
+            fi
+          done
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios

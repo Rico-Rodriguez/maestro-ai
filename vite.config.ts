@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { APP_BASE, SCORE_ORIGIN } from './shared/musescore-contract.mjs';
+import { iosIndexHtml } from './src/ios-viewport.mjs';
 
 export default defineConfig({
   plugins: [
@@ -9,13 +10,15 @@ export default defineConfig({
       name: 'ios-viewport-fit',
       transformIndexHtml(html) {
         if (process.env.VITE_IOS_SHELL !== '1') return html;
-        return html.replace(
-          'width=device-width, initial-scale=1.0',
-          'width=device-width, initial-scale=1.0, viewport-fit=cover',
-        );
+        return iosIndexHtml(html);
       },
     },
   ],
+  build: {
+    minify: 'esbuild',
+    cssMinify: true,
+    sourcemap: false,
+  },
   base: APP_BASE,
   server: {
     proxy: {

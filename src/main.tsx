@@ -12,6 +12,7 @@ function render() {
 }
 
 if (import.meta.env.VITE_IOS_SHELL === '1') {
+  document.documentElement.classList.add('ios-app');
   import('./ios-shell.mjs').then((mod) => mod.installNativeShell()).then(render, render);
 } else {
   render();
