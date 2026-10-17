@@ -8,7 +8,7 @@ export const SILENT_WAV_BASE64 = 'UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAA
 
 export const SILENT_WAV_URI = `data:audio/wav;base64,${SILENT_WAV_BASE64}`;
 
-const SALAMANDER_SAMPLE_MAP = {
+export const SALAMANDER_SAMPLE_MAP = {
   24: 'C1.mp3', 27: 'Ds1.mp3', 30: 'Fs1.mp3', 33: 'A1.mp3',
   36: 'C2.mp3', 39: 'Ds2.mp3', 42: 'Fs2.mp3', 45: 'A2.mp3',
   48: 'C3.mp3', 51: 'Ds3.mp3', 54: 'Fs3.mp3', 57: 'A3.mp3',
@@ -17,8 +17,19 @@ const SALAMANDER_SAMPLE_MAP = {
   84: 'C6.mp3', 87: 'Ds6.mp3', 90: 'Fs6.mp3', 93: 'A6.mp3',
   96: 'C7.mp3',
 };
-const SALAMANDER_BASE_URL = 'https://tonejs.github.io/audio/salamander/';
+// Document-relative so GitHub Pages (/maestro-ai/) and the iOS bundle (/) both resolve.
+export const SALAMANDER_BASE_URL = 'audio/salamander/';
 const SAMPLE_COUNT = Object.keys(SALAMANDER_SAMPLE_MAP).length;
+
+export function primeNativeAudioSession(recording) {
+  const hook = globalThis.__maestroPrimeAudioSession;
+  if (typeof hook !== 'function') return Promise.resolve(false);
+  try {
+    return Promise.resolve(hook(Boolean(recording))).then(() => true, () => false);
+  } catch {
+    return Promise.resolve(false);
+  }
+}
 
 export function isIosLike(nav = typeof navigator === 'undefined' ? undefined : navigator) {
   if (!nav) return false;
@@ -166,8 +177,10 @@ export class MaestroAudioEngine {
   }
 
   primeSession(recording = false) {
-    if (typeof navigator === 'undefined') return;
-    applyAudioSession(navigator, { recording: recording || Boolean(this.micStream) });
+    if (typeof navigator === 'undefined') return Promise.resolve(false);
+    const active = recording || Boolean(this.micStream);
+    const webOk = applyAudioSession(navigator, { recording: active });
+    return primeNativeAudioSession(active).then(() => webOk);
   }
 
   closeContext() {
@@ -266,6 +279,7 @@ export class MaestroAudioEngine {
 
   unlockFromGesture() {
     if (isIosLike()) this.potetoMode = true;
+    this.primeSession(false);
     if (this.stalled) {
       this.forcePotato = true;
       this.stalled = false;
@@ -589,7 +603,7 @@ export class MaestroAudioEngine {
       throw error;
     }
     if (isIosLike()) this.potetoMode = true;
-    this.primeSession(true);
+    await this.primeSession(true);
     const streamPromise = navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: false,

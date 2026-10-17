@@ -6,17 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:ios": "VITE_IOS_SHELL=1 vite build --base ./",
     "preview": "vite preview",
     "phone": "vite build && node server/phone.mjs",
-    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs test/practice-session.test.mjs test/score-pdf.test.mjs"
+    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs test/practice-session.test.mjs test/score-pdf.test.mjs test/ios-shell.test.mjs"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.3",
     "@cloudflare/puppeteer": "^1.4.0",
     "lucide-react": "^1.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

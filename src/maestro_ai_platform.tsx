@@ -478,6 +478,11 @@ export default function App() {
   const [armSound, setArmSound] = useState(false);
 
   useEffect(() => {
+    const setBars = globalThis.__maestroSetSystemBars;
+    if (typeof setBars === 'function') setBars(darkMode);
+  }, [darkMode]);
+
+  useEffect(() => {
     const checkViewport = () => {
       const mobile = window.innerWidth < 768;
       setIsMobileView(mobile);
@@ -499,6 +504,7 @@ export default function App() {
       audioEngine.unlockFromGesture();
     };
     window.addEventListener('pointerdown', unlock, true);
+    window.addEventListener('touchstart', unlock, true);
     window.addEventListener('touchend', unlock, true);
     const onVisible = () => {
       if (document.visibilityState === 'visible' && audioEngine.ctx && audioEngine.ctx.state !== 'running') {
@@ -510,6 +516,7 @@ export default function App() {
     return () => {
       window.removeEventListener('resize', checkViewport);
       window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('touchstart', unlock, true);
       window.removeEventListener('touchend', unlock, true);
       document.removeEventListener('visibilitychange', onVisible);
     };
@@ -2606,11 +2613,11 @@ export default function App() {
   ];
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0 transition-colors ${
+    <div className={`min-h-screen flex flex-col font-sans pb-[calc(4.25rem+var(--safe-bottom))] md:pb-0 transition-colors ${
       darkMode ? 'bg-stone-950 text-stone-100' : 'bg-[#f6f3ec] text-stone-900'
     }`}>
       {/* Clean Conservatory Header */}
-      <header className={`sticky top-0 z-30 border-b px-4 py-2.5 backdrop-blur-md flex items-center justify-between gap-3 ${
+      <header className={`sticky top-0 z-30 border-b pt-[max(0.625rem,var(--safe-top))] pb-2.5 pl-[max(1rem,var(--safe-left))] pr-[max(1rem,var(--safe-right))] backdrop-blur-md flex items-center justify-between gap-3 ${
         darkMode ? 'bg-stone-900/90 border-stone-800' : 'bg-[#fcfaf5]/90 border-stone-200/90'
       }`}>
         <div className="flex items-center gap-2.5">
@@ -2684,7 +2691,7 @@ export default function App() {
       </header>
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-5 py-4">
+      <main className="flex-1 max-w-6xl w-full mx-auto pl-[max(0.75rem,var(--safe-left))] pr-[max(0.75rem,var(--safe-right))] sm:pl-[max(1.25rem,var(--safe-left))] sm:pr-[max(1.25rem,var(--safe-right))] py-4">
         {activeTab === 'practice' && renderPracticeView()}
         {activeTab === 'repertoire' && renderRepertoireAndImport()}
         {activeTab === 'cleanup' && renderCleanupStudio()}
@@ -2692,7 +2699,7 @@ export default function App() {
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-4 gap-1 backdrop-blur-md ${
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t pt-1.5 pb-[max(0.375rem,var(--safe-bottom))] pl-[max(0.5rem,var(--safe-left))] pr-[max(0.5rem,var(--safe-right))] grid grid-cols-4 gap-1 backdrop-blur-md ${
         darkMode ? 'bg-stone-900/95 border-stone-800' : 'bg-[#fcfaf5]/95 border-stone-200'
       }`}>
         {navItems.map(item => {
