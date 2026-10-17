@@ -6,7 +6,10 @@ import UIKit
 import WebKit
 
 enum MaestroAudioSession {
-    static func apply(recording: Bool) throws {
+    private static var appliedRecording: Bool?
+
+    static func apply(recording: Bool, force: Bool = false) throws {
+        if !force, appliedRecording == recording { return }
         let session = AVAudioSession.sharedInstance()
         if recording {
             try session.setCategory(
@@ -19,11 +22,16 @@ enum MaestroAudioSession {
         }
         // A short hardware buffer keeps the piano close to the finger.
         // A device that rejects it still keeps the playback category.
-        do {
-            try session.setPreferredSampleRate(48_000)
-            try session.setPreferredIOBufferDuration(0.005)
-        } catch {}
+        // Only the first activation asks for it. Repeating setActive on a
+        // tap blocks the main thread and freezes every button.
+        if appliedRecording == nil {
+            do {
+                try session.setPreferredSampleRate(48_000)
+                try session.setPreferredIOBufferDuration(0.005)
+            } catch {}
+        }
         try session.setActive(true)
+        appliedRecording = recording
     }
 }
 
@@ -334,7 +342,7 @@ class MaestroBridgeViewController: CAPBridgeViewController {
             let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             let type = raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:))
             guard type == .ended else { return }
-            try? MaestroAudioSession.apply(recording: false)
+            try? MaestroAudioSession.apply(recording: false, force: true)
             self?.webView?.evaluateJavaScript("window.__maestroResumeAudio && window.__maestroResumeAudio()", completionHandler: nil)
         }
     }

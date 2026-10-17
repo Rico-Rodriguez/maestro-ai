@@ -152,7 +152,11 @@ export async function installNativeShell() {
   try {
     await installMidiPolyfill();
   } catch { /* the Connect button reports MIDI as unavailable */ }
+  let lastHapticAt = 0;
   globalThis.__maestroHaptic = (style) => {
+    const now = Date.now();
+    if (now - lastHapticAt < 40) return;
+    lastHapticAt = now;
     const impact = style === 'MEDIUM' ? ImpactStyle.Medium : ImpactStyle.Light;
     Haptics.impact({ style: impact }).catch(() => {});
   };

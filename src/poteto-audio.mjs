@@ -198,7 +198,11 @@ export class MaestroAudioEngine {
     this.silentEl = null;
     this.voices = [];
     this.liveBuffers = new Map();
+    // AppDelegate already opened playback. A later tap must not set the
+    // session up again; setActive on every touch blocks the main thread.
+    this.primedRecording = isCapacitorNative() ? false : null;
     globalThis.__maestroResumeAudio = () => {
+      this.primedRecording = null;
       this.primeSession(Boolean(this.micStream));
       if (this.ctx && this.ctx.state !== 'closed') this.ctx.resume().catch(() => {});
     };
@@ -229,7 +233,9 @@ export class MaestroAudioEngine {
   primeSession(recording = false) {
     if (typeof navigator === 'undefined') return Promise.resolve(false);
     const active = recording || Boolean(this.micStream);
+    if (isCapacitorNative() && this.primedRecording === active) return Promise.resolve(true);
     const webOk = applyAudioSession(navigator, { recording: active });
+    if (isCapacitorNative()) this.primedRecording = active;
     return primeNativeAudioSession(active).then(() => webOk);
   }
 
@@ -332,6 +338,15 @@ export class MaestroAudioEngine {
   }
 
   unlockFromGesture() {
+    if (
+      isCapacitorNative()
+      && this.ctx
+      && this.ctx.state === 'running'
+      && this.unlocked
+      && !this.stalled
+    ) {
+      return Promise.resolve(true);
+    }
     this.potetoMode = usesSimplePiano();
     this.preloadAcousticSamples();
     this.primeSession(false);

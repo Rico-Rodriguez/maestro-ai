@@ -527,8 +527,10 @@ export default function App() {
       audioEngine.unlockFromGesture();
     };
     window.addEventListener('pointerdown', unlock, true);
-    window.addEventListener('touchstart', unlock, true);
-    window.addEventListener('touchend', unlock, true);
+    if (!IOS_APP) {
+      window.addEventListener('touchstart', unlock, true);
+      window.addEventListener('touchend', unlock, true);
+    }
     const onVisible = () => {
       if (document.visibilityState === 'visible' && audioEngine.ctx && audioEngine.ctx.state !== 'running') {
         audioEngine.ctx.resume().catch(() => {});
@@ -539,8 +541,10 @@ export default function App() {
     return () => {
       window.removeEventListener('resize', checkViewport);
       window.removeEventListener('pointerdown', unlock, true);
-      window.removeEventListener('touchstart', unlock, true);
-      window.removeEventListener('touchend', unlock, true);
+      if (!IOS_APP) {
+        window.removeEventListener('touchstart', unlock, true);
+        window.removeEventListener('touchend', unlock, true);
+      }
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
