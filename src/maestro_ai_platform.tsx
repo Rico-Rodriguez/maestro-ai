@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { useMuseScorePaste } from './musescore-paste';
 import { renderScorePdf } from './score-pdf.mjs';
 import {
@@ -6,7 +6,17 @@ import {
   layoutStaffGroup,
   octaveShiftForWindow,
 } from './staff-layout.mjs';
-import { MaestroAudioEngine, isIosLike } from './poteto-audio.mjs';
+import { MaestroAudioEngine, usesSimplePiano } from './poteto-audio.mjs';
+import {
+  STAFF_BEAT_PX,
+  STAFF_LEFT,
+  beatFromStaffScroll,
+  bindIosKeyboard,
+  cappedDevicePixelRatio,
+  paintFallingNotes,
+  scrollForBeat,
+  shouldPublishBeat,
+} from './ios-motion.mjs';
 import {
   PRACTICE_MODES,
   practiceModeMeta,
@@ -23,6 +33,8 @@ import {
   ChevronLeft, Activity, Award, FileText, Download, Eye, Wrench, ShieldCheck,
   Radio, Plus, Check, X, RefreshCw, Compass, Sun, Moon, Smartphone, Maximize2
 } from 'lucide-react';
+
+const IOS_APP = import.meta.env.VITE_IOS_SHELL === '1';
 
 // ============================================================================
 // 1. MUSIC THEORY & MAESTRO MUSIC GRAPH (MMG) UTILITIES
@@ -431,6 +443,16 @@ function exportToMusicXML(song) {
 // ============================================================================
 
 const audioEngine = new MaestroAudioEngine();
+if (IOS_APP) audioEngine.preloadAcousticSamples();
+
+function bytesToBase64(bytes) {
+  const chunk = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
 
 function pdfFileName(title) {
   const cleaned = String(title || 'score').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').trim() || 'score';
@@ -438,11 +460,16 @@ function pdfFileName(title) {
 }
 
 function savePdfBytes(bytes, title) {
+  const name = pdfFileName(title);
+  if (IOS_APP && typeof globalThis.__maestroShareFile === 'function') {
+    globalThis.__maestroShareFile({ filename: name, base64: bytesToBase64(bytes) });
+    return;
+  }
   const blob = new Blob([bytes], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = pdfFileName(title);
+  anchor.download = name;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -478,6 +505,11 @@ export default function App() {
   const [armSound, setArmSound] = useState(false);
 
   useEffect(() => {
+    const setBars = globalThis.__maestroSetSystemBars;
+    if (typeof setBars === 'function') setBars(darkMode);
+  }, [darkMode]);
+
+  useEffect(() => {
     const checkViewport = () => {
       const mobile = window.innerWidth < 768;
       setIsMobileView(mobile);
@@ -499,7 +531,10 @@ export default function App() {
       audioEngine.unlockFromGesture();
     };
     window.addEventListener('pointerdown', unlock, true);
-    window.addEventListener('touchend', unlock, true);
+    if (!IOS_APP) {
+      window.addEventListener('touchstart', unlock, true);
+      window.addEventListener('touchend', unlock, true);
+    }
     const onVisible = () => {
       if (document.visibilityState === 'visible' && audioEngine.ctx && audioEngine.ctx.state !== 'running') {
         audioEngine.ctx.resume().catch(() => {});
@@ -510,7 +545,10 @@ export default function App() {
     return () => {
       window.removeEventListener('resize', checkViewport);
       window.removeEventListener('pointerdown', unlock, true);
-      window.removeEventListener('touchend', unlock, true);
+      if (!IOS_APP) {
+        window.removeEventListener('touchstart', unlock, true);
+        window.removeEventListener('touchend', unlock, true);
+      }
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
@@ -570,6 +608,9 @@ export default function App() {
   const notationScrollRef = useRef(null);
   const notationFollowRef = useRef(true);
   const notationResumeRef = useRef(null);
+  const scrubbingRef = useRef(false);
+  const staffScrollTargetRef = useRef(null);
+  const lastScrubPublishRef = useRef(0);
   const beatRef = useRef(0);
   const modeRef = useRef('wait');
   const eventsRef = useRef([]);
@@ -584,6 +625,15 @@ export default function App() {
   const noteInputRef = useRef(() => {});
   const noteReleaseRef = useRef(() => {});
   const audioWatchRef = useRef({ lastTime: -1, stalls: 0 });
+  const publishedBeatRef = useRef(0);
+  const playheadRef = useRef(null);
+  const keyboardBoxRef = useRef(null);
+  const pressedNotesRef = useRef(new Set());
+  const darkModeRef = useRef(false);
+  const boundsRef = useRef({ minMidi: 36, maxMidi: 84 });
+  const layoutRef = useRef('notation');
+  const tabRef = useRef('practice');
+  const paintIosFrameRef = useRef(() => {});
 
   const activeEvents = useMemo(() => {
     if (!currentSong) return [];
@@ -628,6 +678,8 @@ export default function App() {
 
   const movePlayhead = (beat, clearEvals = false) => {
     beatRef.current = beat;
+    publishedBeatRef.current = beat;
+    if (IOS_APP) paintIosFrameRef.current(beat);
     setCurrentBeat(beat);
     if (clearEvals) {
       evaluatedRef.current = {};
@@ -636,9 +688,23 @@ export default function App() {
     }
   };
 
+  const placeStaffScroll = (container, beat) => {
+    const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    const left = Math.min(maxLeft, scrollForBeat(beat, container.clientWidth));
+    staffScrollTargetRef.current = left;
+    if (Math.abs(container.scrollLeft - left) < 0.5) return;
+    container.scrollLeft = left;
+  };
+
   const pauseNotationFollow = () => {
     notationFollowRef.current = false;
     if (notationResumeRef.current) clearTimeout(notationResumeRef.current);
+    if (IOS_APP) {
+      notationResumeRef.current = setTimeout(() => {
+        if (!scrubbingRef.current && playingRef.current) notationFollowRef.current = true;
+      }, 420);
+      return;
+    }
     notationResumeRef.current = setTimeout(() => {
       notationFollowRef.current = true;
     }, 700);
@@ -647,15 +713,17 @@ export default function App() {
   // Move the staff with the playhead. Assigning scrollLeft each frame glides;
   // scrollTo({ behavior: 'smooth' }) restarts every half beat and stutters.
   useEffect(() => {
+    if (IOS_APP && isPlaying) return;
     const container = notationScrollRef.current;
     if (!container || !notationFollowRef.current) return;
-    const playheadPx = 88 + currentBeat * 56;
-    const targetScroll = Math.max(0, playheadPx - container.clientWidth * 0.38);
+    const playheadPx = STAFF_LEFT + currentBeat * STAFF_BEAT_PX;
+    const targetScroll = scrollForBeat(currentBeat, container.clientWidth);
     if (!isPlaying) {
       const viewRight = container.scrollLeft + container.clientWidth;
       if (playheadPx > container.scrollLeft + 32 && playheadPx < viewRight - 48) return;
     }
-    container.scrollLeft = targetScroll;
+    if (IOS_APP) placeStaffScroll(container, currentBeat);
+    else container.scrollLeft = targetScroll;
   }, [currentBeat, isPlaying]);
 
   // ============================================================================
@@ -663,18 +731,23 @@ export default function App() {
   // ============================================================================
 
   const handleUserNoteInput = useCallback((midiPitch, velocity = 90) => {
-    const heard = audioEngine.playNote(midiPitch, 0.45, velocity);
+    const heard = audioEngine.playNote(midiPitch, IOS_APP ? 0 : 0.45, velocity);
     if (!heard) {
       window.setTimeout(() => {
         if (audioEngine.ctx?.state !== 'running') setArmSound(true);
       }, 500);
     }
 
-    setActivePressedNotes(prev => {
-      const next = new Set(prev);
-      next.add(midiPitch);
-      return next;
-    });
+    if (IOS_APP) {
+      pressedNotesRef.current.add(midiPitch);
+      document.querySelector(`[data-midi="${midiPitch}"]`)?.classList.add('ios-key-down');
+    } else {
+      setActivePressedNotes(prev => {
+        const next = new Set(prev);
+        next.add(midiPitch);
+        return next;
+      });
+    }
 
     const mode = modeRef.current;
     const events = eventsRef.current;
@@ -749,6 +822,12 @@ export default function App() {
   }, []);
 
   const handleUserNoteRelease = useCallback((midiPitch) => {
+    if (IOS_APP) {
+      audioEngine.releaseNote(midiPitch);
+      pressedNotesRef.current.delete(midiPitch);
+      document.querySelector(`[data-midi="${midiPitch}"]`)?.classList.remove('ios-key-down');
+      return;
+    }
     setActivePressedNotes(prev => {
       const next = new Set(prev);
       next.delete(midiPitch);
@@ -764,6 +843,7 @@ export default function App() {
       setIsPlaying(false);
       return;
     }
+    if (IOS_APP) notationFollowRef.current = true;
     const pending = audioEngine.unlockFromGesture();
     setSoundStalled(false);
     setIsPlaying(true);
@@ -791,6 +871,11 @@ export default function App() {
       if (!lastFrameTimeRef.current) lastFrameTimeRef.current = timestamp;
       const dtSec = Math.min(0.08, (timestamp - lastFrameTimeRef.current) / 1000);
       lastFrameTimeRef.current = timestamp;
+      if (IOS_APP && scrubbingRef.current) {
+        paintIosFrameRef.current(beatRef.current);
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
 
       const events = eventsRef.current;
       const mode = modeRef.current;
@@ -892,7 +977,21 @@ export default function App() {
       }
 
       beatRef.current = nextBeat;
-      if (Math.abs(nextBeat - prevBeat) > 0.0001) setCurrentBeat(nextBeat);
+      if (IOS_APP) {
+        paintIosFrameRef.current(nextBeat);
+        if (shouldPublishBeat(
+          publishedBeatRef.current,
+          nextBeat,
+          beatsRef.current,
+          events,
+          evaluatedRef.current,
+        )) {
+          publishedBeatRef.current = nextBeat;
+          setCurrentBeat(nextBeat);
+        }
+      } else if (Math.abs(nextBeat - prevBeat) > 0.0001) {
+        setCurrentBeat(nextBeat);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -944,7 +1043,8 @@ export default function App() {
           input.onmidimessage = (msg) => {
             const [status, data1, data2] = msg.data;
             const cmd = status & 0xf0;
-            if (cmd === 0x90 && data2 > 0) noteInputRef.current(data1, data2, 'midi');
+            if (IOS_APP && cmd === 0xb0 && data1 === 64) audioEngine.setSustain(data2 >= 64);
+            else if (cmd === 0x90 && data2 > 0) noteInputRef.current(data1, data2, 'midi');
             else if (cmd === 0x80 || (cmd === 0x90 && data2 === 0)) noteReleaseRef.current(data1);
           };
         });
@@ -978,6 +1078,7 @@ export default function App() {
           setIsPlaying(false);
           return;
         }
+        if (IOS_APP) notationFollowRef.current = true;
         const pending = audioEngine.unlockFromGesture();
         setSoundStalled(false);
         setIsPlaying(true);
@@ -1052,7 +1153,129 @@ export default function App() {
     return { minMidi: 36, maxMidi: 84 };
   }, [keyboardRangeMode, octaveShift]);
 
+  darkModeRef.current = darkMode;
+  boundsRef.current = keyboardMidiBounds;
+  layoutRef.current = viewLayout;
+  tabRef.current = activeTab;
+  paintIosFrameRef.current = (beat) => {
+    const head = playheadRef.current;
+    if (head) head.style.transform = `translate3d(${STAFF_LEFT + beat * STAFF_BEAT_PX}px, 0, 0)`;
+    const container = notationScrollRef.current;
+    if (container && notationFollowRef.current && playingRef.current && !scrubbingRef.current) {
+      placeStaffScroll(container, beat);
+    }
+    const canvas = fallingCanvasRef.current;
+    if (!canvas || layoutRef.current === 'notation' || tabRef.current !== 'practice') return;
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 2 || cssHeight < 2) return;
+    const pixelRatio = cappedDevicePixelRatio(window.devicePixelRatio, 2);
+    const bufferWidth = Math.max(1, Math.round(cssWidth * pixelRatio));
+    const bufferHeight = Math.max(1, Math.round(cssHeight * pixelRatio));
+    if (canvas.width !== bufferWidth) canvas.width = bufferWidth;
+    if (canvas.height !== bufferHeight) canvas.height = bufferHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    paintFallingNotes(
+      ctx,
+      cssWidth,
+      cssHeight,
+      beat,
+      eventsRef.current,
+      evaluatedRef.current,
+      boundsRef.current,
+      darkModeRef.current,
+      beatsRef.current,
+    );
+  };
+
+  useLayoutEffect(() => {
+    if (!IOS_APP) return;
+    paintIosFrameRef.current(beatRef.current);
+    document.querySelectorAll('[data-midi]').forEach((el) => {
+      const midi = Number(el.getAttribute('data-midi'));
+      el.classList.toggle('ios-key-down', pressedNotesRef.current.has(midi));
+    });
+  });
+
   useEffect(() => {
+    if (!IOS_APP) return undefined;
+    const node = notationScrollRef.current;
+    if (!node) return undefined;
+    let endTimer = 0;
+    let lastPublished = -1;
+    const onScroll = () => {
+      const left = node.scrollLeft;
+      if (
+        staffScrollTargetRef.current != null
+        && Math.abs(left - staffScrollTargetRef.current) < 1.25
+      ) return;
+      staffScrollTargetRef.current = null;
+      if (notationResumeRef.current) {
+        clearTimeout(notationResumeRef.current);
+        notationResumeRef.current = null;
+      }
+      notationFollowRef.current = false;
+      scrubbingRef.current = true;
+      const beat = beatFromStaffScroll({
+        scrollLeft: left,
+        clientWidth: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+        totalBeats: totalBeatsRef.current,
+      });
+      const previous = beatRef.current;
+      beatRef.current = beat;
+      if (beat < previous - 0.01) {
+        (eventsRef.current || []).forEach((ev) => {
+          if (ev.onset >= beat - 0.02) playedSynthIdsRef.current.delete(ev.id);
+        });
+      }
+      const head = playheadRef.current;
+      if (head) head.style.transform = `translate3d(${STAFF_LEFT + beat * STAFF_BEAT_PX}px, 0, 0)`;
+      const now = performance.now();
+      const bar = beatsRef.current || 4;
+      const barChanged = Math.floor(beat / bar) !== Math.floor(lastPublished / bar);
+      if (lastPublished < 0 || barChanged || now - lastScrubPublishRef.current > 160) {
+        lastScrubPublishRef.current = now;
+        lastPublished = beat;
+        publishedBeatRef.current = beat;
+        setCurrentBeat(beat);
+      }
+      clearTimeout(endTimer);
+      endTimer = setTimeout(() => {
+        scrubbingRef.current = false;
+        publishedBeatRef.current = beatRef.current;
+        setCurrentBeat(beatRef.current);
+        if (playingRef.current) notationFollowRef.current = true;
+      }, 140);
+    };
+    node.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      node.removeEventListener('scroll', onScroll);
+      clearTimeout(endTimer);
+    };
+  }, [activeTab, viewLayout, selectedSongId]);
+
+  useEffect(() => {
+    if (!IOS_APP) return undefined;
+    const idle = globalThis.__maestroIdle;
+    if (typeof idle === 'function') idle(activeTab === 'practice');
+    const node = keyboardBoxRef.current;
+    if (!node) return undefined;
+    return bindIosKeyboard(node, {
+      onDown: (midi) => {
+        const haptic = globalThis.__maestroHaptic;
+        if (typeof haptic === 'function') haptic('LIGHT');
+        const black = [1, 3, 6, 8, 10].includes(midi % 12);
+        noteInputRef.current(midi, black ? 95 : 92, 'touch');
+      },
+      onUp: (midi) => noteReleaseRef.current(midi),
+    });
+  }, [activeTab, currentSong, keyboardRangeMode, octaveShift, viewLayout]);
+
+  useEffect(() => {
+    if (IOS_APP) return undefined;
     const canvas = fallingCanvasRef.current;
     if (!canvas || viewLayout === 'notation' || activeTab !== 'practice') return;
     const ctx = canvas.getContext('2d');
@@ -1281,11 +1504,13 @@ export default function App() {
             </span>
             <span className="hidden md:flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold pl-2 border-l border-stone-700 truncate">
               <Volume2 className="w-3.5 h-3.5 shrink-0" />
-              {audioEngine.potetoMode || audioEngine.forcePotato
-                ? 'Simple phone piano'
-                : samplesReadyCount > 0
-                  ? `Piano samples ${samplesReadyCount}/25`
-                  : 'Loading piano samples'}
+              {IOS_APP
+                ? 'Salamander Grand · Holm · CC BY 3.0'
+                : audioEngine.potetoMode || audioEngine.forcePotato
+                  ? 'Simple phone piano'
+                  : samplesReadyCount > 0
+                    ? `Piano samples ${samplesReadyCount}/25`
+                    : 'Loading piano samples'}
             </span>
           </div>
 
@@ -1322,7 +1547,10 @@ export default function App() {
         </div>
 
         {/* Piano Keys Container */}
-        <div className="relative w-full h-36 sm:h-44 px-1 pt-1 pb-1.5 flex touch-none">
+        <div
+          ref={IOS_APP ? keyboardBoxRef : undefined}
+          className={`relative w-full h-36 sm:h-44 px-1 pt-1 pb-1.5 flex touch-none${IOS_APP ? ' ios-keyboard' : ''}`}
+        >
           {whiteMidis.map((midi) => {
             const isPressed = activePressedNotes.has(midi);
             const isExpectedR = expectedSetR.has(midi);
@@ -1336,12 +1564,16 @@ export default function App() {
             return (
               <div key={midi} className="relative flex-1 h-full mx-[1px]">
                 <button
+                  data-midi={midi}
                   onPointerDown={(e) => {
+                    if (IOS_APP && e.pointerType === 'touch') return;
                     e.preventDefault();
+                    if (IOS_APP && typeof globalThis.__maestroHaptic === 'function') globalThis.__maestroHaptic('LIGHT');
                     handleUserNoteInput(midi, 92, 'touch');
                   }}
                   onPointerUp={() => handleUserNoteRelease(midi)}
-                  onPointerLeave={() => activePressedNotes.has(midi) && handleUserNoteRelease(midi)}
+                  onPointerCancel={() => handleUserNoteRelease(midi)}
+                  onPointerLeave={() => (IOS_APP ? pressedNotesRef.current.has(midi) : activePressedNotes.has(midi)) && handleUserNoteRelease(midi)}
                   className={`w-full h-full rounded-b-lg border transition-transform flex flex-col justify-end items-center pb-2 text-[11px] font-semibold ${
                     isPressed
                       ? 'bg-emerald-400 border-emerald-600 text-stone-950 translate-y-[2px] shadow-inner'
@@ -1366,16 +1598,23 @@ export default function App() {
 
                 {hasBlackRight && (
                   <button
+                    data-midi={blackMidi}
                     onPointerDown={(e) => {
+                      if (IOS_APP && e.pointerType === 'touch') return;
                       e.stopPropagation();
                       e.preventDefault();
+                      if (IOS_APP && typeof globalThis.__maestroHaptic === 'function') globalThis.__maestroHaptic('LIGHT');
                       handleUserNoteInput(blackMidi, 95, 'touch');
                     }}
                     onPointerUp={(e) => {
                       e.stopPropagation();
                       handleUserNoteRelease(blackMidi);
                     }}
-                    onPointerLeave={() => activePressedNotes.has(blackMidi) && handleUserNoteRelease(blackMidi)}
+                    onPointerCancel={(e) => {
+                      e.stopPropagation();
+                      handleUserNoteRelease(blackMidi);
+                    }}
+                    onPointerLeave={() => (IOS_APP ? pressedNotesRef.current.has(blackMidi) : activePressedNotes.has(blackMidi)) && handleUserNoteRelease(blackMidi)}
                     className={`absolute top-0 -right-[35%] w-[70%] h-[60%] z-20 rounded-b-md border transition-transform flex flex-col justify-end items-center pb-1.5 text-[9px] font-bold ${
                       isBlackPressed
                         ? 'bg-emerald-500 border-emerald-300 text-stone-950 translate-y-[2px]'
@@ -1406,10 +1645,10 @@ export default function App() {
   // ============================================================================
 
   const renderGrandStaffNotation = (interactiveCleanup = false) => {
-    const beatPx = 56;
+    const beatPx = STAFF_BEAT_PX;
     const svgWidth = Math.max(760, totalSongBeats * beatPx + 140);
     const svgHeight = 236;
-    const leftMargin = 88;
+    const leftMargin = STAFF_LEFT;
 
     const trebleBottomY = 82;
     const bassBottomY = 178;
@@ -1427,13 +1666,22 @@ export default function App() {
         onPointerDown={pauseNotationFollow}
         onWheel={pauseNotationFollow}
         style={{ scrollBehavior: 'auto' }}
-        className={`w-full overflow-x-auto overscroll-x-contain touch-pan-x rounded-2xl border shadow-inner transition-colors ${
+        className={`${IOS_APP ? 'ios-staff ' : ''}w-full overflow-x-auto overscroll-x-contain touch-pan-x rounded-2xl border shadow-inner transition-colors ${
           darkMode
             ? 'bg-stone-900/95 border-stone-800'
             : 'bg-[#fcfaf5] border-stone-300/90'
         }`}
       >
-        <svg width={svgWidth} height={svgHeight} className="select-none block">
+        <div
+          className={IOS_APP && !interactiveCleanup ? 'ios-staff-stage' : undefined}
+          style={IOS_APP && !interactiveCleanup ? { width: svgWidth, height: svgHeight } : undefined}
+        >
+        <svg
+          width={svgWidth}
+          height={svgHeight}
+          className="select-none block"
+          style={IOS_APP && !interactiveCleanup ? { position: 'relative', zIndex: 1 } : undefined}
+        >
           {/* Measure Loop Highlight */}
           {loopRange.enabled && (
             <rect
@@ -1505,7 +1753,7 @@ export default function App() {
           })}
 
           {/* Synchronized Playhead Cursor */}
-          {!interactiveCleanup && (
+          {!IOS_APP && !interactiveCleanup && (
             <g>
               <line
                 x1={playheadX}
@@ -1625,6 +1873,10 @@ export default function App() {
             );
           })}
         </svg>
+        {IOS_APP && !interactiveCleanup && (
+          <div className="ios-playhead" ref={playheadRef} aria-hidden="true" />
+        )}
+        </div>
       </div>
     );
   };
@@ -1925,7 +2177,7 @@ export default function App() {
               {midiStatusLine({ access: midiAccess, devices: midiDevices })}
               {' '}
               The mic hears one note at a time and can move Wait or Tempo. It stays quiet during Listen so the speaker is not graded.
-              {isIosLike() ? ' iPhone uses a simple piano so the song still sounds when Safari shows the speaker icon.' : ''}
+              {usesSimplePiano() ? ' iPhone uses a simple piano so the song still sounds when Safari shows the speaker icon.' : ''}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -1980,6 +2232,11 @@ export default function App() {
             <span className="truncate font-semibold text-stone-500 dark:text-stone-400">
               {currentSong.composer} · {currentSong.keySignature} · Bar {Math.floor(currentBeat / beatsPerMeasure) + 1}
             </span>
+            {IOS_APP && (
+              <span className="shrink-0 text-[10px] font-medium text-stone-400 dark:text-stone-500">
+                Salamander Grand · Holm · CC BY 3.0
+              </span>
+            )}
             {uncertainEventsCount > 0 && (
               <button
                 onClick={() => setActiveTab('cleanup')}
@@ -2606,12 +2863,12 @@ export default function App() {
   ];
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0 transition-colors ${
+    <div className={`min-h-screen flex flex-col font-sans pb-[calc(4.25rem+var(--safe-bottom))] md:pb-0 transition-colors ${
       darkMode ? 'bg-stone-950 text-stone-100' : 'bg-[#f6f3ec] text-stone-900'
     }`}>
       {/* Clean Conservatory Header */}
-      <header className={`sticky top-0 z-30 border-b px-4 py-2.5 backdrop-blur-md flex items-center justify-between gap-3 ${
-        darkMode ? 'bg-stone-900/90 border-stone-800' : 'bg-[#fcfaf5]/90 border-stone-200/90'
+      <header className={`sticky top-0 z-30 border-b pt-[max(0.625rem,var(--safe-top))] pb-2.5 pl-[max(1rem,var(--safe-left))] pr-[max(1rem,var(--safe-right))] ${IOS_APP ? '' : 'backdrop-blur-md '}flex items-center justify-between gap-3 ${
+        darkMode ? `bg-stone-900${IOS_APP ? '' : '/90'} border-stone-800` : `bg-[#fcfaf5]${IOS_APP ? '' : '/90'} border-stone-200/90`
       }`}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-orange-700 flex items-center justify-center text-white shadow-sm">
@@ -2684,7 +2941,7 @@ export default function App() {
       </header>
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-5 py-4">
+      <main className="flex-1 max-w-6xl w-full mx-auto pl-[max(0.75rem,var(--safe-left))] pr-[max(0.75rem,var(--safe-right))] sm:pl-[max(1.25rem,var(--safe-left))] sm:pr-[max(1.25rem,var(--safe-right))] py-4">
         {activeTab === 'practice' && renderPracticeView()}
         {activeTab === 'repertoire' && renderRepertoireAndImport()}
         {activeTab === 'cleanup' && renderCleanupStudio()}
@@ -2692,8 +2949,8 @@ export default function App() {
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-4 gap-1 backdrop-blur-md ${
-        darkMode ? 'bg-stone-900/95 border-stone-800' : 'bg-[#fcfaf5]/95 border-stone-200'
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t pt-1.5 pb-[max(0.375rem,var(--safe-bottom))] pl-[max(0.5rem,var(--safe-left))] pr-[max(0.5rem,var(--safe-right))] grid grid-cols-4 gap-1 ${IOS_APP ? '' : 'backdrop-blur-md '}${
+        darkMode ? `bg-stone-900${IOS_APP ? '' : '/95'} border-stone-800` : `bg-[#fcfaf5]${IOS_APP ? '' : '/95'} border-stone-200`
       }`}>
         {navItems.map(item => {
           const Icon = item.icon;

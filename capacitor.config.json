@@ -1,0 +1,20 @@
+{
+  "appId": "com.rico.maestroai",
+  "appName": "Maestro AI",
+  "webDir": "dist",
+  "backgroundColor": "#f6f3ec",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#f6f3ec",
+    "scrollEnabled": true,
+    "allowsLinkPreview": false
+  },
+  "server": {
+    "hostname": "localhost"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "LIGHT"
+    }
+  }
+}

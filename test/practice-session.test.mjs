@@ -14,9 +14,11 @@ import {
   applyAudioSession,
   audioSessionType,
   detectPitch,
+  isCapacitorNative,
   isIosLike,
   isSilentWav,
   silentWavBytes,
+  usesSimplePiano,
 } from '../src/poteto-audio.mjs';
 
 test('practice modes say what they actually do', () => {
@@ -108,6 +110,19 @@ test('poteto mode recognizes iPhone, iPad, and desktop-mode iPad', () => {
   assert.equal(isIosLike({ userAgent: 'Mozilla/5.0 (Macintosh)', platform: 'MacIntel', maxTouchPoints: 5 }), true);
   assert.equal(isIosLike({ userAgent: 'Mozilla/5.0 (Windows NT 10.0)', platform: 'Win32', maxTouchPoints: 0 }), false);
   assert.equal(isIosLike(undefined), false);
+});
+
+test('the installed app plays samples while mobile Safari keeps the short piano', () => {
+  const iphone = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)' };
+  const previous = globalThis.Capacitor;
+  delete globalThis.Capacitor;
+  assert.equal(usesSimplePiano(iphone), true);
+  assert.equal(isCapacitorNative(), false);
+  globalThis.Capacitor = { isNativePlatform: () => true };
+  assert.equal(isCapacitorNative(), true);
+  assert.equal(usesSimplePiano(iphone), false);
+  if (previous === undefined) delete globalThis.Capacitor;
+  else globalThis.Capacitor = previous;
 });
 
 test('the silent unlock clip is a real wav and the session asks for playback', () => {

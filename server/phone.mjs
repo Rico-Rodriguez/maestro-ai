@@ -40,6 +40,7 @@ const FILE_TYPES = {
   '.txt': 'text/plain; charset=utf-8',
   '.mid': 'audio/midi',
   '.midi': 'audio/midi',
+  '.mp3': 'audio/mpeg',
 };
 
 function statusFor(error) {

@@ -1,5 +1,5 @@
 import puppeteer from '@cloudflare/puppeteer';
-import { midiAuthorization } from '../server/score-http.mjs';
+import { midiAuthorization, rememberSalt, saltCandidates } from '../server/score-http.mjs';
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -35,12 +35,12 @@ export async function readScoreWithBrowser(browserBinding, pageUrl) {
     if (!report?.ready || !/^\d+$/.test(report.scoreId || '')) {
       return { ok: false, error: 'unavailable' };
     }
-    const token = midiAuthorization(report.scoreId);
-    const file = await page.evaluate(async (scoreId, auth) => {
+    const pullMidi = async (salt) => page.evaluate(async (scoreId, auth) => {
       const response = await fetch(`/api/jmuse?id=${scoreId}&type=midi&index=0`, {
         headers: { Authorization: auth },
       });
       const text = await response.text();
+      if (text.trim().startsWith('<')) return { ok: false, blocked: true };
       let info = '';
       try {
         info = JSON.parse(text)?.info?.url || '';
@@ -49,14 +49,53 @@ export async function readScoreWithBrowser(browserBinding, pageUrl) {
       }
       if (!info) return { ok: false };
       const downloaded = await fetch(info);
+      if (!downloaded.ok) return { ok: false };
       const bytes = new Uint8Array(await downloaded.arrayBuffer());
       let binary = '';
       for (let i = 0; i < bytes.length; i += 0x8000) {
         binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       }
       return { ok: true, base64: btoa(binary) };
-    }, report.scoreId, token);
-    if (!file?.ok) return { ok: false, error: 'no-midi' };
+    }, report.scoreId, midiAuthorization(report.scoreId, salt));
+
+    let file = null;
+    let blocked = false;
+    const trySalts = async (salts) => {
+      for (const salt of salts) {
+        file = await pullMidi(salt);
+        if (file?.ok) {
+          rememberSalt(salt);
+          return true;
+        }
+        if (file?.blocked) {
+          blocked = true;
+          return false;
+        }
+      }
+      return false;
+    };
+
+    let found = await trySalts(saltCandidates());
+    if (!found && !blocked) {
+      const discovered = await page.evaluate(async () => {
+        const urls = [...document.querySelectorAll('script[src],link[href]')]
+          .map((node) => node.src || node.href)
+          .filter((src) => src && src.includes('/static/public/build/'))
+          .slice(0, 12);
+        for (const url of urls) {
+          const name = url.slice(url.lastIndexOf('/') + 1);
+          if (name.startsWith('vendor')) continue;
+          try {
+            const text = await (await fetch(url)).text();
+            const match = text.match(/"([^"\\]{1,80})"\)\s*\.\s*(?:substr|substring|slice)\(\s*0\s*,\s*4\s*\)/);
+            if (match) return match[1];
+          } catch { /* the next chunk may hold the salt */ }
+        }
+        return '';
+      });
+      if (discovered) found = await trySalts([discovered]);
+    }
+    if (!file?.ok) return { ok: false, error: blocked ? 'unavailable' : 'no-midi' };
     const bytes = Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0));
     if (!isMidi(bytes)) return { ok: false, error: 'no-midi' };
     return {
