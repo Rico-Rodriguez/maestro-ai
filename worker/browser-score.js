@@ -47,9 +47,9 @@ export async function readScoreWithBrowser(browserBinding, pageUrl) {
       } catch {
         info = '';
       }
-      if (!info) return { ok: false, empty: response.ok };
+      if (!info) return { ok: false };
       const downloaded = await fetch(info);
-      if (!downloaded.ok) return { ok: false, empty: true };
+      if (!downloaded.ok) return { ok: false };
       const bytes = new Uint8Array(await downloaded.arrayBuffer());
       let binary = '';
       for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -78,20 +78,22 @@ export async function readScoreWithBrowser(browserBinding, pageUrl) {
     let found = await trySalts(saltCandidates());
     if (!found && !blocked) {
       const discovered = await page.evaluate(async () => {
-        const urls = [...document.querySelectorAll('script[src]')]
-          .map((node) => node.src)
-          .filter((src) => src.includes('/static/public/build/musescore'))
-          .slice(0, 8);
+        const urls = [...document.querySelectorAll('script[src],link[href]')]
+          .map((node) => node.src || node.href)
+          .filter((src) => src && src.includes('/static/public/build/'))
+          .slice(0, 12);
         for (const url of urls) {
+          const name = url.slice(url.lastIndexOf('/') + 1);
+          if (name.startsWith('vendor')) continue;
           try {
             const text = await (await fetch(url)).text();
             const match = text.match(/"([^"\\]{1,80})"\)\s*\.\s*(?:substr|substring|slice)\(\s*0\s*,\s*4\s*\)/);
             if (match) return match[1];
-          } catch { /* the next script may hold the salt */ }
+          } catch { /* the next chunk may hold the salt */ }
         }
         return '';
       });
-      if (discovered) found = await trySalts(saltCandidates(discovered));
+      if (discovered) found = await trySalts([discovered]);
     }
     if (!file?.ok) return { ok: false, error: blocked ? 'unavailable' : 'no-midi' };
     const bytes = Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0));
