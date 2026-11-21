@@ -1,5 +1,6 @@
 import { HELPER_MARK, HELPER_PATH, LIBRARY_PATH, PAGES_ORIGIN } from '../shared/musescore-contract.mjs';
 import { fetchScoreMidi } from '../server/musescore.mjs';
+import { hydrateScoreSalt, persistScoreSalt } from '../server/score-http.mjs';
 import { readScoreWithBrowser } from './browser-score.js';
 
 const STATUS = {
@@ -115,6 +116,7 @@ async function handleHelper(request, env) {
     return json({ error: 'bad-url' }, 400, request);
   }
   const sourceUrl = body.url.trim();
+  await hydrateScoreSalt(env.DB);
   const cached = await findByUrl(env.DB, sourceUrl);
   if (cached) return json(payload(cached), 200, request);
   let result = await fetchScoreMidi(sourceUrl, request.signal);
@@ -127,6 +129,7 @@ async function handleHelper(request, env) {
   }
   if (!result.ok) return json({ error: result.error }, STATUS[result.error], request);
   await saveScore(env.DB, result, sourceUrl);
+  await persistScoreSalt(env.DB);
   return json({
     title: result.title,
     scoreId: result.scoreId,
