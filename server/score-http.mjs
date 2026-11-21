@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 // The salt lives in the current site bundle and changes. The first entry is the
 // salt this app last saw work; the rest are older ones worth one more try.
 const KNOWN_SALTS = [',%!),', '9654,4e'];
-const SCRIPT_URL = /https:\/\/musescore\.com\/static\/public\/build\/musescore[^"'\\\s>]+\.js/g;
+const SCRIPT_URL = /https:\/\/musescore\.com\/static\/public\/build\/[^"'\\\s>]+\.js/g;
 const SALT_IN_SCRIPT = /"([^"\\]{1,80})"\)\s*\.\s*(?:substr|substring|slice)\(\s*0\s*,\s*4\s*\)/;
 
 const TOKEN_SUFFIX = KNOWN_SALTS[0];
@@ -90,9 +90,10 @@ function isMidi(bytes) {
 
 async function discoverSalt(html, fetchImpl, signal) {
   const inline = saltFromScript(html);
+  const urls = scriptUrlsFromPage(html).slice(0, 12);
   if (inline) return inline;
-  const urls = scriptUrlsFromPage(html).slice(0, 8);
   for (const url of urls) {
+    if (url.slice(url.lastIndexOf('/') + 1).startsWith('vendor')) continue;
     if (signal?.aborted) {
       const error = new Error('aborted');
       error.name = 'AbortError';
