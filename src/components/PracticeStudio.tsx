@@ -524,6 +524,7 @@ export default function PracticeStudio({
   const hardestMeasure = getHardestMeasure(practiceState.stats);
   const nextChip = formatNextChip(expectedNotes);
   const totalMeasures = score ? Math.max(1, score.totalMeasures) : 1;
+  const currentBar = Math.max(1, Math.floor(practiceState.beat / defaultBeatsPerMeasure) + 1);
 
   const unopenedSaved = useMemo(() => {
     const openIds = new Set(sessionScores.map((s) => s.id));
@@ -1042,8 +1043,12 @@ export default function PracticeStudio({
               }`}
             />
             <span className="truncate font-medium">
-              {practiceState.lastFeedback.text ||
-                PRACTICE_MODES.find((m) => m.id === practiceState.mode)?.idle}
+              {practiceState.mode === 'listen'
+                ? practiceState.running
+                  ? `Listening · Bar ${currentBar}`
+                  : 'Press Play to listen.'
+                : practiceState.lastFeedback.text ||
+                  PRACTICE_MODES.find((m) => m.id === practiceState.mode)?.idle}
             </span>
           </div>
 
@@ -1051,18 +1056,22 @@ export default function PracticeStudio({
             <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-400">
               {nextChip}
             </span>
-            <span className="hidden sm:inline">
-              <span className={mutedText}>Hits </span>
-              <strong>{practiceState.stats.hits}</strong>
-            </span>
-            <span>
-              <span className={mutedText}>Acc </span>
-              <strong>{totalAttempts > 0 ? `${accuracyPct}%` : '—'}</strong>
-            </span>
-            <span>
-              <span className={mutedText}>Streak </span>
-              <strong>{practiceState.stats.streak}</strong>
-            </span>
+            {practiceState.mode !== 'listen' ? (
+              <>
+                <span className="hidden sm:inline">
+                  <span className={mutedText}>Hits </span>
+                  <strong>{practiceState.stats.hits}</strong>
+                </span>
+                <span>
+                  <span className={mutedText}>Acc </span>
+                  <strong>{totalAttempts > 0 ? `${accuracyPct}%` : '—'}</strong>
+                </span>
+                <span>
+                  <span className={mutedText}>Streak </span>
+                  <strong>{practiceState.stats.streak}</strong>
+                </span>
+              </>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -1166,7 +1175,9 @@ export default function PracticeStudio({
               className={[
                 'overflow-hidden rounded-2xl border',
                 darkMode ? 'border-stone-800' : 'border-stone-300/80',
-                viewLayout === 'combined' ? 'h-36 sm:h-48 lg:h-56' : 'h-64 sm:h-80 lg:h-96',
+                viewLayout === 'combined'
+                  ? 'h-36 sm:h-48 lg:h-56'
+                  : 'h-[44dvh] min-h-[270px] max-h-[500px]',
               ].join(' ')}
             >
               <FallingNotesCanvas

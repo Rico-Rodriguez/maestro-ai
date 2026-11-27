@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NoteEvent, TimeSigPoint } from '../music/types';
 import type { PracticeGrade } from '../practice/engine';
 import type { PianoLayout } from './piano-geometry';
@@ -25,21 +25,43 @@ interface NotePalette {
   glow: string;
 }
 
-const LOOKAHEAD_BEATS = 5.5;
 const STRIKE_OFFSET_PX = 8;
+const NOTE_TOP_GAP_PX = 2.5;
+const ANTICIPATION_BEATS = 0.45;
+const OCTAVE_WATERMARKS = new Set(['C2', 'C3', 'C4', 'C5', 'C6']);
 
-const PALETTE_R: NotePalette = {
+const SPEED_OPTIONS = [
+  { id: 'slow', label: 'Slow', beats: 8 },
+  { id: 'normal', label: 'Normal', beats: 6 },
+  { id: 'fast', label: 'Fast', beats: 4.2 },
+] as const;
+
+const PALETTE_R_WHITE: NotePalette = {
   top: '#fbbf24',
-  bottom: '#c2410c',
-  border: 'rgba(254, 243, 199, 0.45)',
+  bottom: '#d97706',
+  border: 'rgba(254, 243, 199, 0.5)',
   glow: 'rgba(245, 158, 11, 0.72)',
 };
 
-const PALETTE_L: NotePalette = {
+const PALETTE_L_WHITE: NotePalette = {
   top: '#7dd3fc',
-  bottom: '#0369a1',
-  border: 'rgba(224, 242, 254, 0.45)',
+  bottom: '#0284c7',
+  border: 'rgba(224, 242, 254, 0.5)',
   glow: 'rgba(56, 189, 248, 0.72)',
+};
+
+const PALETTE_R_BLACK: NotePalette = {
+  top: '#fb923c',
+  bottom: '#9a3412',
+  border: '#fed7aa',
+  glow: 'rgba(251, 146, 60, 0.78)',
+};
+
+const PALETTE_L_BLACK: NotePalette = {
+  top: '#60a5fa',
+  bottom: '#1e40af',
+  border: '#bfdbfe',
+  glow: 'rgba(96, 165, 250, 0.78)',
 };
 
 const PALETTE_HIT: NotePalette = {
@@ -170,6 +192,8 @@ export function FallingNotesCanvas({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
+  const [lookaheadBeats, setLookaheadBeats] = useState<number>(8);
+  const [showLabels, setShowLabels] = useState<boolean>(true);
 
   const indexedEvents = useMemo(() => {
     const sorted = [...events].sort((a, b) => a.onset - b.onset || a.pitch - b.pitch);
@@ -196,6 +220,8 @@ export function FallingNotesCanvas({
     grades,
     getLiveBeat,
     darkMode,
+    lookaheadBeats,
+    showLabels,
   });
   stateRef.current = {
     indexedEvents,
@@ -204,6 +230,8 @@ export function FallingNotesCanvas({
     grades,
     getLiveBeat,
     darkMode,
+    lookaheadBeats,
+    showLabels,
   };
 
   useEffect(() => {
@@ -263,14 +291,16 @@ export function FallingNotesCanvas({
           grades: activeGrades,
           getLiveBeat: readBeat,
           darkMode: isDark,
+          lookaheadBeats: activeLookahead,
+          showLabels: showNoteLabels,
         } = stateRef.current;
 
         const liveBeat = readBeat();
         const strikeY = Math.max(24, height - STRIKE_OFFSET_PX);
-        const pxPerBeat = Math.max(28, strikeY / LOOKAHEAD_BEATS);
+        const pxPerBeat = Math.max(8, strikeY / activeLookahead);
         const tailBeats = STRIKE_OFFSET_PX / pxPerBeat + 0.5;
         const visibleMinBeat = liveBeat - tailBeats;
-        const visibleMaxBeat = liveBeat + LOOKAHEAD_BEATS + 0.75;
+        const visibleMaxBeat = liveBeat + activeLookahead + 0.75;
 
         const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
         if (isDark) {
@@ -289,42 +319,84 @@ export function FallingNotesCanvas({
           ctx.fillRect(bk.x * width, 0, bk.width * width, strikeY);
         }
 
-        ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(120, 113, 108, 0.18)';
         ctx.lineWidth = 1;
+        ctx.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
         for (let i = 0; i < activeLayout.whiteKeys.length; i += 1) {
           const wk = activeLayout.whiteKeys[i];
-          if (!wk.isC) continue;
+          const pc = ((wk.midi % 12) + 12) % 12;
+          if (pc !== 0 && pc !== 5) continue;
           const x = Math.round(wk.x * width) + 0.5;
+          ctx.strokeStyle =
+            pc === 0
+              ? isDark
+                ? 'rgba(148, 163, 184, 0.22)'
+                : 'rgba(120, 113, 108, 0.26)'
+              : isDark
+                ? 'rgba(148, 163, 184, 0.08)'
+                : 'rgba(120, 113, 108, 0.11)';
           ctx.beginPath();
           ctx.moveTo(x, 0);
           ctx.lineTo(x, strikeY);
           ctx.stroke();
+
+          if (wk.isC && OCTAVE_WATERMARKS.has(wk.label)) {
+            ctx.fillStyle = isDark ? 'rgba(148, 163, 184, 0.34)' : 'rgba(87, 83, 78, 0.4)';
+            ctx.fillText(wk.label, x + 3.5, 6);
+          }
         }
 
         const startMeasureIdx = Math.max(0, lowerBoundMeasure(mData.lines, visibleMinBeat) - 1);
         ctx.font = '600 10px ui-sans-serif, system-ui, -apple-system, sans-serif';
-        ctx.textBaseline = 'bottom';
         ctx.textAlign = 'left';
 
-        const drawMeasureLine = (measureNum: number, beat: number) => {
+        const drawMeasureWithSubBeats = (measureNum: number, beat: number, nextBeat: number) => {
+          ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.07)' : 'rgba(120, 113, 108, 0.09)';
+          ctx.lineWidth = 1;
+          for (let subBeat = beat + 1; subBeat < nextBeat - 0.05; subBeat += 1) {
+            if (subBeat < visibleMinBeat || subBeat > visibleMaxBeat) continue;
+            const subY = strikeY - (subBeat - liveBeat) * pxPerBeat;
+            if (subY < 0 || subY > strikeY + 1) continue;
+            const crispSubY = Math.round(subY) + 0.5;
+            ctx.beginPath();
+            ctx.moveTo(0, crispSubY);
+            ctx.lineTo(width, crispSubY);
+            ctx.stroke();
+          }
+
           const y = strikeY - (beat - liveBeat) * pxPerBeat;
           if (y < 0 || y > strikeY + 2) return;
           const crispY = Math.round(y) + 0.5;
-          ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(120, 113, 108, 0.22)';
+          ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(120, 113, 108, 0.25)';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(0, crispY);
           ctx.lineTo(width, crispY);
           ctx.stroke();
 
-          ctx.fillStyle = isDark ? 'rgba(148, 163, 184, 0.6)' : 'rgba(87, 83, 78, 0.68)';
-          ctx.fillText(`Bar ${measureNum}`, 8, crispY - 3);
+          const barLabel = `Bar ${measureNum}`;
+          const textW = ctx.measureText(barLabel).width;
+          const pillX = 6;
+          const pillW = textW + 10;
+          const pillH = 15;
+          const pillY = crispY - pillH - 2;
+          if (pillY >= 0) {
+            traceRoundedRect(ctx, pillX, pillY, pillW, pillH, 4);
+            ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.84)' : 'rgba(28, 25, 23, 0.72)';
+            ctx.fill();
+            ctx.fillStyle = isDark ? 'rgba(226, 232, 240, 0.9)' : 'rgba(250, 247, 240, 0.96)';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(barLabel, pillX + 5, pillY + pillH / 2);
+          }
         };
 
         for (let i = startMeasureIdx; i < mData.lines.length; i += 1) {
           const m = mData.lines[i];
           if (m.beat > visibleMaxBeat) break;
-          drawMeasureLine(m.measure, m.beat);
+          const nextBeat =
+            i + 1 < mData.lines.length ? mData.lines[i + 1].beat : m.beat + mData.tailBpb;
+          drawMeasureWithSubBeats(m.measure, m.beat, nextBeat);
         }
 
         const lastKnown = mData.lines[mData.lines.length - 1];
@@ -332,11 +404,48 @@ export function FallingNotesCanvas({
           let extraMeasure = lastKnown.measure + 1;
           let extraBeat = lastKnown.beat + mData.tailBpb;
           while (extraBeat <= visibleMaxBeat) {
-            if (extraBeat >= visibleMinBeat) {
-              drawMeasureLine(extraMeasure, extraBeat);
+            const nextExtra = extraBeat + mData.tailBpb;
+            if (nextExtra >= visibleMinBeat) {
+              drawMeasureWithSubBeats(extraMeasure, extraBeat, nextExtra);
             }
             extraMeasure += 1;
-            extraBeat += mData.tailBpb;
+            extraBeat = nextExtra;
+          }
+        }
+
+        const resolvePalette = (
+          hand: NoteEvent['hand'],
+          isBlack: boolean,
+          grade?: PracticeGrade,
+        ): NotePalette => {
+          if (grade?.status === 'hit') return PALETTE_HIT;
+          if (grade?.status === 'miss') return PALETTE_MISS;
+          if (isBlack) return hand === 'R' ? PALETTE_R_BLACK : PALETTE_L_BLACK;
+          return hand === 'R' ? PALETTE_R_WHITE : PALETTE_L_WHITE;
+        };
+
+        const spotlightStartIdx = lowerBoundOnset(evData.sorted, liveBeat);
+        for (let i = spotlightStartIdx; i < evData.sorted.length; i += 1) {
+          const ev = evData.sorted[i];
+          if (ev.onset > liveBeat + ANTICIPATION_BEATS) break;
+          if (ev.onset <= liveBeat) continue;
+          const geom = activeLayout.byMidi.get(ev.pitch);
+          if (!geom) continue;
+
+          const palette = resolvePalette(ev.hand, geom.isBlack, activeGrades[ev.id]);
+          const colX = geom.x * width;
+          const colW = geom.width * width;
+          const barBottom = Math.min(strikeY, strikeY - (ev.onset - liveBeat) * pxPerBeat);
+          if (strikeY > barBottom) {
+            const proximity = 1 - (ev.onset - liveBeat) / ANTICIPATION_BEATS;
+            const laneGrad = ctx.createLinearGradient(0, barBottom, 0, strikeY);
+            laneGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            laneGrad.addColorStop(1, palette.glow);
+            ctx.save();
+            ctx.globalAlpha = 0.14 + proximity * 0.28;
+            ctx.fillStyle = laneGrad;
+            ctx.fillRect(colX, barBottom, colW, strikeY - barBottom);
+            ctx.restore();
           }
         }
 
@@ -346,7 +455,6 @@ export function FallingNotesCanvas({
           visibleMinBeat - evData.maxDuration - 0.5,
         );
 
-        ctx.font = '700 10px ui-sans-serif, system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
 
@@ -367,14 +475,12 @@ export function FallingNotesCanvas({
 
           const rawBottom = strikeY - (ev.onset - liveBeat) * pxPerBeat;
           const rawTop = strikeY - (noteEnd - liveBeat) * pxPerBeat;
-          const clampedTop = Math.max(-4, rawTop);
+          const barTopGap = rawTop + NOTE_TOP_GAP_PX;
           const clampedBottom = Math.min(height + 4, rawBottom);
+          const clampedTop = Math.max(-4, Math.min(clampedBottom - 6, barTopGap));
           const barH = Math.max(6, clampedBottom - clampedTop);
 
-          const grade = activeGrades[ev.id];
-          let palette = ev.hand === 'R' ? PALETTE_R : PALETTE_L;
-          if (grade?.status === 'hit') palette = PALETTE_HIT;
-          else if (grade?.status === 'miss') palette = PALETTE_MISS;
+          const palette = resolvePalette(ev.hand, geom.isBlack, activeGrades[ev.id]);
 
           const isActive = ev.onset <= liveBeat && noteEnd >= liveBeat;
           if (isActive) {
@@ -395,16 +501,40 @@ export function FallingNotesCanvas({
           ctx.fill();
           ctx.restore();
 
+          ctx.save();
+          traceRoundedRect(ctx, barX, clampedTop, barW, barH, 5);
+          ctx.clip();
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+          ctx.fillRect(barX, clampedTop + barH - 3, barW, 3);
+          ctx.restore();
+
           ctx.strokeStyle = palette.border;
           ctx.lineWidth = 1;
-          traceRoundedRect(ctx, barX + 0.5, clampedTop + 0.5, Math.max(1, barW - 1), Math.max(1, barH - 1), 4.5);
+          traceRoundedRect(
+            ctx,
+            barX + 0.5,
+            clampedTop + 0.5,
+            Math.max(1, barW - 1),
+            Math.max(1, barH - 1),
+            4.5,
+          );
           ctx.stroke();
 
-          if (barW >= 20 && barH >= 18) {
-            const labelY = Math.min(clampedBottom - 4, strikeY - 4);
-            if (labelY - clampedTop >= 12) {
-              ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-              ctx.fillText(ev.pitchName, barX + barW / 2, labelY, barW - 4);
+          if (showNoteLabels && barW >= 9 && barH >= 11) {
+            const labelY = Math.min(clampedTop + barH - 3.5, strikeY - 3.5);
+            if (labelY - clampedTop >= 7.5) {
+              const labelText =
+                barW >= 20 && barH >= 14 ? ev.pitchName : ev.pitchName.replace(/-?\d+$/, '');
+              ctx.font =
+                barW >= 20
+                  ? '700 10px ui-sans-serif, system-ui, -apple-system, sans-serif'
+                  : '700 9px ui-sans-serif, system-ui, -apple-system, sans-serif';
+              ctx.lineWidth = 2.5;
+              ctx.lineJoin = 'round';
+              ctx.strokeStyle = 'rgba(12, 10, 9, 0.85)';
+              ctx.strokeText(labelText, barX + barW / 2, labelY, barW - 3);
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+              ctx.fillText(labelText, barX + barW / 2, labelY, barW - 3);
             }
           }
         }
@@ -459,8 +589,68 @@ export function FallingNotesCanvas({
   }, []);
 
   return (
-    <div ref={containerRef} className="relative w-full h-full overflow-hidden select-none">
-      <canvas ref={canvasRef} className="block w-full h-full" />
+    <div className="flex flex-col w-full h-full overflow-hidden select-none">
+      <div
+        className={[
+          'flex h-8 shrink-0 items-center justify-between gap-2 border-b px-3 text-[11px]',
+          darkMode
+            ? 'border-stone-800 bg-stone-900 text-stone-300'
+            : 'border-stone-300/75 bg-[#f3efe6] text-stone-700',
+        ].join(' ')}
+      >
+        <div
+          className={[
+            'inline-flex items-center rounded-md border p-0.5',
+            darkMode ? 'border-stone-700 bg-stone-800' : 'border-stone-300 bg-white/70',
+          ].join(' ')}
+        >
+          {SPEED_OPTIONS.map((opt) => {
+            const active = lookaheadBeats === opt.beats;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setLookaheadBeats(opt.beats)}
+                className={[
+                  'rounded px-2 py-0.5 text-[10px] font-semibold transition',
+                  active
+                    ? darkMode
+                      ? 'bg-stone-700 text-amber-300 shadow-sm'
+                      : 'bg-white text-stone-900 shadow-sm'
+                    : darkMode
+                      ? 'text-stone-400 hover:text-stone-200'
+                      : 'text-stone-600 hover:text-stone-900',
+                ].join(' ')}
+                title={`Show ${opt.beats} beats ahead`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowLabels((prev) => !prev)}
+          className={[
+            'rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold transition',
+            showLabels
+              ? darkMode
+                ? 'border-amber-500/70 bg-amber-500/20 text-amber-300'
+                : 'border-amber-500/70 bg-amber-500/20 text-amber-700'
+              : darkMode
+                ? 'border-stone-700 bg-stone-800 text-stone-300 hover:bg-stone-700'
+                : 'border-stone-300 bg-white/70 text-stone-600 hover:bg-white',
+          ].join(' ')}
+          title="Toggle note pitch labels"
+        >
+          ABC
+        </button>
+      </div>
+
+      <div ref={containerRef} className="relative flex-1 min-h-0 w-full overflow-hidden">
+        <canvas ref={canvasRef} className="block w-full h-full" />
+      </div>
     </div>
   );
 }
