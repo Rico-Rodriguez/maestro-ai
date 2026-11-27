@@ -213,6 +213,9 @@ export function PianoKeyboard({
 
     const velocity = computeStrikeVelocity(hitEl, e.clientY);
     activePointersRef.current.set(e.pointerId, midi);
+    if (e.pointerType !== 'mouse') {
+      globalThis.__maestroHaptic?.('LIGHT');
+    }
     onNoteOnRef.current(midi, velocity);
   }, []);
 
@@ -235,6 +238,9 @@ export function PianoKeyboard({
 
       if (validNext >= 0 && hitEl) {
         const velocity = computeStrikeVelocity(hitEl, e.clientY);
+        if (e.pointerType !== 'mouse') {
+          globalThis.__maestroHaptic?.('LIGHT');
+        }
         onNoteOnRef.current(validNext, velocity);
       }
     },

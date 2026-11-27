@@ -1,3 +1,42 @@
+/// <reference types="vite/client" />
+
+export {};
+
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_IOS_SHELL?: string;
+  }
+
+  var __maestroPrimeAudioSession: ((recording: boolean) => Promise<void>) | undefined;
+  var __maestroSetSystemBars: ((dark: boolean) => Promise<void>) | undefined;
+  var __maestroHaptic: ((style?: 'LIGHT' | 'MEDIUM') => void) | undefined;
+  var __maestroIdle: ((disabled: boolean) => Promise<void>) | undefined;
+  var __maestroShareFile:
+    | ((payload: { filename: string; mimeType: string; base64: string }) => Promise<boolean>)
+    | undefined;
+}
+
+declare module '*/ios-shell.mjs' {
+  export function installNativeShell(): Promise<void>;
+}
+
+declare module '*/ios-viewport.mjs' {
+  export function iosIndexHtml(html: string): string;
+}
+
+declare module '*/score-fetch.mjs' {
+  export function shouldUseNativeScoreFetch(
+    input: RequestInfo | URL,
+    pageHref: string,
+    scoreOrigin?: string,
+  ): boolean;
+  export function nativeHttpToResponse(native: {
+    status?: number;
+    headers?: Record<string, string | string[]>;
+    data?: unknown;
+  }): Response;
+}
+
 declare module '*/score-pdf.mjs' {
   export function renderScorePdf(song: {
     title: string;

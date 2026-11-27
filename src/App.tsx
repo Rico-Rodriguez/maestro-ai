@@ -23,13 +23,31 @@ function pdfFileName(title: string): string {
   return `${cleaned}.pdf`;
 }
 
+function uint8ToBase64(bytes: Uint8Array): string {
+  const CHUNK = 0x4000;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    parts.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+  }
+  return btoa(parts.join(''));
+}
+
 function downloadScorePdf(score: Score): void {
   const bytes = renderScorePdf(score);
+  const filename = pdfFileName(score.title);
+  if (globalThis.__maestroShareFile) {
+    void globalThis.__maestroShareFile({
+      filename,
+      mimeType: 'application/pdf',
+      base64: uint8ToBase64(bytes),
+    });
+    return;
+  }
   const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = pdfFileName(score.title);
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -70,6 +88,7 @@ export default function App() {
   useEffect(() => {
     document.body.style.backgroundColor = darkMode ? '#0c0a09' : '#f6f3ec';
     document.body.style.color = darkMode ? '#f5f5f4' : '#1c1917';
+    void globalThis.__maestroSetSystemBars?.(darkMode)?.catch?.(() => {});
   }, [darkMode]);
 
   useEffect(() => {
