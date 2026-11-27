@@ -4,9 +4,11 @@ import { pathToFileURL } from 'node:url';
 
 export const DEFAULT_ICON_URL = 'https://rico-rodriguez.github.io/maestro-ai/icon-1024.png';
 export const DEFAULT_SOURCE_URL =
-  'https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/source.json';
+  'https://github.com/Rico-Rodriguez/maestro-ai/releases/latest/download/source.json';
 export const DEFAULT_DOWNLOAD_URL =
   'https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/MaestroAI.ipa';
+
+const MAX_VERSIONS = 10;
 
 export function buildSideloadSource({
   version,
@@ -17,6 +19,7 @@ export function buildSideloadSource({
   downloadURL = DEFAULT_DOWNLOAD_URL,
   iconURL = DEFAULT_ICON_URL,
   sourceURL = DEFAULT_SOURCE_URL,
+  existingVersions = [],
 }) {
   if (!version) {
     throw new Error('version is required');
@@ -31,8 +34,24 @@ export function buildSideloadSource({
 
   const resolvedVersion = String(version);
   const resolvedBuildVersion = String(buildVersion);
-  const resolvedDate = String(date);
+  // Swift ISO8601DateFormatter rejects fractional seconds by default
+  const resolvedDate = new Date(date).toISOString().replace(/\.\d{3}Z$/, 'Z');
   const resolvedDescription = String(description);
+
+  const latestEntry = {
+    version: resolvedVersion,
+    buildVersion: resolvedBuildVersion,
+    date: resolvedDate,
+    localizedDescription: resolvedDescription,
+    downloadURL,
+    size: resolvedSize,
+    minOSVersion: '15.0',
+  };
+
+  const priorVersions = Array.isArray(existingVersions)
+    ? existingVersions.filter((entry) => entry && String(entry.version) !== resolvedVersion)
+    : [];
+  const versions = [latestEntry, ...priorVersions].slice(0, MAX_VERSIONS);
 
   return {
     name: 'Maestro AI',
@@ -60,17 +79,7 @@ export function buildSideloadSource({
         versionDescription: resolvedDescription,
         downloadURL,
         size: resolvedSize,
-        versions: [
-          {
-            version: resolvedVersion,
-            buildVersion: resolvedBuildVersion,
-            date: resolvedDate,
-            localizedDescription: resolvedDescription,
-            downloadURL,
-            size: resolvedSize,
-            minOSVersion: '15.0',
-          },
-        ],
+        versions,
         appPermissions: {
           entitlements: [],
           privacy: {
@@ -120,6 +129,18 @@ function main(argv) {
     throw new Error('Either --ipa or --size is required');
   }
 
+  let existingVersions = [];
+  if (args.existing) {
+    const existingPath = path.resolve(args.existing);
+    if (fs.existsSync(existingPath)) {
+      const existingSource = JSON.parse(fs.readFileSync(existingPath, 'utf8'));
+      const prior = existingSource?.apps?.[0]?.versions;
+      if (Array.isArray(prior)) {
+        existingVersions = prior;
+      }
+    }
+  }
+
   const source = buildSideloadSource({
     version: args.version,
     buildVersion: args.build,
@@ -129,6 +150,7 @@ function main(argv) {
     downloadURL: args['download-url'] ?? DEFAULT_DOWNLOAD_URL,
     iconURL: args['icon-url'] ?? DEFAULT_ICON_URL,
     sourceURL: args['source-url'] ?? DEFAULT_SOURCE_URL,
+    existingVersions,
   });
 
   const outPath = path.resolve(args.out);

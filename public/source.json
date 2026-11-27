@@ -3,7 +3,7 @@
   "subtitle": "Interactive Piano Studio",
   "description": "Practice sheet music and falling notes with sampled piano audio, MuseScore import, MIDI keyboard, and microphone pitch detection.",
   "iconURL": "https://rico-rodriguez.github.io/maestro-ai/icon-1024.png",
-  "sourceURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/source.json",
+  "sourceURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/latest/download/source.json",
   "identifier": "com.rico.maestroai.source",
   "tintColor": "#D97706",
   "featuredApps": [
@@ -20,16 +20,16 @@
       "tintColor": "#D97706",
       "category": "music",
       "version": "1.0.14",
-      "versionDate": "2026-11-27T18:45:04.133Z",
-      "versionDescription": "Maestro AI iOS build 1.0.14 (455a8fb).",
+      "versionDate": "2026-11-27T18:45:04Z",
+      "versionDescription": "Maestro AI iOS build 1.0.14.",
       "downloadURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/MaestroAI.ipa",
       "size": 13135951,
       "versions": [
         {
           "version": "1.0.14",
           "buildVersion": "14",
-          "date": "2026-11-27T18:45:04.133Z",
-          "localizedDescription": "Maestro AI iOS build 1.0.14 (455a8fb).",
+          "date": "2026-11-27T18:45:04Z",
+          "localizedDescription": "Maestro AI iOS build 1.0.14.",
           "downloadURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/MaestroAI.ipa",
           "size": 13135951,
           "minOSVersion": "15.0"
