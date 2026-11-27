@@ -75,50 +75,60 @@ jobs:
           APP=$(find "$RUNNER_TEMP/MaestroAI.xcarchive/Products/Applications" -maxdepth 1 -type d -name '*.app' | head -n 1)
           test -n "$APP"
           WORK="$RUNNER_TEMP/ipa"
+          IPA_NAME="MaestroAI-1.0.${{ github.run_number }}.ipa"
           rm -rf "$WORK"
           mkdir -p "$WORK/Payload"
           cp -R "$APP" "$WORK/Payload/App.app"
           cd "$WORK"
-          zip -r -y "$GITHUB_WORKSPACE/MaestroAI.ipa" Payload
+          zip -r -y "$GITHUB_WORKSPACE/$IPA_NAME" Payload
+          cp "$GITHUB_WORKSPACE/$IPA_NAME" "$GITHUB_WORKSPACE/MaestroAI.ipa"
           test -f Payload/App.app/Info.plist
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Payload/App.app/Info.plist)
           DISPLAY_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' Payload/App.app/Info.plist)
           test "$BUNDLE_ID" = "com.rico.maestroai"
           test "$DISPLAY_NAME" = "Maestro AI"
-          unzip -l "$GITHUB_WORKSPACE/MaestroAI.ipa" | grep -q 'Payload/App.app/Info.plist'
-          unzip -l "$GITHUB_WORKSPACE/MaestroAI.ipa" | grep -q 'Payload/App.app/public/index.html'
-          unzip -l "$GITHUB_WORKSPACE/MaestroAI.ipa" | grep -q 'Payload/App.app/public/audio/salamander/C4.mp3'
-          unzip -l "$GITHUB_WORKSPACE/MaestroAI.ipa" | grep -q 'Payload/App.app/public/assets/'
+          unzip -l "$GITHUB_WORKSPACE/$IPA_NAME" | grep -q 'Payload/App.app/Info.plist'
+          unzip -l "$GITHUB_WORKSPACE/$IPA_NAME" | grep -q 'Payload/App.app/public/index.html'
+          unzip -l "$GITHUB_WORKSPACE/$IPA_NAME" | grep -q 'Payload/App.app/public/audio/salamander/C4.mp3'
+          unzip -l "$GITHUB_WORKSPACE/$IPA_NAME" | grep -q 'Payload/App.app/public/assets/'
 
       - name: Generate sideload source.json
         run: |
           set -euo pipefail
           node scripts/update-sideload-source.mjs \
-            --ipa "$GITHUB_WORKSPACE/MaestroAI.ipa" \
+            --ipa "$GITHUB_WORKSPACE/MaestroAI-1.0.${{ github.run_number }}.ipa" \
             --version "1.0.${{ github.run_number }}" \
             --build "${{ github.run_number }}" \
+            --download-url "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/v1.0.${{ github.run_number }}/MaestroAI-1.0.${{ github.run_number }}.ipa" \
+            --existing public/source.json \
             --out "$GITHUB_WORKSPACE/source.json" \
             --notes "Maestro AI iOS build 1.0.${{ github.run_number }} (${GITHUB_SHA:0:7})."
 
-      - name: Publish ios-v1 pre-release
+      - name: Publish versioned GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          VERSION="1.0.${{ github.run_number }}"
+          TAG="v${VERSION}"
+          IPA_NAME="MaestroAI-${VERSION}.ipa"
           NOTES=$(printf '%s\n' \
-            'Unsigned Maestro AI iOS build for SideInstaller, AltStore, or SideStore.' \
+            'Unsigned Maestro AI iOS build for SideInstaller, FlareStore, Feather, AltStore, or SideStore.' \
             '' \
             'Bundle ID: com.rico.maestroai' \
             'Display name: Maestro AI' \
             '' \
             'The archive is built with CODE_SIGNING_ALLOWED=NO. SideInstaller re-signs it with your Apple ID.')
-          if gh release view ios-v1 >/dev/null 2>&1; then
-            gh release upload ios-v1 MaestroAI.ipa source.json --clobber
-            gh release edit ios-v1 --prerelease --target "$GITHUB_SHA" --title "Maestro AI iOS v1 (unsigned)" --notes "$NOTES"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$GITHUB_WORKSPACE/$IPA_NAME" "$GITHUB_WORKSPACE/source.json" --clobber
+            gh release edit "$TAG" --prerelease=false --latest --target "$GITHUB_SHA" --title "Maestro AI $VERSION" --notes "$NOTES"
           else
-            gh release create ios-v1 MaestroAI.ipa source.json --prerelease --target "$GITHUB_SHA" --title "Maestro AI iOS v1 (unsigned)" --notes "$NOTES"
+            gh release create "$TAG" "$GITHUB_WORKSPACE/$IPA_NAME" "$GITHUB_WORKSPACE/source.json" --latest --target "$GITHUB_SHA" --title "Maestro AI $VERSION" --notes "$NOTES"
           fi
-          gh release view ios-v1 --json url,assets --jq '{url: .url, assets: [.assets[].name]}'
+          if gh release view ios-v1 >/dev/null 2>&1; then
+            gh release upload ios-v1 "$GITHUB_WORKSPACE/source.json" --clobber
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url: .url, assets: [.assets[].name]}'
 
       - name: Update public/source.json
         env:

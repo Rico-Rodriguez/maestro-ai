@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -115,6 +117,8 @@ test('public/source.json is valid AltStore/SideStore source JSON', () => {
   assert.equal(latest.minOSVersion, '15.0');
   assert.ok(typeof latest.buildVersion === 'string' && latest.buildVersion.length > 0);
   assert.ok(!Number.isNaN(Date.parse(latest.date)));
+  assert.match(app.versionDate, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.match(latest.date, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
 });
 
 test('buildSideloadSource formats all required AltStore v2 fields', () => {
@@ -167,4 +171,79 @@ test('buildSideloadSource formats all required AltStore v2 fields', () => {
       minOSVersion: '15.0',
     },
   ]);
+});
+
+test('buildSideloadSource strips fractional seconds and merges/deduplicates existingVersions', () => {
+  const existingVersions = Array.from({ length: 11 }, (_, idx) => {
+    const num = 42 - idx;
+    return {
+      version: `1.0.${num}`,
+      buildVersion: String(num),
+      date: `2026-11-${String(20 - idx).padStart(2, '0')}T04:00:00Z`,
+      localizedDescription: `Old ${num}`,
+      downloadURL: `https://example.com/MaestroAI-1.0.${num}.ipa`,
+      size: 13000000 + num,
+      minOSVersion: '15.0',
+    };
+  });
+
+  const source = buildSideloadSource({
+    version: '1.0.42',
+    buildVersion: 42,
+    date: '2026-11-27T18:45:04.123Z',
+    size: 14000000,
+    description: 'New 42',
+    downloadURL: 'https://example.com/MaestroAI-1.0.42.ipa',
+    existingVersions,
+  });
+
+  const [app] = source.apps;
+  assert.equal(app.versionDate, '2026-11-27T18:45:04Z');
+  assert.equal(app.versions.length, 10);
+  assert.equal(app.versions[0].version, '1.0.42');
+  assert.equal(app.versions[0].date, '2026-11-27T18:45:04Z');
+  assert.equal(app.versions[0].localizedDescription, 'New 42');
+  assert.equal(app.versions.filter((entry) => entry.version === '1.0.42').length, 1);
+  assert.equal(app.versions[1].version, '1.0.41');
+  assert.equal(app.versions[9].version, '1.0.33');
+});
+
+test('update-sideload-source CLI merges --existing and ignores missing --existing file', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'maestro-source-'));
+  const scriptPath = path.join(root, 'scripts', 'update-sideload-source.mjs');
+  const outPath = path.join(tmpDir, 'source.json');
+  const missingPath = path.join(tmpDir, 'does-not-exist.json');
+
+  try {
+    execFileSync(process.execPath, [
+      scriptPath,
+      '--version', '1.0.14',
+      '--build', '14',
+      '--size', '1000',
+      '--date', '2026-11-27T18:00:00.500Z',
+      '--existing', missingPath,
+      '--out', outPath,
+    ]);
+    const first = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    assert.equal(first.sourceURL, 'https://github.com/Rico-Rodriguez/maestro-ai/releases/latest/download/source.json');
+    assert.equal(first.apps[0].versions.length, 1);
+    assert.equal(first.apps[0].versionDate, '2026-11-27T18:00:00Z');
+
+    execFileSync(process.execPath, [
+      scriptPath,
+      '--version', '1.0.15',
+      '--build', '15',
+      '--size', '2000',
+      '--date', '2026-11-27T19:00:00.250Z',
+      '--existing', outPath,
+      '--out', outPath,
+    ]);
+    const second = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    assert.deepEqual(
+      second.apps[0].versions.map((entry) => entry.version),
+      ['1.0.15', '1.0.14'],
+    );
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
