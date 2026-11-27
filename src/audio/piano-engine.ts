@@ -807,6 +807,7 @@ export class PianoAudioEngine {
   }
 
   private applyAudioSession(): void {
+    void globalThis.__maestroPrimeAudioSession?.(this.recording)?.catch?.(() => {});
     if (typeof navigator === 'undefined') return;
     const nav = navigator as NavigatorWithAudioSession;
     if (!nav.audioSession) return;

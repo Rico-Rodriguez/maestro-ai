@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { midiAuthorization } from './score-http.mjs';
+import { midiAuthorization, rememberSalt, saltCandidates } from './score-http.mjs';
 
 export { midiAuthorization };
 
@@ -127,11 +127,18 @@ export async function readScoreInChrome(pageUrl, signal) {
     await delay(500);
   }
   if (!report?.ready || !/^\d+$/.test(report.scoreId || '')) return { kind: 'unavailable' };
-  const file = await cdp(tab.webSocketDebuggerUrl, 'Runtime.evaluate', {
-    expression: readMidiSource(report.scoreId, midiAuthorization(report.scoreId)),
-    awaitPromise: true,
-    returnByValue: true,
-  });
+  let file = null;
+  for (const salt of saltCandidates()) {
+    file = await cdp(tab.webSocketDebuggerUrl, 'Runtime.evaluate', {
+      expression: readMidiSource(report.scoreId, midiAuthorization(report.scoreId, salt)),
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    if (file?.ok) {
+      rememberSalt(salt);
+      break;
+    }
+  }
   if (!file?.ok) return { kind: 'no-midi', title: report.title, scoreId: report.scoreId };
   const bytes = Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0));
   if (classifyDownload(bytes) !== 'midi') {
