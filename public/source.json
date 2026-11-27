@@ -19,19 +19,19 @@
       "iconURL": "https://rico-rodriguez.github.io/maestro-ai/icon-1024.png",
       "tintColor": "#D97706",
       "category": "music",
-      "version": "1.0",
-      "versionDate": "2026-11-27T03:47:41Z",
-      "versionDescription": "Redesigned Maestro AI piano studio with sampled piano, beaming sheet music, YIN mic detection, and MuseScore salt fixes.",
+      "version": "1.0.10",
+      "versionDate": "2026-11-27T04:02:23.880Z",
+      "versionDescription": "Maestro AI iOS build 1.0.10 (2de0b3b).",
       "downloadURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/MaestroAI.ipa",
-      "size": 13127913,
+      "size": 13130154,
       "versions": [
         {
-          "version": "1.0",
-          "buildVersion": "1",
-          "date": "2026-11-27T03:47:41Z",
-          "localizedDescription": "Redesigned Maestro AI piano studio with sampled piano, beaming sheet music, YIN mic detection, and MuseScore salt fixes.",
+          "version": "1.0.10",
+          "buildVersion": "10",
+          "date": "2026-11-27T04:02:23.880Z",
+          "localizedDescription": "Maestro AI iOS build 1.0.10 (2de0b3b).",
           "downloadURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/MaestroAI.ipa",
-          "size": 13127913,
+          "size": 13130154,
           "minOSVersion": "15.0"
         }
       ],
