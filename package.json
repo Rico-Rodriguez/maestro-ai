@@ -8,13 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "phone": "vite build && node server/phone.mjs",
-    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs test/practice-session.test.mjs test/score-pdf.test.mjs"
+    "test": "node --test test/musescore.test.mjs test/library.test.mjs test/helper-endpoint.test.mjs test/score-http.test.mjs test/phone-cors.test.mjs test/score-pdf.test.mjs test/practice-session.test.mjs test/midi-parser.test.mjs test/yin-pitch.test.mjs test/practice-engine.test.mjs test/piano-geometry.test.mjs"
   },
   "dependencies": {
     "@cloudflare/puppeteer": "^1.4.0",
+    "@tonejs/midi": "^2.0.28",
     "lucide-react": "^1.16.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "smplr": "^1.2.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",

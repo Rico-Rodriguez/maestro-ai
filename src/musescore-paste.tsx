@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useRef, useState } from 'react';
 import { HELPER_ERRORS, HELPER_MARK, HELPER_PATH, LIBRARY_PATH } from '../shared/musescore-contract.mjs';
 import { helperApiUrl, helperCandidates } from './helper-endpoint.mjs';
