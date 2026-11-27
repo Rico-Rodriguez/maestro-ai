@@ -640,7 +640,7 @@ export default function PracticeStudio({
       octaveShift={octaveShift}
       onOctaveShift={shiftOctave}
       userPressedNotes={userPressedNotes}
-      expectedNotes={expectedNotes}
+      expectedNotes={practiceState.mode === 'listen' ? [] : expectedNotes}
       getPlaybackPitches={getPlaybackPitches}
       getPlaybackSustain={getPlaybackSustain}
       userSustainDown={userSustainDown}
@@ -1213,11 +1213,11 @@ export default function PracticeStudio({
           </div>
 
           <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] sm:gap-3 sm:text-xs">
-            <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-400">
-              {nextChip}
-            </span>
             {practiceState.mode !== 'listen' ? (
               <>
+                <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-400">
+                  {nextChip}
+                </span>
                 <span className="hidden sm:inline">
                   <span className={mutedText}>Hits </span>
                   <strong>{practiceState.stats.hits}</strong>
@@ -1360,6 +1360,9 @@ export default function PracticeStudio({
                   onColorModeChange={setColorMode}
                   flushBottom
                   hideToolbar={Boolean(kidLocked)}
+                  canShiftOctave={rangeMode === 'kid' || rangeMode === 'compact'}
+                  octaveShift={octaveShift}
+                  onOctaveShift={shiftOctave}
                 />
               </div>
 

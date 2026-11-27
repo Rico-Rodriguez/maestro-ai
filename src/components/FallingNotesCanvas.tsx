@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NoteEvent, TimeSigPoint } from '../music/types';
 import type { PracticeGrade } from '../practice/engine';
-import { getNotePalette, type ColorMode, type NotePalette } from './note-colors';
+import { getKeyStickerColor, getNotePalette, type ColorMode, type NotePalette } from './note-colors';
 import type { PianoLayout } from './piano-geometry';
 
 export interface FallingNotesCanvasProps {
@@ -16,6 +16,9 @@ export interface FallingNotesCanvasProps {
   onColorModeChange?: (mode: ColorMode) => void;
   flushBottom?: boolean;
   hideToolbar?: boolean;
+  canShiftOctave?: boolean;
+  octaveShift?: number;
+  onOctaveShift?: (delta: number) => void;
 }
 
 interface MeasureLine {
@@ -33,6 +36,16 @@ interface SparkleParticle {
   decay: number;
   color: string;
   isStar: boolean;
+}
+
+interface DrawableBar {
+  ev: NoteEvent;
+  barX: number;
+  barW: number;
+  clampedTop: number;
+  barH: number;
+  palette: NotePalette;
+  isActive: boolean;
 }
 
 const STRIKE_OFFSET_PX = 8;
@@ -200,6 +213,9 @@ export function FallingNotesCanvas({
   onColorModeChange,
   flushBottom = false,
   hideToolbar = false,
+  canShiftOctave = false,
+  octaveShift = 0,
+  onOctaveShift,
 }: FallingNotesCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -508,15 +524,14 @@ export function FallingNotesCanvas({
           }
         }
 
+        const whiteBars: DrawableBar[] = [];
+        const blackBars: DrawableBar[] = [];
         const activeBursts: Array<{ x: number; w: number; palette: NotePalette }> = [];
         const currentActiveIds = new Set<string>();
         const startEventIdx = lowerBoundOnset(
           evData.sorted,
           visibleMinBeat - evData.maxDuration - 0.5,
         );
-
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
 
         for (let i = startEventIdx; i < evData.sorted.length; i += 1) {
           const ev = evData.sorted[i];
@@ -529,7 +544,9 @@ export function FallingNotesCanvas({
 
           const colX = geom.x * width;
           const colW = geom.width * width;
-          const inset = Math.min(1.5, colW * 0.08);
+          const inset = geom.isBlack
+            ? Math.min(1.5, colW * 0.08)
+            : Math.max(2, colW * 0.12);
           const barX = colX + inset;
           const barW = Math.max(3, colW - inset * 2);
 
@@ -564,6 +581,16 @@ export function FallingNotesCanvas({
             spawnParticles(barX, strikeY, barW, palette, 5);
           }
 
+          const bar: DrawableBar = { ev, barX, barW, clampedTop, barH, palette, isActive };
+          if (geom.isBlack) {
+            blackBars.push(bar);
+          } else {
+            whiteBars.push(bar);
+          }
+        }
+        prevActiveIds = currentActiveIds;
+
+        const drawNoteBar = ({ ev, barX, barW, clampedTop, barH, palette, isActive }: DrawableBar) => {
           const grad = ctx.createLinearGradient(0, clampedTop, 0, clampedTop + barH);
           grad.addColorStop(0, palette.top);
           grad.addColorStop(1, palette.bottom);
@@ -601,7 +628,11 @@ export function FallingNotesCanvas({
             const labelY = Math.min(clampedTop + barH - 3.5, strikeY - 3.5);
             if (labelY - clampedTop >= 7.5) {
               const labelText =
-                barW >= 20 && barH >= 14 ? ev.pitchName : ev.pitchName.replace(/-?\d+$/, '');
+                activeColorMode === 'rainbow'
+                  ? getKeyStickerColor(ev.pitch).shortLabel
+                  : barW >= 20 && barH >= 14
+                    ? ev.pitchName
+                    : ev.pitchName.replace(/-?\d+$/, '');
               ctx.font =
                 barW >= 20
                   ? '700 10px ui-sans-serif, system-ui, -apple-system, sans-serif'
@@ -614,8 +645,16 @@ export function FallingNotesCanvas({
               ctx.fillText(labelText, barX + barW / 2, labelY, barW - 3);
             }
           }
+        };
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        for (let i = 0; i < whiteBars.length; i += 1) {
+          drawNoteBar(whiteBars[i]);
         }
-        prevActiveIds = currentActiveIds;
+        for (let i = 0; i < blackBars.length; i += 1) {
+          drawNoteBar(blackBars[i]);
+        }
 
         const strikeGlow = ctx.createLinearGradient(0, strikeY - 14, 0, height);
         strikeGlow.addColorStop(0, 'rgba(245, 158, 11, 0)');
@@ -703,35 +742,70 @@ export function FallingNotesCanvas({
               : 'border-stone-300/75 bg-[#f3efe6] text-stone-700',
           ].join(' ')}
         >
-          <div
-            className={[
-              'inline-flex items-center rounded-md border p-0.5',
-              darkMode ? 'border-stone-700 bg-stone-800' : 'border-stone-300 bg-white/70',
-            ].join(' ')}
-          >
-            {SPEED_OPTIONS.map((opt) => {
-              const active = lookaheadBeats === opt.beats;
-              return (
+          <div className="flex items-center gap-1.5">
+            <div
+              className={[
+                'inline-flex items-center rounded-md border p-0.5',
+                darkMode ? 'border-stone-700 bg-stone-800' : 'border-stone-300 bg-white/70',
+              ].join(' ')}
+            >
+              {SPEED_OPTIONS.map((opt) => {
+                const active = lookaheadBeats === opt.beats;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setLookaheadBeats(opt.beats)}
+                    className={[
+                      'rounded px-2 py-0.5 text-[10px] font-semibold transition',
+                      active
+                        ? darkMode
+                          ? 'bg-stone-700 text-amber-300 shadow-sm'
+                          : 'bg-white text-stone-900 shadow-sm'
+                        : darkMode
+                          ? 'text-stone-400 hover:text-stone-200'
+                          : 'text-stone-600 hover:text-stone-900',
+                    ].join(' ')}
+                    title={`Show ${opt.beats} beats ahead`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {canShiftOctave && onOctaveShift && (
+              <div className="inline-flex items-center gap-1">
                 <button
-                  key={opt.id}
                   type="button"
-                  onClick={() => setLookaheadBeats(opt.beats)}
+                  disabled={octaveShift <= -2}
+                  onClick={() => onOctaveShift(-1)}
                   className={[
-                    'rounded px-2 py-0.5 text-[10px] font-semibold transition',
-                    active
-                      ? darkMode
-                        ? 'bg-stone-700 text-amber-300 shadow-sm'
-                        : 'bg-white text-stone-900 shadow-sm'
-                      : darkMode
-                        ? 'text-stone-400 hover:text-stone-200'
-                        : 'text-stone-600 hover:text-stone-900',
+                    'rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition disabled:opacity-40 disabled:pointer-events-none',
+                    darkMode
+                      ? 'border-stone-700 bg-stone-800 text-stone-200 hover:bg-stone-700'
+                      : 'border-stone-300 bg-white/70 text-stone-700 hover:bg-white',
                   ].join(' ')}
-                  title={`Show ${opt.beats} beats ahead`}
+                  title="Shift keyboard down an octave"
                 >
-                  {opt.label}
+                  -8va
                 </button>
-              );
-            })}
+                <button
+                  type="button"
+                  disabled={octaveShift >= 3}
+                  onClick={() => onOctaveShift(1)}
+                  className={[
+                    'rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition disabled:opacity-40 disabled:pointer-events-none',
+                    darkMode
+                      ? 'border-stone-700 bg-stone-800 text-stone-200 hover:bg-stone-700'
+                      : 'border-stone-300 bg-white/70 text-stone-700 hover:bg-white',
+                  ].join(' ')}
+                  title="Shift keyboard up an octave"
+                >
+                  +8va
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
