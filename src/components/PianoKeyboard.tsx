@@ -618,27 +618,6 @@ export function PianoKeyboard({
       <div className="relative w-full">
         <div className="h-[4px] w-full bg-gradient-to-b from-red-950 via-red-800 to-red-950 shadow-[0_2px_4px_rgba(0,0,0,0.6)]" />
 
-        {flushTop && showOctaveButtons && (
-          <>
-            <button
-              type="button"
-              disabled={octaveShift <= -2}
-              onClick={() => onOctaveShift(-1)}
-              className="absolute top-2 left-1.5 z-20 px-2 py-0.5 rounded-md text-[10px] font-bold bg-stone-900/75 hover:bg-stone-800/90 backdrop-blur-sm disabled:opacity-35 disabled:pointer-events-none text-stone-100 border border-white/15 shadow-sm"
-            >
-              -8va
-            </button>
-            <button
-              type="button"
-              disabled={octaveShift >= 3}
-              onClick={() => onOctaveShift(1)}
-              className="absolute top-2 right-1.5 z-20 px-2 py-0.5 rounded-md text-[10px] font-bold bg-stone-900/75 hover:bg-stone-800/90 backdrop-blur-sm disabled:opacity-35 disabled:pointer-events-none text-stone-100 border border-white/15 shadow-sm"
-            >
-              +8va
-            </button>
-          </>
-        )}
-
         <div
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
