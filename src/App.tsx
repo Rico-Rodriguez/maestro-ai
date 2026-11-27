@@ -227,16 +227,18 @@ export default function App() {
             : 'border-stone-200/90 bg-[#f6f3ec]/90'
         }`}
       >
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-600 text-stone-950 shadow-sm">
+        <div className="mx-auto flex max-w-[1440px] flex-nowrap items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-2.5">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-600 text-stone-950 shadow-sm sm:h-8 sm:w-8">
                 <Music2 className="h-4 w-4" />
               </div>
               <div>
-                <span className="font-display text-2xl leading-none tracking-tight">Maestro</span>
+                <span className="font-display text-xl leading-none tracking-tight sm:text-2xl">
+                  Maestro
+                </span>
                 <span
-                  className={`ml-2 hidden text-[11px] font-medium uppercase tracking-widest sm:inline ${
+                  className={`ml-2 hidden text-[11px] font-medium uppercase tracking-widest md:inline ${
                     darkMode ? 'text-stone-400' : 'text-stone-500'
                   }`}
                 >
@@ -247,14 +249,14 @@ export default function App() {
 
             <nav
               aria-label="Primary"
-              className={`inline-flex items-center rounded-xl border p-0.5 ${
+              className={`inline-flex shrink-0 items-center rounded-xl border p-0.5 ${
                 darkMode ? 'border-stone-800 bg-stone-900' : 'border-stone-200 bg-stone-200/60'
               }`}
             >
               <button
                 type="button"
                 onClick={() => setTab('practice')}
-                className={`rounded-lg px-3.5 py-1 text-xs font-semibold transition ${
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition sm:px-3.5 ${
                   tab === 'practice'
                     ? darkMode
                       ? 'bg-stone-800 text-amber-300 shadow-sm'
@@ -269,7 +271,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setTab('library')}
-                className={`rounded-lg px-3.5 py-1 text-xs font-semibold transition ${
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition sm:px-3.5 ${
                   tab === 'library'
                     ? darkMode
                       ? 'bg-stone-800 text-amber-300 shadow-sm'
@@ -284,7 +286,7 @@ export default function App() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={handleConnectMidi}
@@ -293,7 +295,7 @@ export default function App() {
                   ? midiDevices.map((d) => d.name).join(', ')
                   : 'Connect Web MIDI keyboard'
               }
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
                 midiDevices.length > 0
                   ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
                   : darkMode
@@ -309,7 +311,7 @@ export default function App() {
               type="button"
               onClick={() => void handleToggleMic()}
               title={micActive ? 'Stop acoustic microphone' : 'Enable acoustic microphone'}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
                 micActive
                   ? 'border-rose-500/40 bg-rose-500/15 text-rose-400'
                   : darkMode
@@ -318,9 +320,13 @@ export default function App() {
               }`}
             >
               {micActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-              <span>
-                {micActive ? (micPitch ? micPitch.name : 'Mic On') : 'Mic'}
-              </span>
+              {micActive ? (
+                <span className="max-w-[44px] truncate sm:max-w-none">
+                  {micPitch ? micPitch.name : 'On'}
+                </span>
+              ) : (
+                <span className="hidden sm:inline">Mic</span>
+              )}
             </button>
 
             <button
@@ -346,7 +352,7 @@ export default function App() {
         ) : null}
       </header>
 
-      <main>
+      <main className="px-2.5 py-2 sm:px-6 sm:py-4">
         <div className={tab === 'practice' ? '' : 'hidden'}>
           <PracticeStudio
             score={activeScore}

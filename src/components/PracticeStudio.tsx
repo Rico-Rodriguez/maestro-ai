@@ -107,8 +107,8 @@ const LAYOUT_OPTIONS: readonly { id: StudioViewLayout; label: string }[] = [
 
 const HAND_OPTIONS: readonly { id: HandFilter; label: string }[] = [
   { id: 'BOTH', label: 'Both' },
-  { id: 'R', label: 'Right' },
-  { id: 'L', label: 'Left' },
+  { id: 'R', label: 'R' },
+  { id: 'L', label: 'L' },
 ];
 
 export default function PracticeStudio({
@@ -574,14 +574,14 @@ export default function PracticeStudio({
   const hasDeviceActive = midiDevices.length > 0 || micActive;
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-3 py-3 sm:px-5">
-      <div className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-2 ${surface}`}>
-        <div className="flex flex-wrap items-center gap-2">
+    <div className="mx-auto flex max-w-[1440px] flex-col gap-2.5">
+      <div className={`flex flex-col gap-2 rounded-2xl border px-2.5 py-2 sm:px-3 lg:flex-row lg:items-center lg:justify-between ${surface}`}>
+        <div className="flex w-full items-center gap-1.5 sm:w-auto sm:flex-1 sm:gap-2">
           <button
             type="button"
             disabled={!score}
             onClick={togglePlay}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-semibold text-stone-950 shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-stone-950 shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3.5"
           >
             {practiceState.running ? (
               <>
@@ -601,7 +601,7 @@ export default function PracticeStudio({
             disabled={!score}
             onClick={handleRestart}
             title="Restart"
-            className={`inline-flex items-center justify-center rounded-xl border p-1.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
+            className={`inline-flex shrink-0 items-center justify-center rounded-xl border p-1.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
@@ -611,7 +611,7 @@ export default function PracticeStudio({
             value={selectValue}
             disabled={scoreBusy}
             onChange={(e) => handleScoreDropdown(e.target.value)}
-            className={`max-w-[220px] truncate rounded-xl border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${
+            className={`min-w-0 flex-1 truncate rounded-xl border px-2 py-1.5 text-xs font-medium focus:outline-none sm:max-w-[220px] sm:px-2.5 ${
               darkMode
                 ? 'border-stone-800 bg-stone-950 text-stone-100'
                 : 'border-stone-200 bg-stone-50 text-stone-800'
@@ -638,6 +638,26 @@ export default function PracticeStudio({
             ) : null}
           </select>
 
+          <button
+            type="button"
+            onClick={() => setShowSettings((prev) => !prev)}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition sm:hidden ${
+              showSettings
+                ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
+                : subtleBtn
+            }`}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Studio</span>
+            <span
+              className={`h-2 w-2 rounded-full ${
+                hasDeviceActive ? 'bg-emerald-400' : 'bg-stone-500/60'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className="flex w-full items-center justify-between gap-1.5 sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
           <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
             {PRACTICE_MODES.map((m) => (
               <button
@@ -645,7 +665,7 @@ export default function PracticeStudio({
                 type="button"
                 title={m.hint}
                 onClick={() => handleModeChange(m.id)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition sm:px-2.5 sm:text-xs ${
                   practiceState.mode === m.id ? pillActive : pillInactive
                 }`}
               >
@@ -654,7 +674,7 @@ export default function PracticeStudio({
             ))}
           </div>
 
-          <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+          <div className={`hidden items-center rounded-xl border p-0.5 sm:inline-flex ${pillGroup}`}>
             {HAND_OPTIONS.map((h) => (
               <button
                 key={h.id}
@@ -668,13 +688,11 @@ export default function PracticeStudio({
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setShowSettings((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-xs font-medium transition ${subtleBtn}`}
+            className={`hidden items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-xs font-medium transition sm:inline-flex ${subtleBtn}`}
             title="Tempo & studio settings"
           >
             <span>{effectiveBpm} BPM</span>
@@ -689,7 +707,7 @@ export default function PracticeStudio({
                 key={opt.id}
                 type="button"
                 onClick={() => setViewLayout(opt.id)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition sm:px-2.5 sm:text-xs ${
                   viewLayout === opt.id ? pillActive : pillInactive
                 }`}
               >
@@ -701,7 +719,7 @@ export default function PracticeStudio({
           <button
             type="button"
             onClick={() => setShowSettings((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+            className={`hidden items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition sm:inline-flex ${
               showSettings
                 ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
                 : subtleBtn
@@ -721,16 +739,45 @@ export default function PracticeStudio({
             disabled={!score}
             onClick={() => score && onExportPdf(score)}
             title="Export sheet music PDF"
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
+            className={`hidden items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex ${subtleBtn}`}
           >
             <FileDown className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">PDF</span>
+            <span>PDF</span>
           </button>
         </div>
       </div>
 
       {showSettings ? (
         <section className={`rounded-2xl border p-4 ${surface}`}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/40 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold">Hand Focus</span>
+              <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                {HAND_OPTIONS.map((h) => (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => handleHandChange(h.id)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                      practiceState.handFilter === h.id ? pillActive : pillInactive
+                    }`}
+                  >
+                    {h.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={!score}
+              onClick={() => score && onExportPdf(score)}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              <span>Export PDF</span>
+            </button>
+          </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-3">
               <div>
@@ -983,8 +1030,8 @@ export default function PracticeStudio({
       ) : null}
 
       {score ? (
-        <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3.5 py-2 text-xs ${surface}`}>
-          <div className="flex min-w-0 items-center gap-2.5">
+        <div className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-1.5 text-xs ${surface}`}>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <span
               className={`h-2 w-2 shrink-0 rounded-full ${
                 practiceState.lastFeedback.status === 'hit'
@@ -1000,11 +1047,11 @@ export default function PracticeStudio({
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
+          <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] sm:gap-3 sm:text-xs">
             <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-400">
               {nextChip}
             </span>
-            <span>
+            <span className="hidden sm:inline">
               <span className={mutedText}>Hits </span>
               <strong>{practiceState.stats.hits}</strong>
             </span>
@@ -1115,15 +1162,23 @@ export default function PracticeStudio({
           ) : null}
 
           {viewLayout === 'falling' || viewLayout === 'combined' ? (
-            <FallingNotesCanvas
-              events={filteredEvents}
-              layout={pianoLayout}
-              timeSignatures={score.timeSignatures}
-              defaultBeatsPerMeasure={defaultBeatsPerMeasure}
-              grades={practiceState.grades}
-              getLiveBeat={getLiveBeat}
-              darkMode={darkMode}
-            />
+            <div
+              className={[
+                'overflow-hidden rounded-2xl border',
+                darkMode ? 'border-stone-800' : 'border-stone-300/80',
+                viewLayout === 'combined' ? 'h-36 sm:h-48 lg:h-56' : 'h-64 sm:h-80 lg:h-96',
+              ].join(' ')}
+            >
+              <FallingNotesCanvas
+                events={filteredEvents}
+                layout={pianoLayout}
+                timeSignatures={score.timeSignatures}
+                defaultBeatsPerMeasure={defaultBeatsPerMeasure}
+                grades={practiceState.grades}
+                getLiveBeat={getLiveBeat}
+                darkMode={darkMode}
+              />
+            </div>
           ) : null}
         </div>
       )}

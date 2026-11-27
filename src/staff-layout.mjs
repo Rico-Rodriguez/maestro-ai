@@ -35,9 +35,9 @@ export function groupStaffEvents(events, onsetSlack = 0.12) {
   return groups;
 }
 
-export function layoutStaffGroup(notes) {
+export function layoutStaffGroup(notes, stemUpOverride) {
   const steps = notes.map((note) => note.stepOffset);
-  const stemUp = stemGoesUp(steps);
+  const stemUp = typeof stemUpOverride === 'boolean' ? stemUpOverride : stemGoesUp(steps);
   const dxs = chordColumns(steps, stemUp);
   const placed = notes.map((note, index) => ({ ...note, dx: dxs[index] }));
   const stemX = stemUp
