@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: ios-ipa
@@ -120,6 +121,8 @@ jobs:
           gh release view ios-v1 --json url,assets --jq '{url: .url, assets: [.assets[].name]}'
 
       - name: Update public/source.json
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -129,4 +132,5 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "chore(ios): update sideload source.json for 1.0.${{ github.run_number }}"
             git pull --rebase origin main && git push origin HEAD:main
+            gh workflow run deploy.yml --ref main
           fi

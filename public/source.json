@@ -3,7 +3,7 @@
   "subtitle": "Interactive Piano Studio",
   "description": "Practice sheet music and falling notes with sampled piano audio, MuseScore import, MIDI keyboard, and microphone pitch detection.",
   "iconURL": "https://rico-rodriguez.github.io/maestro-ai/icon-1024.png",
-  "sourceURL": "https://rico-rodriguez.github.io/maestro-ai/source.json",
+  "sourceURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/source.json",
   "identifier": "com.rico.maestroai.source",
   "tintColor": "#D97706",
   "featuredApps": [
