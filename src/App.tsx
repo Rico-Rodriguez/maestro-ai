@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Moon, Music2, Sun, Usb } from 'lucide-react';
+import { Lock, LockOpen, Mic, MicOff, Moon, Music2, Sun, Usb } from 'lucide-react';
 import { pianoEngine, type AudioEngineStatus } from './audio/piano-engine';
 import LibraryView, { type MuseScoreController } from './components/LibraryView';
 import PracticeStudio from './components/PracticeStudio';
@@ -54,6 +54,7 @@ function downloadScorePdf(score: Score): void {
 
 export default function App() {
   const [tab, setTab] = useState<AppTab>('practice');
+  const [kidLocked, setKidLocked] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [sessionScores, setSessionScores] = useState<Score[]>([]);
   const [activeScore, setActiveScore] = useState<Score | null>(null);
@@ -266,101 +267,139 @@ export default function App() {
               </div>
             </div>
 
-            <nav
-              aria-label="Primary"
-              className={`inline-flex shrink-0 items-center rounded-xl border p-0.5 ${
-                darkMode ? 'border-stone-800 bg-stone-900' : 'border-stone-200 bg-stone-200/60'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setTab('practice')}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition sm:px-3.5 ${
-                  tab === 'practice'
-                    ? darkMode
-                      ? 'bg-stone-800 text-amber-300 shadow-sm'
-                      : 'bg-white text-stone-900 shadow-sm'
-                    : darkMode
-                      ? 'text-stone-400 hover:text-stone-200'
-                      : 'text-stone-600 hover:text-stone-900'
+            {!kidLocked ? (
+              <nav
+                aria-label="Primary"
+                className={`inline-flex shrink-0 items-center rounded-xl border p-0.5 ${
+                  darkMode ? 'border-stone-800 bg-stone-900' : 'border-stone-200 bg-stone-200/60'
                 }`}
               >
-                Practice
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('library')}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition sm:px-3.5 ${
-                  tab === 'library'
-                    ? darkMode
-                      ? 'bg-stone-800 text-amber-300 shadow-sm'
-                      : 'bg-white text-stone-900 shadow-sm'
-                    : darkMode
-                      ? 'text-stone-400 hover:text-stone-200'
-                      : 'text-stone-600 hover:text-stone-900'
-                }`}
-              >
-                Library
-              </button>
-            </nav>
+                <button
+                  type="button"
+                  onClick={() => setTab('practice')}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition sm:px-3.5 ${
+                    tab === 'practice'
+                      ? darkMode
+                        ? 'bg-stone-800 text-amber-300 shadow-sm'
+                        : 'bg-white text-stone-900 shadow-sm'
+                      : darkMode
+                        ? 'text-stone-400 hover:text-stone-200'
+                        : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  Practice
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('library')}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition sm:px-3.5 ${
+                    tab === 'library'
+                      ? darkMode
+                        ? 'bg-stone-800 text-amber-300 shadow-sm'
+                        : 'bg-white text-stone-900 shadow-sm'
+                      : darkMode
+                        ? 'text-stone-400 hover:text-stone-200'
+                        : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  Library
+                </button>
+              </nav>
+            ) : null}
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={handleConnectMidi}
-              title={
-                midiDevices.length > 0
-                  ? midiDevices.map((d) => d.name).join(', ')
-                  : 'Connect Web MIDI keyboard'
-              }
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
-                midiDevices.length > 0
-                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
-                  : darkMode
-                    ? 'border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800'
-                    : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
-              }`}
-            >
-              <Usb className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{midiBadgeLabel}</span>
-            </button>
+            {kidLocked ? (
+              <button
+                type="button"
+                onClick={() => setKidLocked(false)}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                  darkMode
+                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                    : 'border-amber-600/30 bg-amber-100 text-amber-900 hover:bg-amber-200'
+                }`}
+              >
+                <LockOpen className="h-3.5 w-3.5" />
+                <span>Unlock</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleConnectMidi}
+                  title={
+                    midiDevices.length > 0
+                      ? midiDevices.map((d) => d.name).join(', ')
+                      : 'Connect Web MIDI keyboard'
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
+                    midiDevices.length > 0
+                      ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
+                      : darkMode
+                        ? 'border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800'
+                        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
+                  }`}
+                >
+                  <Usb className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{midiBadgeLabel}</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => void handleToggleMic()}
-              title={micActive ? 'Stop acoustic microphone' : 'Enable acoustic microphone'}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
-                micActive
-                  ? 'border-rose-500/40 bg-rose-500/15 text-rose-400'
-                  : darkMode
-                    ? 'border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800'
-                    : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
-              }`}
-            >
-              {micActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-              {micActive ? (
-                <span className="max-w-[44px] truncate sm:max-w-none">
-                  {micPitch ? micPitch.name : 'On'}
-                </span>
-              ) : (
-                <span className="hidden sm:inline">Mic</span>
-              )}
-            </button>
+                <button
+                  type="button"
+                  onClick={() => void handleToggleMic()}
+                  title={micActive ? 'Stop acoustic microphone' : 'Enable acoustic microphone'}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
+                    micActive
+                      ? 'border-rose-500/40 bg-rose-500/15 text-rose-400'
+                      : darkMode
+                        ? 'border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800'
+                        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
+                  }`}
+                >
+                  {micActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                  {micActive ? (
+                    <span className="max-w-[44px] truncate sm:max-w-none">
+                      {micPitch ? micPitch.name : 'On'}
+                    </span>
+                  ) : (
+                    <span className="hidden sm:inline">Mic</span>
+                  )}
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setDarkMode((prev) => !prev)}
-              aria-label={darkMode ? 'Switch to Warm Ivory Paper theme' : 'Switch to Dark Concert Studio theme'}
-              title={darkMode ? 'Warm Ivory Paper' : 'Dark Concert Studio'}
-              className={`inline-flex items-center justify-center rounded-xl border p-1.5 transition ${
-                darkMode
-                  ? 'border-stone-800 bg-stone-900 text-amber-300 hover:bg-stone-800'
-                  : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
-              }`}
-            >
-              {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab('practice');
+                    setKidLocked(true);
+                  }}
+                  title="Lock controls for toddler practice"
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
+                    darkMode
+                      ? 'border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800'
+                      : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
+                  }`}
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Kid Lock</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDarkMode((prev) => !prev)}
+                  aria-label={
+                    darkMode ? 'Switch to Warm Ivory Paper theme' : 'Switch to Dark Concert Studio theme'
+                  }
+                  title={darkMode ? 'Warm Ivory Paper' : 'Dark Concert Studio'}
+                  className={`inline-flex items-center justify-center rounded-xl border p-1.5 transition ${
+                    darkMode
+                      ? 'border-stone-800 bg-stone-900 text-amber-300 hover:bg-stone-800'
+                      : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
+                  }`}
+                >
+                  {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -397,10 +436,12 @@ export default function App() {
             viewActive={tab === 'practice'}
             registerNoteHandler={registerNoteHandler}
             registerMicGate={registerMicGate}
+            kidLocked={kidLocked}
+            onExitKidLock={() => setKidLocked(false)}
           />
         </div>
 
-        {tab === 'library' ? (
+        {!kidLocked && tab === 'library' ? (
           <LibraryView
             darkMode={darkMode}
             museScore={museScore}

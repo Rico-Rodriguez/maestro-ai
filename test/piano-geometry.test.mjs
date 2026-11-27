@@ -7,9 +7,10 @@ import { createServer } from 'vite';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let viteServer;
 let geomModule;
+let colorsModule;
 
-async function loadGeomModule() {
-  if (!geomModule) {
+async function ensureViteServer() {
+  if (!viteServer) {
     viteServer = await createServer({
       root,
       configFile: path.join(root, 'vite.config.ts'),
@@ -17,9 +18,24 @@ async function loadGeomModule() {
       appType: 'custom',
       logLevel: 'error',
     });
-    geomModule = await viteServer.ssrLoadModule('/src/components/piano-geometry.ts');
+  }
+  return viteServer;
+}
+
+async function loadGeomModule() {
+  if (!geomModule) {
+    const server = await ensureViteServer();
+    geomModule = await server.ssrLoadModule('/src/components/piano-geometry.ts');
   }
   return geomModule;
+}
+
+async function loadColorsModule() {
+  if (!colorsModule) {
+    const server = await ensureViteServer();
+    colorsModule = await server.ssrLoadModule('/src/components/note-colors.ts');
+  }
+  return colorsModule;
 }
 
 after(async () => {
@@ -93,4 +109,99 @@ test('buildPianoLayout places every black key inside [0, 1] near the boundary be
       );
     }
   }
+});
+
+test('computePianoRange handles kid mode with giant 15-key C4..D5 white-key bounds and octave shifts', async () => {
+  const { computePianoRange, buildPianoLayout } = await loadGeomModule();
+
+  const kidDefault = computePianoRange('kid', undefined, undefined, 0);
+  assert.deepEqual(kidDefault, { minMidi: 60, maxMidi: 74 });
+  assert.equal(isWhite(kidDefault.minMidi), true);
+  assert.equal(isWhite(kidDefault.maxMidi), true);
+
+  const kidLayout = buildPianoLayout(kidDefault.minMidi, kidDefault.maxMidi);
+  assert.equal(kidLayout.whiteCount, 9);
+  assert.equal(kidLayout.allKeys.length, 15);
+
+  assert.deepEqual(computePianoRange('kid', undefined, undefined, -1), { minMidi: 48, maxMidi: 62 });
+  assert.deepEqual(computePianoRange('kid', undefined, undefined, 1), { minMidi: 72, maxMidi: 86 });
+  assert.deepEqual(computePianoRange('kid', undefined, undefined, -4), { minMidi: 24, maxMidi: 38 });
+  assert.deepEqual(computePianoRange('kid', undefined, undefined, 4), { minMidi: 96, maxMidi: 108 });
+});
+
+test('autoOctaveShiftForPitches keeps current shift when covered and shifts toward out-of-range targets', async () => {
+  const { autoOctaveShiftForPitches } = await loadGeomModule();
+
+  assert.equal(autoOctaveShiftForPitches([], 0, 'kid'), 0);
+  assert.equal(autoOctaveShiftForPitches([60, 64, 67], 0, 'kid'), 0);
+  // Keeps current shift when at least one expected pitch is already inside
+  assert.equal(autoOctaveShiftForPitches([60, 79], 0, 'kid'), 0);
+
+  // Out-of-range lower and higher targets shift cleanly in kid and compact modes
+  assert.equal(autoOctaveShiftForPitches([53], 0, 'kid'), -1);
+  assert.equal(autoOctaveShiftForPitches([79], 0, 'kid'), 1);
+  assert.equal(autoOctaveShiftForPitches([38, 43], 0, 'kid'), -2);
+  assert.equal(autoOctaveShiftForPitches([88, 92], 0, 'kid'), 2);
+  assert.equal(autoOctaveShiftForPitches([78], 0, 'compact'), 1);
+  assert.equal(autoOctaveShiftForPitches([44], 0, 'compact'), -1);
+  assert.equal(autoOctaveShiftForPitches([36], 0, 'compact'), -2);
+});
+
+test('getNotePalette and getKeyStickerColor return ChromaNotes rainbow colors and crisp hands palettes', async () => {
+  const { getNotePalette, getKeyStickerColor } = await loadColorsModule();
+
+  const cRainbow = getNotePalette(60, 'R', 'rainbow');
+  assert.equal(cRainbow.top, '#f87171');
+  assert.equal(cRainbow.bottom, '#dc2626');
+  assert.equal(cRainbow.stickerBg, '#ef4444');
+
+  const eRainbow = getNotePalette(64, 'L', 'rainbow');
+  assert.equal(eRainbow.top, '#fde047');
+  assert.equal(eRainbow.stickerText, '#422006');
+
+  const fSharpRainbow = getNotePalette(66, 'R', 'rainbow');
+  assert.equal(fSharpRainbow.border, '#fef3c7');
+  assert.notEqual(fSharpRainbow.top, getNotePalette(65, 'R', 'rainbow').top);
+
+  const rhWhite = getNotePalette(60, 'R', 'hands');
+  const lhWhite = getNotePalette(60, 'L', 'hands');
+  const rhBlack = getNotePalette(61, 'R', 'hands');
+  const lhBlack = getNotePalette(61, 'L', 'hands');
+  assert.notEqual(rhWhite.top, lhWhite.top);
+  assert.notEqual(rhWhite.top, rhBlack.top);
+  assert.notEqual(lhWhite.top, lhBlack.top);
+
+  assert.deepEqual(getKeyStickerColor(60).shortLabel, 'C');
+  assert.deepEqual(getKeyStickerColor(61).shortLabel, 'C#');
+  assert.deepEqual(getKeyStickerColor(71).shortLabel, 'B');
+});
+
+test('measureAtBeat tracks bar numbers consistently across time-signature changes', async () => {
+  const { measureAtBeat } = await loadColorsModule();
+
+  // No time signature overrides -> uses defaultBeatsPerMeasure
+  assert.equal(measureAtBeat([], 4, 0), 1);
+  assert.equal(measureAtBeat([], 4, 3.9), 1);
+  assert.equal(measureAtBeat([], 4, 4), 2);
+  assert.equal(measureAtBeat([], 3, 6), 3);
+
+  // Changes from 4/4 at beat 0 -> 3/4 at beat 8 -> 6/8 (3 quarter beats) at beat 14
+  const timeSigs = [
+    { tick: 0, beat: 0, numerator: 4, denominator: 4 },
+    { tick: 3840, beat: 8, numerator: 3, denominator: 4 },
+    { tick: 6720, beat: 14, numerator: 6, denominator: 8 },
+  ];
+  assert.equal(measureAtBeat(timeSigs, 4, 0), 1);
+  assert.equal(measureAtBeat(timeSigs, 4, 4), 2);
+  assert.equal(measureAtBeat(timeSigs, 4, 7.5), 2);
+  assert.equal(measureAtBeat(timeSigs, 4, 8), 3);
+  assert.equal(measureAtBeat(timeSigs, 4, 11), 4);
+  assert.equal(measureAtBeat(timeSigs, 4, 14), 5);
+  assert.equal(measureAtBeat(timeSigs, 4, 17), 6);
+
+  // Time signature starting after beat 0 uses defaultBeatsPerMeasure for the prefix
+  const delayedSig = [{ tick: 1920, beat: 4, numerator: 3, denominator: 4 }];
+  assert.equal(measureAtBeat(delayedSig, 4, 2), 1);
+  assert.equal(measureAtBeat(delayedSig, 4, 4), 2);
+  assert.equal(measureAtBeat(delayedSig, 4, 7), 3);
 });
