@@ -37,13 +37,17 @@ interface MeasureSpan {
   timeSignatureChange?: [number, number];
 }
 
+interface RoutedNoteEvent extends NoteEvent {
+  originalHand: NoteEvent['hand'];
+}
+
 interface StaffNoteGroup {
   hand: 'R' | 'L';
   onset: number;
-  notes: NoteEvent[];
+  notes: RoutedNoteEvent[];
 }
 
-interface PreparedNote extends NoteEvent {
+interface PreparedNote extends RoutedNoteEvent {
   stepOffset: number;
 }
 
@@ -69,13 +73,13 @@ interface LaidOutGroupEntry {
   nextOnsetInHand: number | null;
 }
 
-const SVG_HEIGHT = 248;
-const TREBLE_BOTTOM_Y = 86;
-const BASS_BOTTOM_Y = 186;
+const SVG_HEIGHT = 256;
+const TREBLE_BOTTOM_Y = 82;
+const BASS_BOTTOM_Y = 192;
 const STEP_PX = 5;
 const STEM_LEN = 26;
-const BUFFER_BEATS = 8;
-const WINDOW_QUANT_BEATS = 2;
+const BUFFER_BEATS = 14;
+const WINDOW_QUANT_BEATS = 4;
 const MANUAL_SCROLL_PAUSE_MS = 2400;
 const MIN_ZOOM = 0.7;
 const MAX_ZOOM = 1.6;
@@ -251,6 +255,7 @@ export function GrandStaff({
 }: GrandStaffProps) {
   const fadeGradId = useId();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const playheadBandRef = useRef<SVGRectElement | null>(null);
   const playheadLineRef = useRef<SVGLineElement | null>(null);
   const playheadCircleRef = useRef<SVGCircleElement | null>(null);
   const pauseAutoFollowUntilRef = useRef<number>(0);
@@ -353,6 +358,9 @@ export function GrandStaff({
       const liveBeat = getLiveBeatRef.current();
       const px = leftMarginRef.current + liveBeat * beatPxRef.current;
 
+      if (playheadBandRef.current) {
+        playheadBandRef.current.setAttribute('x', String(px - 8));
+      }
       if (playheadLineRef.current) {
         const s = String(px);
         playheadLineRef.current.setAttribute('x1', s);
@@ -366,21 +374,18 @@ export function GrandStaff({
       if (container && performance.now() >= pauseAutoFollowUntilRef.current) {
         const sticky = stickyWidthRef.current;
         const viewportW = Math.max(120, container.clientWidth - sticky);
-        const visibleLeft = container.scrollLeft + sticky + viewportW * 0.14;
-        const visibleRight = container.scrollLeft + sticky + viewportW * 0.72;
-
-        if (px < visibleLeft || px > visibleRight) {
-          const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
-          const targetScroll = Math.max(
-            0,
-            Math.min(maxScroll, px - sticky - viewportW * 0.28),
-          );
-          const diff = targetScroll - container.scrollLeft;
-          if (Math.abs(diff) > viewportW * 0.65) {
-            container.scrollLeft = targetScroll;
-          } else if (Math.abs(diff) > 1.5) {
-            container.scrollLeft += diff * 0.18;
-          }
+        const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+        const targetScroll = Math.max(
+          0,
+          Math.min(maxScroll, px - sticky - viewportW * 0.20),
+        );
+        const diff = targetScroll - container.scrollLeft;
+        if (Math.abs(diff) <= 40) {
+          container.scrollLeft = targetScroll;
+        } else if (Math.abs(diff) <= viewportW * 0.85) {
+          container.scrollLeft += diff * 0.22;
+        } else {
+          container.scrollLeft = targetScroll;
         }
       }
 
@@ -420,9 +425,23 @@ export function GrandStaff({
     ],
   );
 
-  const staffGroups = useMemo<StaffNoteGroup[]>(
-    () => groupStaffEvents(events) as StaffNoteGroup[],
+  const routedEvents = useMemo<RoutedNoteEvent[]>(
+    () =>
+      events.map((ev) => {
+        const displayClef =
+          ev.hand === 'R' ? (ev.pitch < 55 ? 'bass' : 'treble') : ev.pitch > 67 ? 'treble' : 'bass';
+        return {
+          ...ev,
+          hand: displayClef === 'treble' ? 'R' : 'L',
+          originalHand: ev.hand,
+        };
+      }),
     [events],
+  );
+
+  const staffGroups = useMemo<StaffNoteGroup[]>(
+    () => groupStaffEvents(routedEvents) as StaffNoteGroup[],
+    [routedEvents],
   );
 
   const beamingData = useMemo(() => {
@@ -726,7 +745,7 @@ export function GrandStaff({
                   x={loopBounds.x}
                   y={18}
                   width={loopBounds.width}
-                  height={194}
+                  height={SVG_HEIGHT - 36}
                   rx={8}
                   fill={paperMode ? 'rgba(217, 119, 6, 0.09)' : 'rgba(217, 119, 6, 0.13)'}
                   stroke="#d97706"
@@ -791,7 +810,7 @@ export function GrandStaff({
                     <g>
                       <text
                         x={x + 6}
-                        y={62}
+                        y={TREBLE_BOTTOM_Y - 24}
                         fill={inkHex}
                         fontSize="13"
                         fontWeight="bold"
@@ -801,7 +820,7 @@ export function GrandStaff({
                       </text>
                       <text
                         x={x + 6}
-                        y={80}
+                        y={TREBLE_BOTTOM_Y - 6}
                         fill={inkHex}
                         fontSize="13"
                         fontWeight="bold"
@@ -811,7 +830,7 @@ export function GrandStaff({
                       </text>
                       <text
                         x={x + 6}
-                        y={162}
+                        y={BASS_BOTTOM_Y - 24}
                         fill={inkHex}
                         fontSize="13"
                         fontWeight="bold"
@@ -821,7 +840,7 @@ export function GrandStaff({
                       </text>
                       <text
                         x={x + 6}
-                        y={180}
+                        y={BASS_BOTTOM_Y - 6}
                         fill={inkHex}
                         fontSize="13"
                         fontWeight="bold"
@@ -1032,7 +1051,7 @@ export function GrandStaff({
                     const ledgerSteps = ledgerStepsForOffset(ev.stepOffset);
                     const accidentalX = ev.cx - 12 - ev.accidentalLane * 8;
 
-                    let noteColor = ev.hand === 'R' ? rhHex : lhHex;
+                    let noteColor = ev.originalHand === 'R' ? rhHex : lhHex;
                     if (grade?.status === 'hit') noteColor = '#059669';
                     if (grade?.status === 'miss') noteColor = '#be123c';
 
@@ -1124,12 +1143,21 @@ export function GrandStaff({
             })}
 
             <g className="pointer-events-none">
+              <rect
+                ref={playheadBandRef}
+                x={initialPlayheadX - 8}
+                y={18}
+                width={16}
+                height={SVG_HEIGHT - 36}
+                rx={4}
+                fill="rgba(16, 185, 129, 0.08)"
+              />
               <line
                 ref={playheadLineRef}
                 x1={initialPlayheadX}
                 y1={20}
                 x2={initialPlayheadX}
-                y2={210}
+                y2={SVG_HEIGHT - 18}
                 stroke="#059669"
                 strokeWidth={2.5}
               />
@@ -1189,10 +1217,10 @@ export function GrandStaff({
                 stroke={inkHex}
                 strokeWidth={2.5}
               />
-              <text x={22} y={78} fill={inkHex} fontSize="34" fontFamily="Georgia, serif">
+              <text x={22} y={TREBLE_BOTTOM_Y - 8} fill={inkHex} fontSize="34" fontFamily="Georgia, serif">
                 𝄞
               </text>
-              <text x={22} y={174} fill={inkHex} fontSize="28" fontFamily="Georgia, serif">
+              <text x={22} y={BASS_BOTTOM_Y - 12} fill={inkHex} fontSize="28" fontFamily="Georgia, serif">
                 𝄢
               </text>
 
@@ -1228,7 +1256,7 @@ export function GrandStaff({
 
               <text
                 x={timeSigX}
-                y={62}
+                y={TREBLE_BOTTOM_Y - 24}
                 fill={inkHex}
                 fontSize="15"
                 fontWeight="bold"
@@ -1238,7 +1266,7 @@ export function GrandStaff({
               </text>
               <text
                 x={timeSigX}
-                y={80}
+                y={TREBLE_BOTTOM_Y - 6}
                 fill={inkHex}
                 fontSize="15"
                 fontWeight="bold"
@@ -1248,7 +1276,7 @@ export function GrandStaff({
               </text>
               <text
                 x={timeSigX}
-                y={162}
+                y={BASS_BOTTOM_Y - 24}
                 fill={inkHex}
                 fontSize="15"
                 fontWeight="bold"
@@ -1258,7 +1286,7 @@ export function GrandStaff({
               </text>
               <text
                 x={timeSigX}
-                y={180}
+                y={BASS_BOTTOM_Y - 6}
                 fill={inkHex}
                 fontSize="15"
                 fontWeight="bold"
