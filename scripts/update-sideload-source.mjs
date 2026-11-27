@@ -3,7 +3,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const DEFAULT_ICON_URL = 'https://rico-rodriguez.github.io/maestro-ai/icon-1024.png';
-export const DEFAULT_SOURCE_URL = 'https://rico-rodriguez.github.io/maestro-ai/source.json';
+export const DEFAULT_SOURCE_URL =
+  'https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/source.json';
 export const DEFAULT_DOWNLOAD_URL =
   'https://github.com/Rico-Rodriguez/maestro-ai/releases/download/ios-v1/MaestroAI.ipa';
 
