@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { iosIndexHtml } from '../src/ios-viewport.mjs';
 import { nativeHttpToResponse, shouldUseNativeScoreFetch } from '../src/score-fetch.mjs';
+import { buildSideloadSource } from '../scripts/update-sideload-source.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -84,4 +85,86 @@ test('iosIndexHtml adds viewport-fit=cover and user-scalable=no', () => {
   assert.ok(transformed.includes('viewport-fit=cover'));
   assert.ok(transformed.includes('user-scalable=no'));
   assert.ok(transformed.includes('maximum-scale=1.0'));
+});
+
+test('public/icon-1024.png exists and is larger than 1000 bytes', () => {
+  const stat = fs.statSync(path.join(root, 'public', 'icon-1024.png'));
+  assert.ok(stat.isFile());
+  assert.ok(stat.size > 1000, `icon-1024.png expected > 1000 bytes, got ${stat.size}`);
+});
+
+test('public/source.json is valid AltStore/SideStore source JSON', () => {
+  const raw = fs.readFileSync(path.join(root, 'public', 'source.json'), 'utf8');
+  const source = JSON.parse(raw);
+
+  assert.equal(source.identifier, 'com.rico.maestroai.source');
+  assert.deepEqual(source.featuredApps, ['com.rico.maestroai']);
+  assert.equal(source.apps.length, 1);
+
+  const [app] = source.apps;
+  assert.equal(app.bundleIdentifier, 'com.rico.maestroai');
+  assert.equal(app.category, 'music');
+  assert.ok(typeof app.version === 'string' && app.version.length > 0);
+  assert.ok(Number.isFinite(app.size) && app.size > 0);
+  assert.ok(Array.isArray(app.versions) && app.versions.length >= 1);
+
+  const [latest] = app.versions;
+  assert.equal(latest.version, app.version);
+  assert.equal(latest.downloadURL, app.downloadURL);
+  assert.equal(latest.size, app.size);
+  assert.equal(latest.minOSVersion, '15.0');
+  assert.ok(typeof latest.buildVersion === 'string' && latest.buildVersion.length > 0);
+  assert.ok(!Number.isNaN(Date.parse(latest.date)));
+});
+
+test('buildSideloadSource formats all required AltStore v2 fields', () => {
+  const source = buildSideloadSource({
+    version: '1.0.42',
+    buildVersion: 42,
+    date: '2026-11-27T04:00:00Z',
+    size: 14000000,
+    description: 'Build 42 notes',
+    downloadURL: 'https://example.com/MaestroAI.ipa',
+    iconURL: 'https://example.com/icon-1024.png',
+    sourceURL: 'https://example.com/source.json',
+  });
+
+  assert.equal(source.name, 'Maestro AI');
+  assert.equal(source.subtitle, 'Interactive Piano Studio');
+  assert.equal(source.iconURL, 'https://example.com/icon-1024.png');
+  assert.equal(source.sourceURL, 'https://example.com/source.json');
+  assert.equal(source.identifier, 'com.rico.maestroai.source');
+  assert.equal(source.tintColor, '#D97706');
+  assert.deepEqual(source.featuredApps, ['com.rico.maestroai']);
+  assert.deepEqual(source.news, []);
+
+  const [app] = source.apps;
+  assert.equal(app.name, 'Maestro AI');
+  assert.equal(app.bundleIdentifier, 'com.rico.maestroai');
+  assert.equal(app.developerName, 'Rico Rodriguez');
+  assert.equal(app.iconURL, 'https://example.com/icon-1024.png');
+  assert.equal(app.version, '1.0.42');
+  assert.equal(app.versionDate, '2026-11-27T04:00:00Z');
+  assert.equal(app.versionDescription, 'Build 42 notes');
+  assert.equal(app.downloadURL, 'https://example.com/MaestroAI.ipa');
+  assert.equal(app.size, 14000000);
+  assert.deepEqual(app.appPermissions, {
+    entitlements: [],
+    privacy: {
+      NSMicrophoneUsageDescription: 'Maestro AI listens to acoustic piano notes.',
+      NSBluetoothAlwaysUsageDescription: 'Maestro AI connects to Bluetooth MIDI keyboards.',
+    },
+  });
+
+  assert.deepEqual(app.versions, [
+    {
+      version: '1.0.42',
+      buildVersion: '42',
+      date: '2026-11-27T04:00:00Z',
+      localizedDescription: 'Build 42 notes',
+      downloadURL: 'https://example.com/MaestroAI.ipa',
+      size: 14000000,
+      minOSVersion: '15.0',
+    },
+  ]);
 });
