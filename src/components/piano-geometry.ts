@@ -1,6 +1,6 @@
 import { midiToPitchName } from '../music/pitch';
 
-export type PianoRangeMode = 'auto' | 'compact' | '61' | '88';
+export type PianoRangeMode = 'kid' | 'compact' | 'auto' | '61' | '88';
 
 export interface KeyGeom {
   midi: number;
@@ -61,6 +61,13 @@ export function computePianoRange(
   }
   if (mode === '61') {
     return { minMidi: 36, maxMidi: 96 };
+  }
+  if (mode === 'kid') {
+    const base = Math.max(24, Math.min(96, 60 + octaveShift * 12));
+    return {
+      minMidi: snapDownToWhite(base),
+      maxMidi: snapUpToWhite(base + 14),
+    };
   }
   if (mode === 'compact') {
     const clampedBase = Math.max(24, Math.min(84, 48 + octaveShift * 12));
@@ -166,4 +173,75 @@ export function buildPianoLayout(minMidi: number, maxMidi: number): PianoLayout 
     byMidi,
     whiteCount,
   };
+}
+
+const AUTO_SHIFT_CANDIDATES = [-2, -1, 0, 1, 2] as const;
+
+export function autoOctaveShiftForPitches(
+  pitches: readonly number[],
+  currentShift: number,
+  mode: 'kid' | 'compact',
+): number {
+  let minP = Infinity;
+  let maxP = -Infinity;
+  let validCount = 0;
+
+  const currentRange = computePianoRange(mode, undefined, undefined, currentShift);
+
+  for (let i = 0; i < pitches.length; i += 1) {
+    const p = pitches[i];
+    if (!Number.isFinite(p)) continue;
+    validCount += 1;
+    if (p >= currentRange.minMidi && p <= currentRange.maxMidi) {
+      return currentShift;
+    }
+    if (p < minP) minP = p;
+    if (p > maxP) maxP = p;
+  }
+
+  if (validCount === 0) return currentShift;
+
+  const center = (minP + maxP) / 2;
+  let bestShift = currentShift;
+  let bestCovered = -1;
+  let bestOutDist = Infinity;
+  let bestMidDist = Infinity;
+  let bestShiftDelta = Infinity;
+
+  for (const shift of AUTO_SHIFT_CANDIDATES) {
+    const range = computePianoRange(mode, undefined, undefined, shift);
+    let covered = 0;
+    for (let i = 0; i < pitches.length; i += 1) {
+      const p = pitches[i];
+      if (Number.isFinite(p) && p >= range.minMidi && p <= range.maxMidi) {
+        covered += 1;
+      }
+    }
+    const outDist =
+      center < range.minMidi
+        ? range.minMidi - center
+        : center > range.maxMidi
+          ? center - range.maxMidi
+          : 0;
+    const midDist = Math.abs(center - (range.minMidi + range.maxMidi) / 2);
+    const shiftDelta = Math.abs(shift - currentShift);
+
+    const better =
+      covered > bestCovered ||
+      (covered === bestCovered &&
+        (outDist < bestOutDist ||
+          (outDist === bestOutDist &&
+            (midDist < bestMidDist ||
+              (midDist === bestMidDist && shiftDelta < bestShiftDelta)))));
+
+    if (better) {
+      bestShift = shift;
+      bestCovered = covered;
+      bestOutDist = outDist;
+      bestMidDist = midDist;
+      bestShiftDelta = shiftDelta;
+    }
+  }
+
+  return bestShift;
 }

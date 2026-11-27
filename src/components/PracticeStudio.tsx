@@ -40,7 +40,13 @@ import {
 import FallingNotesCanvas from './FallingNotesCanvas';
 import GrandStaff from './GrandStaff';
 import type { SavedMuseScore } from './LibraryView';
-import { buildPianoLayout, computePianoRange, type PianoRangeMode } from './piano-geometry';
+import { measureAtBeat, type ColorMode } from './note-colors';
+import {
+  autoOctaveShiftForPitches,
+  buildPianoLayout,
+  computePianoRange,
+  type PianoRangeMode,
+} from './piano-geometry';
 import PianoKeyboard from './PianoKeyboard';
 
 export type StudioViewLayout = 'combined' | 'falling' | 'notation';
@@ -69,6 +75,8 @@ export interface PracticeStudioProps {
   viewActive: boolean;
   registerNoteHandler: (handler: ((event: NoteInput) => void) | null) => void;
   registerMicGate: (gate: (() => boolean) | null) => void;
+  kidLocked?: boolean;
+  onExitKidLock?: () => void;
 }
 
 const EMPTY_PRACTICE_STATE: PracticeState = {
@@ -111,6 +119,19 @@ const HAND_OPTIONS: readonly { id: HandFilter; label: string }[] = [
   { id: 'L', label: 'L' },
 ];
 
+const KEY_SIZE_OPTIONS: readonly { mode: PianoRangeMode; label: string }[] = [
+  { mode: 'kid', label: 'Big 15' },
+  { mode: 'compact', label: '25' },
+  { mode: 'auto', label: 'Auto' },
+  { mode: '61', label: '61' },
+  { mode: '88', label: '88' },
+];
+
+const COLOR_MODE_OPTIONS: readonly { id: ColorMode; label: string }[] = [
+  { id: 'rainbow', label: 'Rainbow' },
+  { id: 'hands', label: 'Hands' },
+];
+
 export default function PracticeStudio({
   score,
   sessionScores,
@@ -135,15 +156,21 @@ export default function PracticeStudio({
   viewActive,
   registerNoteHandler,
   registerMicGate,
+  kidLocked = false,
 }: PracticeStudioProps) {
   const [practiceState, setPracticeState] = useState<PracticeState>(() =>
     score ? createPracticeState(score) : EMPTY_PRACTICE_STATE,
   );
   const [userPressedNotes, setUserPressedNotes] = useState<Set<number>>(() => new Set());
   const [userSustainDown, setUserSustainDown] = useState(false);
-  const [rangeMode, setRangeMode] = useState<PianoRangeMode>('auto');
+  const [rangeMode, setRangeMode] = useState<PianoRangeMode>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'compact' : 'auto',
+  );
   const [octaveShift, setOctaveShift] = useState(0);
-  const [viewLayout, setViewLayout] = useState<StudioViewLayout>('combined');
+  const [viewLayout, setViewLayout] = useState<StudioViewLayout>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'falling' : 'combined',
+  );
+  const [colorMode, setColorMode] = useState<ColorMode>('rainbow');
   const [tempoScale, setTempoScale] = useState(1);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [guideSoundOn, setGuideSoundOn] = useState(true);
@@ -516,6 +543,35 @@ export default function PracticeStudio({
     return Math.max(1, num * (4 / Math.max(1, den)));
   }, [score]);
 
+  useEffect(() => {
+    if (kidLocked) {
+      setShowSettings(false);
+    }
+  }, [kidLocked]);
+
+  useEffect(() => {
+    if (!score) return;
+    if (rangeMode !== 'kid' && rangeMode !== 'compact') return;
+
+    const pitches =
+      practiceState.mode === 'listen'
+        ? filteredEvents
+            .filter(
+              (ev) =>
+                ev.onset >= practiceState.beat - 0.1 &&
+                ev.onset <= practiceState.beat + 1.2,
+            )
+            .map((ev) => ev.pitch)
+        : expectedNotes.map((n) => n.pitch);
+
+    if (pitches.length === 0) return;
+
+    setOctaveShift((prev) => {
+      const next = autoOctaveShiftForPitches(pitches, prev, rangeMode);
+      return next !== prev ? next : prev;
+    });
+  }, [score, rangeMode, practiceState.mode, practiceState.beat, filteredEvents, expectedNotes]);
+
   const effectiveBpm = Math.max(1, Math.round(liveBpm * tempoScale));
   const totalAttempts =
     practiceState.stats.hits + practiceState.stats.misses + practiceState.stats.wrongNotes;
@@ -524,7 +580,9 @@ export default function PracticeStudio({
   const hardestMeasure = getHardestMeasure(practiceState.stats);
   const nextChip = formatNextChip(expectedNotes);
   const totalMeasures = score ? Math.max(1, score.totalMeasures) : 1;
-  const currentBar = Math.max(1, Math.floor(practiceState.beat / defaultBeatsPerMeasure) + 1);
+  const currentBar = score
+    ? measureAtBeat(score.timeSignatures, defaultBeatsPerMeasure, practiceState.beat)
+    : 1;
 
   const unopenedSaved = useMemo(() => {
     const openIds = new Set(sessionScores.map((s) => s.id));
@@ -574,9 +632,68 @@ export default function PracticeStudio({
   const selectValue = score ? score.id : '';
   const hasDeviceActive = midiDevices.length > 0 || micActive;
 
+  const renderKeyboard = (flushTop: boolean) => (
+    <PianoKeyboard
+      layout={pianoLayout}
+      rangeMode={rangeMode}
+      onRangeModeChange={setRangeMode}
+      octaveShift={octaveShift}
+      onOctaveShift={shiftOctave}
+      userPressedNotes={userPressedNotes}
+      expectedNotes={expectedNotes}
+      getPlaybackPitches={getPlaybackPitches}
+      getPlaybackSustain={getPlaybackSustain}
+      userSustainDown={userSustainDown}
+      audioStatus={audioStatus}
+      onNoteOn={handlePianoNoteOn}
+      onNoteOff={handlePianoNoteOff}
+      darkMode={darkMode}
+      colorMode={colorMode}
+      showKeyStickers={true}
+      flushTop={flushTop}
+      hideControls={Boolean(kidLocked)}
+    />
+  );
+
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-2.5">
-      <div className={`flex flex-col gap-2 rounded-2xl border px-2.5 py-2 sm:px-3 lg:flex-row lg:items-center lg:justify-between ${surface}`}>
+      {kidLocked ? (
+        <div className={`flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 ${surface}`}>
+          <button
+            type="button"
+            disabled={!score}
+            onClick={togglePlay}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-stone-950 shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {practiceState.running ? (
+              <>
+                <Pause className="h-4 w-4" />
+                Pause
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Play
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            disabled={!score}
+            onClick={handleRestart}
+            title="Restart"
+            className={`inline-flex shrink-0 items-center justify-center rounded-xl border p-2.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {score ? score.title : 'Ready to Play'}
+          </span>
+        </div>
+      ) : (
+        <div className={`flex flex-col gap-2 rounded-2xl border px-2.5 py-2 sm:px-3 lg:flex-row lg:items-center lg:justify-between ${surface}`}>
         <div className="flex w-full items-center gap-1.5 sm:w-auto sm:flex-1 sm:gap-2">
           <button
             type="button"
@@ -747,25 +864,64 @@ export default function PracticeStudio({
           </button>
         </div>
       </div>
+      )}
 
-      {showSettings ? (
+      {showSettings && !kidLocked ? (
         <section className={`rounded-2xl border p-4 ${surface}`}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/40 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold">Hand Focus</span>
-              <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
-                {HAND_OPTIONS.map((h) => (
-                  <button
-                    key={h.id}
-                    type="button"
-                    onClick={() => handleHandChange(h.id)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                      practiceState.handFilter === h.id ? pillActive : pillInactive
-                    }`}
-                  >
-                    {h.label}
-                  </button>
-                ))}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/40 pb-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold">Hand Focus</span>
+                <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                  {HAND_OPTIONS.map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      onClick={() => handleHandChange(h.id)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                        practiceState.handFilter === h.id ? pillActive : pillInactive
+                      }`}
+                    >
+                      {h.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold">Key Size</span>
+                <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                  {KEY_SIZE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.mode}
+                      type="button"
+                      onClick={() => setRangeMode(opt.mode)}
+                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${
+                        rangeMode === opt.mode ? pillActive : pillInactive
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold">Colors</span>
+                <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                  {COLOR_MODE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setColorMode(opt.id)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                        colorMode === opt.id ? pillActive : pillInactive
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -1047,8 +1203,12 @@ export default function PracticeStudio({
                 ? practiceState.running
                   ? `Listening · Bar ${currentBar}`
                   : 'Press Play to listen.'
-                : practiceState.lastFeedback.text ||
-                  PRACTICE_MODES.find((m) => m.id === practiceState.mode)?.idle}
+                : practiceState.mode === 'wait' &&
+                    practiceState.lastFeedback.status === 'hit' &&
+                    practiceState.stats.streak >= 3
+                  ? `Awesome! ⭐ ${practiceState.stats.streak} in a row · ${practiceState.lastFeedback.text}`
+                  : practiceState.lastFeedback.text ||
+                    PRACTICE_MODES.find((m) => m.id === practiceState.mode)?.idle}
             </span>
           </div>
 
@@ -1085,7 +1245,7 @@ export default function PracticeStudio({
           }`}
         >
           <div>
-            <p className="font-display text-2xl">Piece Complete</p>
+            <p className="font-display text-2xl">You played it! 🌟</p>
             <div className="mt-1 flex flex-wrap items-center gap-4 font-mono text-xs">
               <span>Accuracy: {totalAttempts > 0 ? `${accuracyPct}%` : '—'}</span>
               <span>
@@ -1125,36 +1285,40 @@ export default function PracticeStudio({
       ) : null}
 
       {!score ? (
-        <div className={`flex flex-col items-center justify-center rounded-2xl border px-6 py-12 text-center ${surface}`}>
-          <h2 className="font-display text-3xl tracking-tight">Ready at the Bench</h2>
-          <p className={`mt-2 max-w-md text-xs leading-relaxed ${mutedText}`}>
-            Open a saved score or local MIDI file from the Library, or load the bundled sample
-            piece to start practicing with interactive notation and falling notes.
-          </p>
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              disabled={sampleLoading}
-              onClick={() => void onLoadSample()}
-              className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-stone-950 shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {sampleLoading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5" />
-              )}
-              Load Sample: Merry-Go-Round of Life
-            </button>
-            <button
-              type="button"
-              onClick={onGoToLibrary}
-              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-semibold transition ${subtleBtn}`}
-            >
-              <Library className="h-3.5 w-3.5" />
-              Browse Library
-            </button>
+        <>
+          <div className={`flex flex-col items-center justify-center rounded-2xl border px-6 py-12 text-center ${surface}`}>
+            <h2 className="font-display text-3xl tracking-tight">Ready at the Bench</h2>
+            <p className={`mt-2 max-w-md text-xs leading-relaxed ${mutedText}`}>
+              Open a saved score or local MIDI file from the Library, or load the bundled sample
+              piece to start practicing with interactive notation and falling notes.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                disabled={sampleLoading}
+                onClick={() => void onLoadSample()}
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-stone-950 shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sampleLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                Load Sample: Merry-Go-Round of Life
+              </button>
+              <button
+                type="button"
+                onClick={onGoToLibrary}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-semibold transition ${subtleBtn}`}
+              >
+                <Library className="h-3.5 w-3.5" />
+                Browse Library
+              </button>
+            </div>
           </div>
-        </div>
+
+          {renderKeyboard(false)}
+        </>
       ) : (
         <div className="flex flex-col gap-3">
           {viewLayout === 'notation' || viewLayout === 'combined' ? (
@@ -1173,43 +1337,39 @@ export default function PracticeStudio({
           {viewLayout === 'falling' || viewLayout === 'combined' ? (
             <div
               className={[
-                'overflow-hidden rounded-2xl border',
+                'flex flex-col overflow-hidden rounded-2xl border',
                 darkMode ? 'border-stone-800' : 'border-stone-300/80',
-                viewLayout === 'combined'
-                  ? 'h-36 sm:h-48 lg:h-56'
-                  : 'h-[44dvh] min-h-[270px] max-h-[500px]',
               ].join(' ')}
             >
-              <FallingNotesCanvas
-                events={filteredEvents}
-                layout={pianoLayout}
-                timeSignatures={score.timeSignatures}
-                defaultBeatsPerMeasure={defaultBeatsPerMeasure}
-                grades={practiceState.grades}
-                getLiveBeat={getLiveBeat}
-                darkMode={darkMode}
-              />
+              <div
+                className={
+                  viewLayout === 'combined'
+                    ? 'h-36 sm:h-48 lg:h-56'
+                    : 'h-[44dvh] min-h-[270px] max-h-[500px]'
+                }
+              >
+                <FallingNotesCanvas
+                  events={filteredEvents}
+                  layout={pianoLayout}
+                  timeSignatures={score.timeSignatures}
+                  defaultBeatsPerMeasure={defaultBeatsPerMeasure}
+                  grades={practiceState.grades}
+                  getLiveBeat={getLiveBeat}
+                  darkMode={darkMode}
+                  colorMode={colorMode}
+                  onColorModeChange={setColorMode}
+                  flushBottom
+                  hideToolbar={Boolean(kidLocked)}
+                />
+              </div>
+
+              {renderKeyboard(true)}
             </div>
-          ) : null}
+          ) : (
+            renderKeyboard(false)
+          )}
         </div>
       )}
-
-      <PianoKeyboard
-        layout={pianoLayout}
-        rangeMode={rangeMode}
-        onRangeModeChange={setRangeMode}
-        octaveShift={octaveShift}
-        onOctaveShift={shiftOctave}
-        userPressedNotes={userPressedNotes}
-        expectedNotes={expectedNotes}
-        getPlaybackPitches={getPlaybackPitches}
-        getPlaybackSustain={getPlaybackSustain}
-        userSustainDown={userSustainDown}
-        audioStatus={audioStatus}
-        onNoteOn={handlePianoNoteOn}
-        onNoteOff={handlePianoNoteOff}
-        darkMode={darkMode}
-      />
     </div>
   );
 }
