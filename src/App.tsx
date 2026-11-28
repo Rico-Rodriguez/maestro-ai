@@ -122,8 +122,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.body.style.backgroundColor = darkMode ? '#161513' : '#f7f4ee';
-    document.body.style.color = darkMode ? '#efe9de' : '#1f1b16';
+    document.body.style.backgroundColor = darkMode ? '#17131a' : '#fbf5f1';
+    document.body.style.color = darkMode ? '#f3eaf0' : '#2a1d22';
     void globalThis.__maestroSetSystemBars?.(darkMode)?.catch?.(() => {});
   }, [darkMode]);
 
@@ -343,28 +343,28 @@ export default function App() {
   const hasDeviceActive = midiDevices.length > 0 || micActive;
 
   const headerButtonClass = darkMode
-    ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#efe9de] hover:bg-[#262421]'
-    : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#1f1b16] hover:bg-[#efe9df]';
+    ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0] hover:bg-[#2a2430]'
+    : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22] hover:bg-[#f6ebe6]';
 
-  const mutedIconClass = darkMode ? 'text-[#aaa398]' : 'text-[#5e554a]';
+  const mutedIconClass = darkMode ? 'text-[#b9a9b4]' : 'text-[#6b5560]';
 
   return (
     <div
       className={`min-h-screen transition-colors duration-150 ${
-        darkMode ? 'bg-[#161513] text-[#efe9de]' : 'bg-[#f7f4ee] text-[#1f1b16]'
+        darkMode ? 'bg-[#17131a] text-[#f3eaf0]' : 'bg-[#fbf5f1] text-[#2a1d22]'
       }`}
     >
       <header
         className={`sticky top-0 z-30 border-b ${
           darkMode
-            ? 'border-[#efe9de]/[0.08] bg-[#161513]/95'
-            : 'border-[#1f1b16]/[0.08] bg-[#f7f4ee]/95'
+            ? 'border-[#f3eaf0]/[0.08] bg-[#17131a]/95'
+            : 'border-[#2a1d22]/[0.08] bg-[#fbf5f1]/95'
         } backdrop-blur-sm`}
       >
         <div className="mx-auto flex h-14 max-w-[1440px] flex-nowrap items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex shrink-0 items-center gap-2.5">
             <PianoMark />
-            <span className="text-[17px] font-medium leading-none tracking-[-0.01em]">
+            <span className="text-[17px] font-semibold leading-none tracking-[-0.01em]">
               Maestro
             </span>
           </div>
@@ -378,16 +378,16 @@ export default function App() {
                 onPointerLeave={cancelHoldToUnlock}
                 onPointerCancel={cancelHoldToUnlock}
                 title="Press and hold to unlock controls (or press Escape)"
-                className={`relative inline-flex h-9 items-center gap-2 overflow-hidden rounded-[8px] border px-3 text-xs font-medium transition-colors duration-150 select-none touch-none ${
+                className={`relative inline-flex h-10 items-center gap-2 overflow-hidden rounded-[12px] border px-3 text-xs font-medium transition-colors duration-150 select-none touch-none ${
                   darkMode
-                    ? 'border-[#efe9de]/[0.12] bg-[#1c1a18] text-[#efe9de]'
-                    : 'border-[#1f1b16]/[0.12] bg-[#fdfbf7] text-[#1f1b16]'
+                    ? 'border-[#f3eaf0]/[0.12] bg-[#1f1a22] text-[#f3eaf0]'
+                    : 'border-[#2a1d22]/[0.12] bg-[#fffdfb] text-[#2a1d22]'
                 }`}
               >
                 <span
                   aria-hidden="true"
                   className={`pointer-events-none absolute inset-y-0 left-0 transition-none ${
-                    darkMode ? 'bg-[#efe9de]/15' : 'bg-[#1f1b16]/10'
+                    darkMode ? 'bg-[#f3eaf0]/15' : 'bg-[#2a1d22]/10'
                   }`}
                   style={{ width: `${Math.round(unlockProgress * 100)}%` }}
                 />
@@ -399,11 +399,11 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setTab((prev) => (prev === 'practice' ? 'library' : 'practice'))}
-                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
+                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
                     tab === 'library'
                       ? darkMode
-                        ? 'border-[#efe9de] bg-[#efe9de] text-[#161513]'
-                        : 'border-[#c85a32] bg-[#c85a32] text-white hover:bg-[#b44e29]'
+                        ? 'border-[#f06595] bg-[#f06595] text-[#17131a] hover:bg-[#f47aa4]'
+                        : 'border-[#d6336c] bg-[#d6336c] text-white hover:bg-[#be2a5e]'
                       : headerButtonClass
                   }`}
                 >
@@ -418,7 +418,7 @@ export default function App() {
                   type="button"
                   onClick={() => void handleToggleMic()}
                   title={micActive ? 'Stop acoustic microphone' : 'Enable acoustic microphone'}
-                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
+                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
                     micActive
                       ? darkMode
                         ? 'border-[#4cc38a]/40 bg-[#4cc38a]/10 text-[#4cc38a]'
@@ -439,7 +439,7 @@ export default function App() {
                       <span
                         aria-hidden="true"
                         className={`h-1.5 w-6 overflow-hidden rounded-full ${
-                          darkMode ? 'bg-[#262421]' : 'bg-[#efe9df]'
+                          darkMode ? 'bg-[#2a2430]' : 'bg-[#f6ebe6]'
                         }`}
                       >
                         <span
@@ -463,7 +463,7 @@ export default function App() {
                     setKidLocked(true);
                   }}
                   title="Lock controls for focused practice"
-                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${headerButtonClass}`}
+                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${headerButtonClass}`}
                 >
                   <Lock className={`h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
                   <span className="hidden sm:inline">Lock</span>
@@ -480,11 +480,11 @@ export default function App() {
                     }
                   }}
                   title="Studio settings"
-                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
+                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
                     showSettings && tab === 'practice'
                       ? darkMode
-                        ? 'border-[#e07047]/60 bg-[#262421] text-[#efe9de]'
-                        : 'border-[#c85a32]/50 bg-[#efe9df] text-[#1f1b16]'
+                        ? 'border-[#f06595]/60 bg-[#2a2430] text-[#f3eaf0]'
+                        : 'border-[#d6336c]/50 bg-[#f6ebe6] text-[#2a1d22]'
                       : headerButtonClass
                   }`}
                 >
@@ -527,7 +527,7 @@ export default function App() {
               type="button"
               onClick={() => setMicError(null)}
               aria-label="Dismiss microphone notice"
-              className="rounded-[6px] p-1 hover:bg-black/5"
+              className="rounded-[8px] p-1 hover:bg-black/5"
             >
               <X className="h-4 w-4" strokeWidth={1.5} />
             </button>
@@ -537,8 +537,8 @@ export default function App() {
           <div
             className={`flex items-center justify-center gap-2 border-t px-4 py-2 text-xs font-medium ${
               darkMode
-                ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#aaa398]'
-                : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#5e554a]'
+                ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#b9a9b4]'
+                : 'border-[#2a1d22]/[0.08] bg-[#f6ebe6] text-[#6b5560]'
             }`}
           >
             <span>{midiNotice}</span>
@@ -546,7 +546,7 @@ export default function App() {
               type="button"
               onClick={() => setMidiNotice(null)}
               aria-label="Dismiss MIDI notice"
-              className="rounded-[6px] p-1 hover:bg-black/5"
+              className="rounded-[8px] p-1 hover:bg-black/5"
             >
               <X className="h-4 w-4" strokeWidth={1.5} />
             </button>

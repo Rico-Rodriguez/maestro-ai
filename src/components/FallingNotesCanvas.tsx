@@ -34,16 +34,25 @@ interface MeasureLine {
   beat: number;
 }
 
-interface HitParticle {
+interface BloomBurst {
+  x: number;
+  y: number;
+  age: number;
+  duration: number;
+  color: string;
+  maxScale: number;
+}
+
+interface DriftingPetal {
   x: number;
   y: number;
   vx: number;
   vy: number;
-  size: number;
-  alpha: number;
-  decay: number;
+  rot: number;
+  vrot: number;
+  age: number;
+  duration: number;
   color: string;
-  isStar: false;
 }
 
 interface DrawableBar {
@@ -59,7 +68,8 @@ interface DrawableBar {
 const STRIKE_OFFSET_PX = 8;
 const FLUSH_STRIKE_OFFSET_PX = 2;
 const NOTE_TOP_GAP_PX = 2.5;
-const MAX_PARTICLES = 40;
+const MAX_PETALS = 60;
+const PETAL_GRAVITY = 140;
 const OCTAVE_WATERMARKS = new Set(['C2', 'C3', 'C4', 'C5', 'C6']);
 
 const SPEED_OPTIONS = [
@@ -159,6 +169,40 @@ function traceRoundedRect(
   ctx.lineTo(x, y + radius);
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
+}
+
+function drawFivePetalFlower(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  color: string,
+  alpha = 1,
+): void {
+  if (alpha <= 0 || radius <= 0.5) return;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.translate(cx, cy);
+  const petalDist = radius * 0.52;
+  const petalRx = radius * 0.44;
+  const petalRy = radius * 0.3;
+
+  ctx.fillStyle = color;
+  for (let p = 0; p < 5; p += 1) {
+    const angle = (p * Math.PI * 2) / 5 - Math.PI / 2;
+    ctx.save();
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.ellipse(petalDist, 0, petalRx, petalRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.fillStyle = '#fff6d6';
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(1.5, radius * 0.28), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function lowerBoundOnset(sortedEvents: readonly NoteEvent[], targetBeat: number): number {
@@ -304,27 +348,42 @@ export function FallingNotesCanvas({
     if (!ctx) return;
 
     let rafId = 0;
-    const particles: HitParticle[] = [];
+    const blooms: BloomBurst[] = [];
+    const petals: DriftingPetal[] = [];
     const celebratedHitIds = new Set<string>();
+    let prevActiveIds = new Set<string>();
     let prevSortedRef = stateRef.current.indexedEvents.sorted;
     let prevLiveBeat = 0;
+    let hasAdvancedBeat = false;
     let lastFrameMs = performance.now();
 
-    const spawnParticles = (x: number, y: number, w: number, palette: NotePalette) => {
-      for (let k = 0; k < 5; k += 1) {
-        if (particles.length >= MAX_PARTICLES) {
-          particles.shift();
+    const spawnBloom = (x: number, y: number, color: string, maxScale: number) => {
+      blooms.push({
+        x,
+        y,
+        age: 0,
+        duration: 0.65,
+        color,
+        maxScale,
+      });
+    };
+
+    const spawnHitPetals = (x: number, y: number, w: number, color: string) => {
+      for (let k = 0; k < 6; k += 1) {
+        if (petals.length >= MAX_PETALS) {
+          petals.shift();
         }
-        particles.push({
-          x: x + w * (0.2 + Math.random() * 0.6),
-          y: y - Math.random() * 2,
-          vx: (Math.random() - 0.5) * 42,
-          vy: -(28 + Math.random() * 44),
-          size: 2.5 + Math.random() * 1.5,
-          alpha: 0.85,
-          decay: 2.0 + Math.random() * 0.7,
-          color: palette.stickerBg,
-          isStar: false,
+        const spread = (k - 2.5) / 2.5;
+        petals.push({
+          x: x + w * (0.3 + Math.random() * 0.4),
+          y: y - 2,
+          vx: spread * 48 + (Math.random() - 0.5) * 24,
+          vy: -(60 + Math.random() * 50),
+          rot: Math.random() * Math.PI * 2,
+          vrot: (Math.random() - 0.5) * 6,
+          age: 0,
+          duration: 0.9,
+          color,
         });
       }
     };
@@ -367,6 +426,11 @@ export function FallingNotesCanvas({
         if (evData.sorted !== prevSortedRef || liveBeat < prevLiveBeat - 0.5) {
           prevSortedRef = evData.sorted;
           celebratedHitIds.clear();
+          prevActiveIds = new Set<string>();
+          hasAdvancedBeat = false;
+        }
+        if (liveBeat > prevLiveBeat + 1e-4) {
+          hasAdvancedBeat = true;
         }
         prevLiveBeat = liveBeat;
 
@@ -377,10 +441,13 @@ export function FallingNotesCanvas({
         const visibleMinBeat = liveBeat - tailBeats;
         const visibleMaxBeat = liveBeat + activeLookahead + 0.75;
 
-        ctx.fillStyle = isDark ? '#12110f' : '#f1ece3';
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+        bgGrad.addColorStop(0, isDark ? '#17131a' : '#fdf3ef');
+        bgGrad.addColorStop(1, isDark ? '#1f1a22' : '#fbf7f2');
+        ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, width, height);
 
-        ctx.fillStyle = isDark ? 'rgba(0, 0, 0, 0.34)' : 'rgba(31, 27, 22, 0.045)';
+        ctx.fillStyle = isDark ? 'rgba(0, 0, 0, 0.3)' : 'rgba(42, 29, 34, 0.035)';
         for (let i = 0; i < activeLayout.blackKeys.length; i += 1) {
           const bk = activeLayout.blackKeys[i];
           ctx.fillRect(bk.x * width, 0, bk.width * width, strikeY);
@@ -396,28 +463,28 @@ export function FallingNotesCanvas({
           const x = Math.round(wk.x * width) + 0.5;
           ctx.strokeStyle = isDark
             ? pc === 0
-              ? 'rgba(239, 233, 222, 0.15)'
-              : 'rgba(239, 233, 222, 0.07)'
+              ? 'rgba(243, 234, 240, 0.14)'
+              : 'rgba(243, 234, 240, 0.06)'
             : pc === 0
-              ? 'rgba(31, 27, 22, 0.15)'
-              : 'rgba(31, 27, 22, 0.07)';
+              ? 'rgba(42, 29, 34, 0.14)'
+              : 'rgba(42, 29, 34, 0.06)';
           ctx.beginPath();
           ctx.moveTo(x, 0);
           ctx.lineTo(x, strikeY);
           ctx.stroke();
 
           if (!suppressChrome && wk.isC && OCTAVE_WATERMARKS.has(wk.label)) {
-            ctx.fillStyle = isDark ? 'rgba(239, 233, 222, 0.36)' : 'rgba(31, 27, 22, 0.42)';
+            ctx.fillStyle = isDark ? 'rgba(243, 234, 240, 0.36)' : 'rgba(42, 29, 34, 0.42)';
             ctx.fillText(wk.label, x + 4, 6);
           }
         }
 
         const startMeasureIdx = Math.max(0, lowerBoundMeasure(mData.lines, visibleMinBeat) - 1);
-        ctx.font = '500 10px Figtree, system-ui, -apple-system, sans-serif';
+        ctx.font = '500 10px Nunito, ui-rounded, system-ui, sans-serif';
         ctx.textAlign = 'left';
 
         const drawMeasureWithSubBeats = (measureNum: number, beat: number, nextBeat: number) => {
-          ctx.strokeStyle = isDark ? 'rgba(239, 233, 222, 0.05)' : 'rgba(31, 27, 22, 0.05)';
+          ctx.strokeStyle = isDark ? 'rgba(243, 234, 240, 0.05)' : 'rgba(42, 29, 34, 0.05)';
           ctx.lineWidth = 1;
           for (let subBeat = beat + 1; subBeat < nextBeat - 0.05; subBeat += 1) {
             if (subBeat < visibleMinBeat || subBeat > visibleMaxBeat) continue;
@@ -433,7 +500,7 @@ export function FallingNotesCanvas({
           const y = strikeY - (beat - liveBeat) * pxPerBeat;
           if (y < 0 || y > strikeY + 2) return;
           const crispY = Math.round(y) + 0.5;
-          ctx.strokeStyle = isDark ? 'rgba(239, 233, 222, 0.12)' : 'rgba(31, 27, 22, 0.12)';
+          ctx.strokeStyle = isDark ? 'rgba(243, 234, 240, 0.12)' : 'rgba(42, 29, 34, 0.12)';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(0, crispY);
@@ -449,9 +516,9 @@ export function FallingNotesCanvas({
             const pillY = crispY - pillH - 2;
             if (pillY >= 0) {
               traceRoundedRect(ctx, pillX, pillY, pillW, pillH, 4);
-              ctx.fillStyle = isDark ? 'rgba(38, 36, 33, 0.92)' : 'rgba(31, 27, 22, 0.78)';
+              ctx.fillStyle = isDark ? 'rgba(42, 36, 48, 0.92)' : 'rgba(42, 29, 34, 0.78)';
               ctx.fill();
-              ctx.fillStyle = isDark ? '#efe9de' : '#fdfbf7';
+              ctx.fillStyle = isDark ? '#f3eaf0' : '#fffdfb';
               ctx.textBaseline = 'middle';
               ctx.fillText(barLabel, pillX + 5, pillY + pillH / 2);
             }
@@ -494,19 +561,24 @@ export function FallingNotesCanvas({
 
         if (activeExpectedPitches.length > 0) {
           const seenExpected = new Set<number>();
-          ctx.fillStyle = isDark ? 'rgba(239, 233, 222, 0.045)' : 'rgba(31, 27, 22, 0.035)';
           for (let i = 0; i < activeExpectedPitches.length; i += 1) {
             const pitch = activeExpectedPitches[i];
             if (seenExpected.has(pitch)) continue;
             seenExpected.add(pitch);
             const geom = activeLayout.byMidi.get(pitch);
             if (!geom) continue;
+            const palette = resolvePalette(pitch, 'R');
+            ctx.save();
+            ctx.globalAlpha = 0.08;
+            ctx.fillStyle = palette.stickerBg;
             ctx.fillRect(geom.x * width, 0, geom.width * width, strikeY);
+            ctx.restore();
           }
         }
 
         const whiteBars: DrawableBar[] = [];
         const blackBars: DrawableBar[] = [];
+        const nextActiveIds = new Set<string>();
         let offLeftPitch: number | null = null;
         let offRightPitch: number | null = null;
         let offLeftDist = Infinity;
@@ -566,9 +638,22 @@ export function FallingNotesCanvas({
           const palette = resolvePalette(ev.pitch, ev.hand, grade);
 
           const isActive = ev.onset <= liveBeat && noteEnd >= liveBeat;
+          if (isActive) {
+            nextActiveIds.add(ev.id);
+          }
+
           if (grade?.status === 'hit' && !celebratedHitIds.has(ev.id)) {
             celebratedHitIds.add(ev.id);
-            spawnParticles(barX, strikeY, barW, palette);
+            spawnBloom(barX + barW / 2, strikeY, palette.stickerBg, 1.0);
+            spawnHitPetals(barX, strikeY, barW, palette.stickerBg);
+          } else if (
+            hasAdvancedBeat &&
+            isActive &&
+            !prevActiveIds.has(ev.id) &&
+            !celebratedHitIds.has(ev.id) &&
+            grade?.status !== 'hit'
+          ) {
+            spawnBloom(barX + barW / 2, strikeY, palette.stickerBg, 0.7);
           }
 
           const bar: DrawableBar = { ev, barX, barW, clampedTop, barH, palette, isActive };
@@ -578,9 +663,14 @@ export function FallingNotesCanvas({
             whiteBars.push(bar);
           }
         }
+        prevActiveIds = nextActiveIds;
 
         const drawNoteBar = ({ ev, barX, barW, clampedTop, barH, palette }: DrawableBar) => {
-          const radius = Math.min(8, barW * 0.35, barH * 0.4);
+          const radius = Math.min(barW / 2, 14, barH / 2);
+
+          traceRoundedRect(ctx, barX, clampedTop + 2, barW, barH, radius);
+          ctx.fillStyle = 'rgba(42, 29, 34, 0.1)';
+          ctx.fill();
 
           traceRoundedRect(ctx, barX, clampedTop, barW, barH, radius);
           ctx.fillStyle = palette.stickerBg;
@@ -589,21 +679,14 @@ export function FallingNotesCanvas({
           ctx.save();
           traceRoundedRect(ctx, barX, clampedTop, barW, barH, radius);
           ctx.clip();
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-          ctx.fillRect(barX, clampedTop, barW, 1);
+          const hlRx = Math.max(1, barW * 0.36);
+          const hlRy = Math.max(1, Math.min(barH * 0.16, 4.5));
+          const hlY = clampedTop + Math.min(barH * 0.22, hlRy + 2.5);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+          ctx.beginPath();
+          ctx.ellipse(barX + barW / 2, hlY, hlRx, hlRy, 0, 0, Math.PI * 2);
+          ctx.fill();
           ctx.restore();
-
-          ctx.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(255, 255, 255, 0.7)';
-          ctx.lineWidth = 1;
-          traceRoundedRect(
-            ctx,
-            barX + 0.5,
-            clampedTop + 0.5,
-            Math.max(1, barW - 1),
-            Math.max(1, barH - 1),
-            Math.max(1, radius - 0.5),
-          );
-          ctx.stroke();
 
           if (activeShowLabels && barW >= 10 && barH >= 12) {
             const labelText =
@@ -617,7 +700,7 @@ export function FallingNotesCanvas({
               clampedTop + Math.min(barH / 2, 14),
               Math.min(clampedTop + barH / 2, strikeY - 11),
             );
-            ctx.font = `600 ${fontSize}px Figtree, system-ui, -apple-system, sans-serif`;
+            ctx.font = `600 ${fontSize}px Nunito, ui-rounded, system-ui, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = palette.stickerText;
@@ -643,50 +726,29 @@ export function FallingNotesCanvas({
 
             const palette = resolvePalette(pitch, 'R');
             const cx = (geom.x + geom.width / 2) * width;
-            const colW = geom.width * width;
-            const halfW = Math.min(9, Math.max(5, colW * 0.22));
-            const tipY = strikeY - 4;
-            const baseY = tipY - halfW * 1.15;
-
-            ctx.beginPath();
-            ctx.moveTo(cx, tipY);
-            ctx.lineTo(cx - halfW, baseY);
-            ctx.lineTo(cx + halfW, baseY);
-            ctx.closePath();
-            ctx.fillStyle = palette.stickerBg;
-            ctx.fill();
-            ctx.lineWidth = 1.5;
-            ctx.strokeStyle = '#ffffff';
-            ctx.stroke();
+            drawFivePetalFlower(ctx, cx, strikeY - 10, 8, palette.stickerBg, 1);
           }
         }
 
-        ctx.strokeStyle = isDark ? 'rgba(239, 233, 222, 0.22)' : 'rgba(31, 27, 22, 0.2)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(0, strikeY);
-        ctx.lineTo(width, strikeY);
-        ctx.stroke();
+        traceRoundedRect(ctx, 0, strikeY - 1.5, width, 3, 1.5);
+        ctx.fillStyle = isDark ? 'rgba(240, 101, 149, 0.35)' : 'rgba(214, 51, 108, 0.35)';
+        ctx.fill();
 
         const drawOffscreenPill = (pitch: number, side: 'left' | 'right') => {
           const palette = resolvePalette(pitch, 'R');
           const shortLabel = getKeyStickerColor(pitch).shortLabel;
           const label = side === 'left' ? `\u2190 ${shortLabel}` : `${shortLabel} \u2192`;
           ctx.save();
-          ctx.font = '600 11px Figtree, system-ui, -apple-system, sans-serif';
+          ctx.font = '600 11px Nunito, ui-rounded, system-ui, sans-serif';
           const textW = ctx.measureText(label).width;
-          const pillH = 22;
-          const pillW = Math.ceil(textW + 14);
+          const pillH = 24;
+          const pillW = Math.ceil(textW + 16);
           const pillX = side === 'left' ? 8 : width - pillW - 8;
           const pillY = Math.max(4, strikeY - 10 - pillH);
 
-          traceRoundedRect(ctx, pillX, pillY, pillW, pillH, 6);
+          traceRoundedRect(ctx, pillX, pillY, pillW, pillH, 10);
           ctx.fillStyle = palette.stickerBg;
           ctx.fill();
-
-          ctx.lineWidth = 1;
-          ctx.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(255, 255, 255, 0.7)';
-          ctx.stroke();
 
           ctx.fillStyle = palette.stickerText;
           ctx.textAlign = 'center';
@@ -702,23 +764,48 @@ export function FallingNotesCanvas({
           drawOffscreenPill(offRightPitch, 'right');
         }
 
-        if (particles.length > 0) {
-          ctx.save();
-          for (let i = particles.length - 1; i >= 0; i -= 1) {
-            const p = particles[i];
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            p.vy *= 0.96;
-            p.alpha -= p.decay * dt;
-            if (p.alpha <= 0) {
-              particles.splice(i, 1);
+        if (blooms.length > 0) {
+          for (let i = blooms.length - 1; i >= 0; i -= 1) {
+            const b = blooms[i];
+            b.age += dt;
+            const t = b.age / b.duration;
+            if (t >= 1) {
+              blooms.splice(i, 1);
               continue;
             }
-            ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+            const scaleProgress =
+              t < 0.45
+                ? 0.3 + (1.15 - 0.3) * (1 - Math.pow(1 - t / 0.45, 3))
+                : 1.15 + (1.0 - 1.15) * ((t - 0.45) / 0.55);
+            const alpha = t < 0.35 ? 1 : Math.max(0, 1 - (t - 0.35) / 0.65);
+            drawFivePetalFlower(ctx, b.x, b.y - 6, 14 * scaleProgress * b.maxScale, b.color, alpha);
+          }
+        }
+
+        if (petals.length > 0) {
+          ctx.save();
+          for (let i = petals.length - 1; i >= 0; i -= 1) {
+            const p = petals[i];
+            p.age += dt;
+            if (p.age >= p.duration) {
+              petals.splice(i, 1);
+              continue;
+            }
+            p.vy += PETAL_GRAVITY * dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.rot += p.vrot * dt;
+
+            const alpha = Math.max(0, 1 - p.age / p.duration);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
             ctx.fillStyle = p.color;
             ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size * 0.55, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, 4.5, 2.6, 0, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
           }
           ctx.restore();
         }
@@ -738,15 +825,15 @@ export function FallingNotesCanvas({
           className={[
             'flex h-9 shrink-0 items-center justify-between gap-2 border-b px-3 text-xs',
             darkMode
-              ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#aaa398]'
-              : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#5e554a]',
+              ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#b9a9b4]'
+              : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#6b5560]',
           ].join(' ')}
         >
           <div className="flex items-center gap-2">
             <div
               className={[
                 'inline-flex items-center rounded-[8px] p-0.5',
-                darkMode ? 'bg-[#262421]' : 'bg-[#efe9df]',
+                darkMode ? 'bg-[#2a2430]' : 'bg-[#f6ebe6]',
               ].join(' ')}
             >
               {SPEED_OPTIONS.map((opt) => {
@@ -760,11 +847,11 @@ export function FallingNotesCanvas({
                       'rounded-[6px] px-2 py-0.5 text-[11px] font-medium transition-colors duration-150',
                       active
                         ? darkMode
-                          ? 'bg-[#1c1a18] text-[#efe9de]'
-                          : 'bg-[#fdfbf7] text-[#1f1b16]'
+                          ? 'bg-[#1f1a22] text-[#f3eaf0]'
+                          : 'bg-[#fffdfb] text-[#2a1d22]'
                         : darkMode
-                          ? 'text-[#aaa398] hover:text-[#efe9de]'
-                          : 'text-[#5e554a] hover:text-[#1f1b16]',
+                          ? 'text-[#b9a9b4] hover:text-[#f3eaf0]'
+                          : 'text-[#6b5560] hover:text-[#2a1d22]',
                     ].join(' ')}
                     title={`Show ${opt.beats} beats ahead`}
                   >
@@ -783,8 +870,8 @@ export function FallingNotesCanvas({
                   className={[
                     'rounded-[6px] border px-2 py-0.5 font-mono text-[11px] font-medium transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none',
                     darkMode
-                      ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#efe9de] hover:bg-[#2f2c28]'
-                      : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#1f1b16] hover:bg-[#e5dfd4]',
+                      ? 'border-[#f3eaf0]/[0.08] bg-[#2a2430] text-[#f3eaf0] hover:bg-[#352d3c]'
+                      : 'border-[#2a1d22]/[0.08] bg-[#f6ebe6] text-[#2a1d22] hover:bg-[#ede0da]',
                   ].join(' ')}
                   title="Shift keyboard down an octave"
                 >
@@ -797,8 +884,8 @@ export function FallingNotesCanvas({
                   className={[
                     'rounded-[6px] border px-2 py-0.5 font-mono text-[11px] font-medium transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none',
                     darkMode
-                      ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#efe9de] hover:bg-[#2f2c28]'
-                      : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#1f1b16] hover:bg-[#e5dfd4]',
+                      ? 'border-[#f3eaf0]/[0.08] bg-[#2a2430] text-[#f3eaf0] hover:bg-[#352d3c]'
+                      : 'border-[#2a1d22]/[0.08] bg-[#f6ebe6] text-[#2a1d22] hover:bg-[#ede0da]',
                   ].join(' ')}
                   title="Shift keyboard up an octave"
                 >
@@ -813,7 +900,7 @@ export function FallingNotesCanvas({
               <div
                 className={[
                   'inline-flex items-center rounded-[8px] p-0.5',
-                  darkMode ? 'bg-[#262421]' : 'bg-[#efe9df]',
+                  darkMode ? 'bg-[#2a2430]' : 'bg-[#f6ebe6]',
                 ].join(' ')}
               >
                 {(['rainbow', 'hands'] as const).map((mode) => {
@@ -827,11 +914,11 @@ export function FallingNotesCanvas({
                         'rounded-[6px] px-2 py-0.5 text-[11px] font-medium transition-colors duration-150',
                         active
                           ? darkMode
-                            ? 'bg-[#1c1a18] text-[#efe9de]'
-                            : 'bg-[#fdfbf7] text-[#1f1b16]'
+                            ? 'bg-[#1f1a22] text-[#f3eaf0]'
+                            : 'bg-[#fffdfb] text-[#2a1d22]'
                           : darkMode
-                            ? 'text-[#aaa398] hover:text-[#efe9de]'
-                            : 'text-[#5e554a] hover:text-[#1f1b16]',
+                            ? 'text-[#b9a9b4] hover:text-[#f3eaf0]'
+                            : 'text-[#6b5560] hover:text-[#2a1d22]',
                       ].join(' ')}
                     >
                       {mode === 'rainbow' ? 'Rainbow' : 'Hands'}
@@ -848,11 +935,11 @@ export function FallingNotesCanvas({
                 'rounded-[6px] border px-2 py-0.5 font-mono text-[11px] font-medium transition-colors duration-150',
                 showLabels
                   ? darkMode
-                    ? 'border-[#e07047]/60 bg-[#e07047]/15 text-[#e07047]'
-                    : 'border-[#c85a32]/50 bg-[#c85a32]/10 text-[#c85a32]'
+                    ? 'border-[#f06595]/60 bg-[#f06595]/15 text-[#f06595]'
+                    : 'border-[#d6336c]/50 bg-[#d6336c]/10 text-[#d6336c]'
                   : darkMode
-                    ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#aaa398] hover:text-[#efe9de]'
-                    : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#5e554a] hover:text-[#1f1b16]',
+                    ? 'border-[#f3eaf0]/[0.08] bg-[#2a2430] text-[#b9a9b4] hover:text-[#f3eaf0]'
+                    : 'border-[#2a1d22]/[0.08] bg-[#f6ebe6] text-[#6b5560] hover:text-[#2a1d22]',
               ].join(' ')}
               title="Toggle note pitch labels"
             >
