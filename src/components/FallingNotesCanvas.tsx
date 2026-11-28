@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NoteEvent, TimeSigPoint } from '../music/types';
 import type { PracticeGrade } from '../practice/engine';
-import { getKeyStickerColor, getNotePalette, type ColorMode, type NotePalette } from './note-colors';
+import {
+  getKeyStickerColor,
+  getKidNoteHint,
+  getNotePalette,
+  type ColorMode,
+  type NotePalette,
+} from './note-colors';
 import type { PianoLayout } from './piano-geometry';
 
 export interface FallingNotesCanvasProps {
@@ -19,6 +25,9 @@ export interface FallingNotesCanvasProps {
   canShiftOctave?: boolean;
   octaveShift?: number;
   onOctaveShift?: (delta: number) => void;
+  expectedPitches?: readonly number[];
+  playfulMode?: boolean;
+  lookaheadOverride?: number;
 }
 
 interface MeasureLine {
@@ -52,8 +61,20 @@ const STRIKE_OFFSET_PX = 8;
 const FLUSH_STRIKE_OFFSET_PX = 2;
 const NOTE_TOP_GAP_PX = 2.5;
 const ANTICIPATION_BEATS = 0.45;
-const MAX_SPARKLE_PARTICLES = 40;
+const MAX_SPARKLE_PARTICLES = 64;
 const OCTAVE_WATERMARKS = new Set(['C2', 'C3', 'C4', 'C5', 'C6']);
+const TWILIGHT_STARS = [
+  { rx: 0.08, ry: 0.12, r: 1.4, phase: 0.2 },
+  { rx: 0.19, ry: 0.28, r: 1.1, phase: 1.1 },
+  { rx: 0.31, ry: 0.09, r: 1.6, phase: 2.3 },
+  { rx: 0.44, ry: 0.22, r: 1.2, phase: 0.7 },
+  { rx: 0.57, ry: 0.14, r: 1.5, phase: 3.1 },
+  { rx: 0.69, ry: 0.31, r: 1.1, phase: 1.8 },
+  { rx: 0.81, ry: 0.11, r: 1.6, phase: 2.6 },
+  { rx: 0.92, ry: 0.24, r: 1.3, phase: 0.5 },
+  { rx: 0.14, ry: 0.48, r: 1.2, phase: 2.9 },
+  { rx: 0.75, ry: 0.44, r: 1.3, phase: 1.4 },
+] as const;
 
 const SPEED_OPTIONS = [
   { id: 'slow', label: 'Slow', beats: 8 },
@@ -216,12 +237,16 @@ export function FallingNotesCanvas({
   canShiftOctave = false,
   octaveShift = 0,
   onOctaveShift,
+  expectedPitches = [],
+  playfulMode = colorMode === 'rainbow',
+  lookaheadOverride,
 }: FallingNotesCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
   const [lookaheadBeats, setLookaheadBeats] = useState<number>(8);
   const [showLabels, setShowLabels] = useState<boolean>(true);
+  const effectiveLookahead = lookaheadOverride ?? lookaheadBeats;
 
   const indexedEvents = useMemo(() => {
     const sorted = [...events].sort((a, b) => a.onset - b.onset || a.pitch - b.pitch);
@@ -252,10 +277,13 @@ export function FallingNotesCanvas({
     grades,
     getLiveBeat,
     darkMode,
-    lookaheadBeats,
+    lookaheadBeats: effectiveLookahead,
     showLabels,
     colorMode,
     flushBottom,
+    hideToolbar,
+    expectedPitches,
+    playfulMode,
   });
   stateRef.current = {
     indexedEvents,
@@ -264,10 +292,13 @@ export function FallingNotesCanvas({
     grades,
     getLiveBeat,
     darkMode,
-    lookaheadBeats,
+    lookaheadBeats: effectiveLookahead,
     showLabels,
     colorMode,
     flushBottom,
+    hideToolbar,
+    expectedPitches,
+    playfulMode,
   };
 
   useEffect(() => {
@@ -359,7 +390,12 @@ export function FallingNotesCanvas({
           showLabels: activeShowLabels,
           colorMode: activeColorMode,
           flushBottom: isFlushBottom,
+          hideToolbar: isHideToolbar,
+          expectedPitches: activeExpectedPitches,
+          playfulMode: isPlayful,
         } = stateRef.current;
+
+        const suppressChrome = isPlayful && isHideToolbar;
 
         const liveBeat = readBeat();
         if (evData.sorted !== prevSortedRef || liveBeat < prevLiveBeat - 0.5) {
@@ -378,16 +414,34 @@ export function FallingNotesCanvas({
 
         const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
         if (isDark) {
-          bgGrad.addColorStop(0, '#070b14');
-          bgGrad.addColorStop(1, '#0f172a');
+          bgGrad.addColorStop(0, '#141936');
+          bgGrad.addColorStop(1, '#1d244c');
         } else {
-          bgGrad.addColorStop(0, '#f5f2eb');
-          bgGrad.addColorStop(1, '#e7e2d7');
+          bgGrad.addColorStop(0, '#e8f6ff');
+          bgGrad.addColorStop(0.55, '#f8fcff');
+          bgGrad.addColorStop(1, '#fffdf6');
         }
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, width, height);
 
-        ctx.fillStyle = isDark ? 'rgba(2, 6, 23, 0.42)' : 'rgba(28, 25, 23, 0.06)';
+        if (isDark) {
+          for (let i = 0; i < TWILIGHT_STARS.length; i += 1) {
+            const star = TWILIGHT_STARS[i];
+            const twinkle = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(nowMs * 0.002 + star.phase));
+            ctx.fillStyle = `rgba(254, 243, 199, ${twinkle.toFixed(2)})`;
+            drawSparkleStar(ctx, star.rx * width, star.ry * strikeY, star.r * 1.8);
+            ctx.fill();
+          }
+        } else {
+          for (let i = 0; i < activeLayout.whiteKeys.length; i += 1) {
+            const wk = activeLayout.whiteKeys[i];
+            const hint = getKidNoteHint(wk.midi);
+            ctx.fillStyle = hint.laneTint;
+            ctx.fillRect(wk.x * width, 0, wk.width * width, strikeY);
+          }
+        }
+
+        ctx.fillStyle = isDark ? 'rgba(10, 14, 34, 0.38)' : 'rgba(148, 163, 184, 0.07)';
         for (let i = 0; i < activeLayout.blackKeys.length; i += 1) {
           const bk = activeLayout.blackKeys[i];
           ctx.fillRect(bk.x * width, 0, bk.width * width, strikeY);
@@ -400,23 +454,25 @@ export function FallingNotesCanvas({
         for (let i = 0; i < activeLayout.whiteKeys.length; i += 1) {
           const wk = activeLayout.whiteKeys[i];
           const pc = ((wk.midi % 12) + 12) % 12;
-          if (pc !== 0 && pc !== 5) continue;
           const x = Math.round(wk.x * width) + 0.5;
-          ctx.strokeStyle =
-            pc === 0
-              ? isDark
-                ? 'rgba(148, 163, 184, 0.22)'
-                : 'rgba(120, 113, 108, 0.26)'
-              : isDark
-                ? 'rgba(148, 163, 184, 0.08)'
-                : 'rgba(120, 113, 108, 0.11)';
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, strikeY);
-          ctx.stroke();
+          if (!isDark) {
+            ctx.strokeStyle =
+              pc === 0 ? 'rgba(148, 163, 184, 0.24)' : 'rgba(148, 163, 184, 0.12)';
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, strikeY);
+            ctx.stroke();
+          } else if (pc === 0 || pc === 5) {
+            ctx.strokeStyle =
+              pc === 0 ? 'rgba(148, 163, 184, 0.22)' : 'rgba(148, 163, 184, 0.09)';
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, strikeY);
+            ctx.stroke();
+          }
 
-          if (wk.isC && OCTAVE_WATERMARKS.has(wk.label)) {
-            ctx.fillStyle = isDark ? 'rgba(148, 163, 184, 0.34)' : 'rgba(87, 83, 78, 0.4)';
+          if (!suppressChrome && wk.isC && OCTAVE_WATERMARKS.has(wk.label)) {
+            ctx.fillStyle = isDark ? 'rgba(148, 163, 184, 0.34)' : 'rgba(100, 116, 139, 0.42)';
             ctx.fillText(wk.label, x + 3.5, 6);
           }
         }
@@ -426,7 +482,7 @@ export function FallingNotesCanvas({
         ctx.textAlign = 'left';
 
         const drawMeasureWithSubBeats = (measureNum: number, beat: number, nextBeat: number) => {
-          ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.07)' : 'rgba(120, 113, 108, 0.09)';
+          ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(148, 163, 184, 0.1)';
           ctx.lineWidth = 1;
           for (let subBeat = beat + 1; subBeat < nextBeat - 0.05; subBeat += 1) {
             if (subBeat < visibleMinBeat || subBeat > visibleMaxBeat) continue;
@@ -442,26 +498,28 @@ export function FallingNotesCanvas({
           const y = strikeY - (beat - liveBeat) * pxPerBeat;
           if (y < 0 || y > strikeY + 2) return;
           const crispY = Math.round(y) + 0.5;
-          ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(120, 113, 108, 0.25)';
+          ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.22)';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(0, crispY);
           ctx.lineTo(width, crispY);
           ctx.stroke();
 
-          const barLabel = `Bar ${measureNum}`;
-          const textW = ctx.measureText(barLabel).width;
-          const pillX = 6;
-          const pillW = textW + 10;
-          const pillH = 15;
-          const pillY = crispY - pillH - 2;
-          if (pillY >= 0) {
-            traceRoundedRect(ctx, pillX, pillY, pillW, pillH, 4);
-            ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.84)' : 'rgba(28, 25, 23, 0.72)';
-            ctx.fill();
-            ctx.fillStyle = isDark ? 'rgba(226, 232, 240, 0.9)' : 'rgba(250, 247, 240, 0.96)';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(barLabel, pillX + 5, pillY + pillH / 2);
+          if (!suppressChrome) {
+            const barLabel = `Bar ${measureNum}`;
+            const textW = ctx.measureText(barLabel).width;
+            const pillX = 6;
+            const pillW = textW + 10;
+            const pillH = 15;
+            const pillY = crispY - pillH - 2;
+            if (pillY >= 0) {
+              traceRoundedRect(ctx, pillX, pillY, pillW, pillH, 4);
+              ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.84)' : 'rgba(28, 25, 23, 0.72)';
+              ctx.fill();
+              ctx.fillStyle = isDark ? 'rgba(226, 232, 240, 0.9)' : 'rgba(250, 247, 240, 0.96)';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(barLabel, pillX + 5, pillY + pillH / 2);
+            }
           }
         };
 
@@ -498,6 +556,31 @@ export function FallingNotesCanvas({
           }
           return getNotePalette(pitch, hand, activeColorMode);
         };
+
+        if (activeExpectedPitches.length > 0) {
+          const seenExpected = new Set<number>();
+          for (let i = 0; i < activeExpectedPitches.length; i += 1) {
+            const pitch = activeExpectedPitches[i];
+            if (seenExpected.has(pitch)) continue;
+            seenExpected.add(pitch);
+            const geom = activeLayout.byMidi.get(pitch);
+            if (!geom) continue;
+
+            const palette = resolvePalette(pitch, 'R');
+            const colX = geom.x * width;
+            const colW = geom.width * width;
+            const beamGrad = ctx.createLinearGradient(0, 0, 0, strikeY);
+            beamGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            beamGrad.addColorStop(0.55, 'rgba(255, 255, 255, 0.04)');
+            beamGrad.addColorStop(1, palette.glow);
+
+            ctx.save();
+            ctx.globalAlpha = isDark ? 0.24 : 0.2;
+            ctx.fillStyle = beamGrad;
+            ctx.fillRect(colX, 0, colW, strikeY);
+            ctx.restore();
+          }
+        }
 
         const spotlightStartIdx = lowerBoundOnset(evData.sorted, liveBeat);
         for (let i = spotlightStartIdx; i < evData.sorted.length; i += 1) {
@@ -578,7 +661,7 @@ export function FallingNotesCanvas({
           }
           if (grade?.status === 'hit' && !celebratedHitIds.has(ev.id)) {
             celebratedHitIds.add(ev.id);
-            spawnParticles(barX, strikeY, barW, palette, 5);
+            spawnParticles(barX, strikeY, barW, palette, 10);
           }
 
           const bar: DrawableBar = { ev, barX, barW, clampedTop, barH, palette, isActive };
@@ -594,66 +677,110 @@ export function FallingNotesCanvas({
           const grad = ctx.createLinearGradient(0, clampedTop, 0, clampedTop + barH);
           grad.addColorStop(0, palette.top);
           grad.addColorStop(1, palette.bottom);
+          const radius = Math.min(11, barW * 0.42, barH * 0.45);
 
           ctx.save();
           if (isActive) {
             ctx.shadowColor = palette.glow;
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = 14;
           }
-          traceRoundedRect(ctx, barX, clampedTop, barW, barH, 5);
+          traceRoundedRect(ctx, barX, clampedTop, barW, barH, radius);
           ctx.fillStyle = grad;
           ctx.fill();
           ctx.restore();
 
           ctx.save();
-          traceRoundedRect(ctx, barX, clampedTop, barW, barH, 5);
+          traceRoundedRect(ctx, barX, clampedTop, barW, barH, radius);
           ctx.clip();
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
+          ctx.fillRect(barX + 2, clampedTop + 1.5, Math.max(0, barW - 4), Math.min(4, barH * 0.25));
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
           ctx.fillRect(barX, clampedTop + barH - 3, barW, 3);
           ctx.restore();
 
-          ctx.strokeStyle = palette.border;
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = isDark ? palette.border : '#ffffff';
+          ctx.lineWidth = isDark ? 1.5 : 2;
           traceRoundedRect(
             ctx,
             barX + 0.5,
             clampedTop + 0.5,
             Math.max(1, barW - 1),
             Math.max(1, barH - 1),
-            4.5,
+            Math.max(1, radius - 0.5),
           );
           ctx.stroke();
 
-          if (activeShowLabels && barW >= 9 && barH >= 11) {
-            const labelY = Math.min(clampedTop + barH - 3.5, strikeY - 3.5);
-            if (labelY - clampedTop >= 7.5) {
-              const labelText =
-                activeColorMode === 'rainbow'
-                  ? getKeyStickerColor(ev.pitch).shortLabel
-                  : barW >= 20 && barH >= 14
-                    ? ev.pitchName
-                    : ev.pitchName.replace(/-?\d+$/, '');
-              ctx.font =
-                barW >= 20
-                  ? '700 10px ui-sans-serif, system-ui, -apple-system, sans-serif'
-                  : '700 9px ui-sans-serif, system-ui, -apple-system, sans-serif';
-              ctx.lineWidth = 2.5;
-              ctx.lineJoin = 'round';
-              ctx.strokeStyle = 'rgba(12, 10, 9, 0.85)';
-              ctx.strokeText(labelText, barX + barW / 2, labelY, barW - 3);
-              ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-              ctx.fillText(labelText, barX + barW / 2, labelY, barW - 3);
-            }
+          if (activeShowLabels && barW >= 10 && barH >= 12) {
+            const labelText =
+              activeColorMode === 'rainbow'
+                ? getKeyStickerColor(ev.pitch).shortLabel
+                : barW >= 20 && barH >= 14
+                  ? ev.pitchName
+                  : ev.pitchName.replace(/-?\d+$/, '');
+            const isRainbowText = activeColorMode === 'rainbow';
+            const fontSize = barW >= 28 ? 13 : barW >= 20 ? 11 : 9.5;
+            const centerY = Math.max(
+              clampedTop + Math.min(barH / 2, 14),
+              Math.min(clampedTop + barH / 2, strikeY - 11),
+            );
+            ctx.font = isRainbowText
+              ? `700 ${fontSize}px Fredoka, ui-rounded, sans-serif`
+              : `700 ${Math.min(10, fontSize)}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 2.6;
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = 'rgba(12, 10, 9, 0.78)';
+            ctx.strokeText(labelText, barX + barW / 2, centerY, barW - 4);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+            ctx.fillText(labelText, barX + barW / 2, centerY, barW - 4);
           }
         };
 
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
         for (let i = 0; i < whiteBars.length; i += 1) {
           drawNoteBar(whiteBars[i]);
         }
         for (let i = 0; i < blackBars.length; i += 1) {
           drawNoteBar(blackBars[i]);
+        }
+
+        if (activeExpectedPitches.length > 0) {
+          const seenPointer = new Set<number>();
+          const bounce = Math.abs(Math.sin(nowMs * 0.0055)) * 7;
+          for (let i = 0; i < activeExpectedPitches.length; i += 1) {
+            const pitch = activeExpectedPitches[i];
+            if (seenPointer.has(pitch)) continue;
+            seenPointer.add(pitch);
+            const geom = activeLayout.byMidi.get(pitch);
+            if (!geom) continue;
+
+            const palette = resolvePalette(pitch, 'R');
+            const cx = (geom.x + geom.width / 2) * width;
+            const colW = geom.width * width;
+            const halfW = Math.min(11, Math.max(6, colW * 0.24));
+            const tipY = strikeY - 5 - bounce;
+            const baseY = tipY - halfW * 1.15;
+
+            ctx.save();
+            ctx.shadowColor = palette.glow;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(cx, tipY);
+            ctx.lineTo(cx - halfW, baseY);
+            ctx.lineTo(cx + halfW, baseY);
+            ctx.closePath();
+            ctx.fillStyle = palette.top;
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(cx, baseY + halfW * 0.36, Math.max(2, halfW * 0.24), 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.restore();
+          }
         }
 
         const strikeGlow = ctx.createLinearGradient(0, strikeY - 14, 0, height);

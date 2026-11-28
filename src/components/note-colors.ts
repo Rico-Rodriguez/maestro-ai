@@ -255,6 +255,40 @@ export function getKeyStickerColor(pitch: number): {
   };
 }
 
+const KID_HINT_BY_PC: Record<number, { colorName: string; laneTint: string }> = {
+  0: { colorName: 'Red', laneTint: 'rgba(248, 113, 113, 0.08)' },
+  1: { colorName: 'Ruby', laneTint: 'rgba(225, 29, 72, 0.08)' },
+  2: { colorName: 'Orange', laneTint: 'rgba(251, 146, 60, 0.08)' },
+  3: { colorName: 'Amber', laneTint: 'rgba(217, 119, 6, 0.08)' },
+  4: { colorName: 'Yellow', laneTint: 'rgba(250, 204, 21, 0.08)' },
+  5: { colorName: 'Green', laneTint: 'rgba(74, 222, 128, 0.08)' },
+  6: { colorName: 'Emerald', laneTint: 'rgba(21, 128, 61, 0.08)' },
+  7: { colorName: 'Teal', laneTint: 'rgba(45, 212, 191, 0.08)' },
+  8: { colorName: 'Cyan', laneTint: 'rgba(8, 145, 178, 0.08)' },
+  9: { colorName: 'Blue', laneTint: 'rgba(96, 165, 250, 0.08)' },
+  10: { colorName: 'Indigo', laneTint: 'rgba(79, 70, 229, 0.08)' },
+  11: { colorName: 'Purple', laneTint: 'rgba(192, 132, 252, 0.08)' },
+};
+
+export function getKidNoteHint(pitch: number): {
+  letter: string;
+  colorName: string;
+  bg: string;
+  text: string;
+  laneTint: string;
+} {
+  const pc = pitchClass(pitch);
+  const style = RAINBOW_BY_PC[pc] ?? RAINBOW_BY_PC[0];
+  const hint = KID_HINT_BY_PC[pc] ?? KID_HINT_BY_PC[0];
+  return {
+    letter: SHORT_LABELS[pc] ?? 'C',
+    colorName: hint.colorName,
+    bg: style.stickerBg,
+    text: style.stickerText,
+    laneTint: hint.laneTint,
+  };
+}
+
 export function measureAtBeat(
   timeSignatures: readonly TimeSigPoint[],
   defaultBeatsPerMeasure: number,
