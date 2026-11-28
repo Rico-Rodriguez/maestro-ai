@@ -19,12 +19,21 @@
       "iconURL": "https://rico-rodriguez.github.io/maestro-ai/icon-1024.png",
       "tintColor": "#D97706",
       "category": "music",
-      "version": "1.0.21",
-      "versionDate": "2026-11-28T05:08:30Z",
-      "versionDescription": "Maestro AI iOS build 1.0.21 (c194c66).",
-      "downloadURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/v1.0.21/MaestroAI-1.0.21.ipa",
-      "size": 13150408,
+      "version": "1.0.22",
+      "versionDate": "2026-11-28T05:35:59Z",
+      "versionDescription": "Maestro AI iOS build 1.0.22 (d3b0ab8).",
+      "downloadURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/v1.0.22/MaestroAI-1.0.22.ipa",
+      "size": 13277496,
       "versions": [
+        {
+          "version": "1.0.22",
+          "buildVersion": "22",
+          "date": "2026-11-28T05:35:59Z",
+          "localizedDescription": "Maestro AI iOS build 1.0.22 (d3b0ab8).",
+          "downloadURL": "https://github.com/Rico-Rodriguez/maestro-ai/releases/download/v1.0.22/MaestroAI-1.0.22.ipa",
+          "size": 13277496,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "1.0.21",
           "buildVersion": "21",
