@@ -36,6 +36,7 @@ interface ScheduledNote {
   hand: Hand;
   onset: number;
   endBeat: number;
+  visualEndBeat: number;
   onWhenSec: number;
   offSent: boolean;
 }
@@ -50,6 +51,8 @@ const LOOKAHEAD_SEC = 0.12;
 const MIN_TEMPO_SCALE = 0.1;
 const MAX_TEMPO_SCALE = 4.0;
 const MIN_NOTE_SEC = 0.015;
+const REARTICULATE_GAP_SEC = 0.008;
+const VISUAL_REARTICULATE_GAP_BEATS = 0.06;
 const BOUNDARY_EPS = 1e-6;
 
 function clampTempoScale(scale: number): number {
@@ -455,7 +458,7 @@ export class PlaybackScheduler {
     const liveBeat = this.getLiveBeat();
     for (let i = 0; i < this.activeScheduledNotes.length; i += 1) {
       const note = this.activeScheduledNotes[i];
-      if (note.onset <= liveBeat + BOUNDARY_EPS && liveBeat < note.endBeat) {
+      if (note.onset <= liveBeat + BOUNDARY_EPS && liveBeat < note.visualEndBeat) {
         active.set(note.pitch, note.hand);
       }
     }
@@ -527,6 +530,7 @@ export class PlaybackScheduler {
       );
 
       if (lookaheadTime >= wrapAudioTime) {
+        this.flushPendingNoteOffs(score, this.scheduledBeat);
         this.scheduleWindow(score, this.scheduledBeat, loopBounds.endBeat);
         this.flushPendingNoteOffs(score, loopBounds.endBeat);
         this.engine.stopAllPlayback(wrapAudioTime);
@@ -557,6 +561,7 @@ export class PlaybackScheduler {
         );
         const clampedNextEnd = Math.min(nextWindowEnd, loopBounds.endBeat);
         if (clampedNextEnd > this.scheduledBeat) {
+          this.flushPendingNoteOffs(score, this.scheduledBeat);
           this.scheduleWindow(score, this.scheduledBeat, clampedNextEnd);
           this.flushPendingNoteOffs(score, clampedNextEnd);
           this.scheduledBeat = clampedNextEnd;
@@ -571,6 +576,7 @@ export class PlaybackScheduler {
     );
 
     if (windowEndBeat > this.scheduledBeat) {
+      this.flushPendingNoteOffs(score, this.scheduledBeat);
       this.scheduleWindow(score, this.scheduledBeat, windowEndBeat);
       this.flushPendingNoteOffs(score, windowEndBeat);
       this.scheduledBeat = windowEndBeat;
@@ -609,6 +615,13 @@ export class PlaybackScheduler {
         this.schedAnchorSongSec,
       );
       const velocity = Math.max(1, Math.min(127, Math.round(ev.velocity * velScale)));
+      this.flushNoteOffsAtOrBefore(score, ev.onset, ev.pitch, onWhenSec);
+      for (let i = 0; i < this.activeScheduledNotes.length; i += 1) {
+        const n = this.activeScheduledNotes[i];
+        if (n.pitch === ev.pitch && n.visualEndBeat > ev.onset - VISUAL_REARTICULATE_GAP_BEATS) {
+          n.visualEndBeat = Math.max(n.onset + 0.03, ev.onset - VISUAL_REARTICULATE_GAP_BEATS);
+        }
+      }
       this.engine.noteOn(ev.pitch, velocity, onWhenSec, 'playback');
 
       this.activeScheduledNotes.push({
@@ -616,6 +629,7 @@ export class PlaybackScheduler {
         hand: ev.hand,
         onset: ev.onset,
         endBeat: ev.onset + ev.duration,
+        visualEndBeat: ev.onset + ev.duration,
         onWhenSec,
         offSent: false,
       });
@@ -658,19 +672,34 @@ export class PlaybackScheduler {
   }
 
   private flushPendingNoteOffs(score: Score, upToBeat: number): void {
+    this.flushNoteOffsAtOrBefore(score, upToBeat);
+  }
+
+  private flushNoteOffsAtOrBefore(
+    score: Score,
+    cutoffBeat: number,
+    rearticulatePitch?: number,
+    nextOnWhenSec?: number,
+  ): void {
     for (let i = 0; i < this.activeScheduledNotes.length; i += 1) {
       const note = this.activeScheduledNotes[i];
-      if (note.offSent || note.endBeat >= upToBeat - BOUNDARY_EPS) continue;
+      if (note.offSent || note.endBeat > cutoffBeat + BOUNDARY_EPS) continue;
       note.offSent = true;
-      const offWhenSec = Math.max(
-        note.onWhenSec + MIN_NOTE_SEC,
-        this.beatToAudioTime(
-          score,
-          note.endBeat,
-          this.schedAnchorAudioTime,
-          this.schedAnchorSongSec,
-        ),
+      const rawOffSec = this.beatToAudioTime(
+        score,
+        note.endBeat,
+        this.schedAnchorAudioTime,
+        this.schedAnchorSongSec,
       );
+      const offWhenSec =
+        rearticulatePitch !== undefined &&
+        note.pitch === rearticulatePitch &&
+        nextOnWhenSec !== undefined
+          ? Math.max(
+              note.onWhenSec + MIN_NOTE_SEC,
+              Math.min(rawOffSec, nextOnWhenSec - REARTICULATE_GAP_SEC),
+            )
+          : Math.max(note.onWhenSec + MIN_NOTE_SEC, rawOffSec);
       this.engine.noteOff(note.pitch, offWhenSec, 'playback');
     }
   }
