@@ -48,7 +48,9 @@ import { type ColorMode } from './note-colors';
 import {
   autoOctaveShiftForPitches,
   buildPianoLayout,
+  chooseSmartRangeMode,
   computePianoRange,
+  initialOctaveShiftForScore,
   type PianoRangeMode,
 } from './piano-geometry';
 import PianoKeyboard from './PianoKeyboard';
@@ -180,13 +182,41 @@ export default function PracticeStudio({
   registerMicGate,
   kidLocked = false,
 }: PracticeStudioProps) {
+  const hasExternalInput = midiDevices.length > 0 || micActive;
   const [practiceState, setPracticeState] = useState<PracticeState>(() =>
     score ? createPracticeState(score) : EMPTY_PRACTICE_STATE,
   );
   const [userPressedNotes, setUserPressedNotes] = useState<Set<number>>(() => new Set());
   const [userSustainDown, setUserSustainDown] = useState(false);
-  const [rangeMode, setRangeMode] = useState<PianoRangeMode>('kid');
-  const [octaveShift, setOctaveShift] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 390,
+  );
+  const [manualRangeOverride, setManualRangeOverride] = useState(false);
+  const [rangeMode, setRangeMode] = useState<PianoRangeMode>(() =>
+    chooseSmartRangeMode({
+      minPitch: score?.minPitch,
+      maxPitch: score?.maxPitch,
+      viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 390,
+      mode: EMPTY_PRACTICE_STATE.mode,
+      hasExternalInput,
+    }),
+  );
+  const [octaveShift, setOctaveShift] = useState<number>(() => {
+    if (!score) return 0;
+    const initMode = chooseSmartRangeMode({
+      minPitch: score.minPitch,
+      maxPitch: score.maxPitch,
+      viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 390,
+      mode: EMPTY_PRACTICE_STATE.mode,
+      hasExternalInput,
+    });
+    return initialOctaveShiftForScore(
+      score.minPitch,
+      score.maxPitch,
+      initMode === 'kid' ? 'kid' : 'compact',
+      score.events.slice(0, 12).map((e) => e.pitch),
+    );
+  });
   const [viewLayout, setViewLayout] = useState<StudioViewLayout>('falling');
   const [colorMode, setColorMode] = useState<ColorMode>('rainbow');
   const [tempoScale, setTempoScale] = useState(0.85);
@@ -217,6 +247,8 @@ export default function PracticeStudio({
   const muteLocalForMidiRef = useRef(muteLocalForMidi);
   const headphonesModeRef = useRef(headphonesMode);
   const octaveShiftRef = useRef(octaveShift);
+  const viewportWidthRef = useRef(viewportWidth);
+  const hasExternalInputRef = useRef(hasExternalInput);
   const prevFinishedRef = useRef(false);
   const celebrationTimersRef = useRef<number[]>([]);
 
@@ -227,6 +259,24 @@ export default function PracticeStudio({
   muteLocalForMidiRef.current = muteLocalForMidi;
   headphonesModeRef.current = headphonesMode;
   octaveShiftRef.current = octaveShift;
+  viewportWidthRef.current = viewportWidth;
+  hasExternalInputRef.current = hasExternalInput;
+
+  const handleManualRangeModeChange = useCallback((mode: PianoRangeMode) => {
+    setManualRangeOverride(true);
+    setRangeMode(mode);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
 
   const clearCelebrationTimers = useCallback(() => {
     for (const timerId of celebrationTimersRef.current) {
@@ -300,6 +350,25 @@ export default function PracticeStudio({
     setPracticeState(next);
     setUserPressedNotes(new Set());
     setUserSustainDown(false);
+    setManualRangeOverride(false);
+    const nextMode = chooseSmartRangeMode({
+      minPitch: score?.minPitch,
+      maxPitch: score?.maxPitch,
+      viewportWidth: viewportWidthRef.current,
+      mode: next.mode,
+      hasExternalInput: hasExternalInputRef.current,
+    });
+    setRangeMode(nextMode);
+    setOctaveShift(
+      score
+        ? initialOctaveShiftForScore(
+            score.minPitch,
+            score.maxPitch,
+            nextMode === 'kid' ? 'kid' : 'compact',
+            score.events.slice(0, 12).map((e) => e.pitch),
+          )
+        : 0,
+    );
     setLiveBpm(score ? Math.round(bpmAtBeat(score, 0)) : 120);
     schedulerRef.current?.pause();
     schedulerRef.current?.updateConfig({
@@ -309,6 +378,25 @@ export default function PracticeStudio({
       loop: next.loop,
     });
   }, [score, clearCelebrationTimers]);
+
+  useEffect(() => {
+    if (manualRangeOverride) return;
+    const nextMode = chooseSmartRangeMode({
+      minPitch: score?.minPitch,
+      maxPitch: score?.maxPitch,
+      viewportWidth,
+      mode: practiceState.mode,
+      hasExternalInput,
+    });
+    setRangeMode(nextMode);
+  }, [
+    manualRangeOverride,
+    score?.minPitch,
+    score?.maxPitch,
+    viewportWidth,
+    practiceState.mode,
+    hasExternalInput,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -711,12 +799,23 @@ export default function PracticeStudio({
     : 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100';
 
   const selectValue = score ? score.id : '';
+  const songWiderThanKeys = Boolean(
+    score && (score.minPitch < pianoLayout.minMidi || score.maxPitch > pianoLayout.maxMidi),
+  );
+  const isNarrowSongFit = Boolean(
+    score &&
+      !songWiderThanKeys &&
+      viewportWidth < 700 &&
+      manualRangeOverride &&
+      rangeMode === 'auto' &&
+      score.maxPitch - score.minPitch > 24,
+  );
 
   const renderKeyboard = (flushTop: boolean) => (
     <PianoKeyboard
       layout={pianoLayout}
       rangeMode={rangeMode}
-      onRangeModeChange={setRangeMode}
+      onRangeModeChange={handleManualRangeModeChange}
       octaveShift={octaveShift}
       onOctaveShift={shiftOctave}
       userPressedNotes={userPressedNotes}
@@ -835,6 +934,24 @@ export default function PracticeStudio({
               </button>
             </div>
 
+            {score && songWiderThanKeys ? (
+              <button
+                type="button"
+                onClick={() => handleManualRangeModeChange('auto')}
+                className={`inline-flex shrink-0 items-center gap-1 rounded-2xl border px-2.5 py-1 text-xs font-bold transition ${subtleBtn}`}
+              >
+                ↔ Fit Full Song
+              </button>
+            ) : score && isNarrowSongFit ? (
+              <button
+                type="button"
+                onClick={() => handleManualRangeModeChange('compact')}
+                className={`inline-flex shrink-0 items-center gap-1 rounded-2xl border px-2.5 py-1 text-xs font-bold transition ${subtleBtn}`}
+              >
+                🎹 Bigger Keys
+              </button>
+            ) : null}
+
             <button
               type="button"
               onClick={onGoToLibrary}
@@ -946,7 +1063,7 @@ export default function PracticeStudio({
                     <button
                       key={opt.mode}
                       type="button"
-                      onClick={() => setRangeMode(opt.mode)}
+                      onClick={() => handleManualRangeModeChange(opt.mode)}
                       className={`rounded-lg px-2 py-1 text-xs font-bold transition ${
                         rangeMode === opt.mode ? pillActive : pillInactive
                       }`}
@@ -1505,7 +1622,7 @@ export default function PracticeStudio({
                 className={
                   viewLayout === 'combined'
                     ? 'h-36 sm:h-48 lg:h-56'
-                    : 'h-[44dvh] min-h-[270px] max-h-[500px]'
+                    : 'kid-falling-stage h-[44dvh] min-h-[270px] max-h-[500px]'
                 }
               >
                 <FallingNotesCanvas

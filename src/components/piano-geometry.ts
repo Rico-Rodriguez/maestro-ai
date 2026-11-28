@@ -245,3 +245,81 @@ export function autoOctaveShiftForPitches(
 
   return bestShift;
 }
+
+export function chooseSmartRangeMode(params: {
+  minPitch?: number;
+  maxPitch?: number;
+  viewportWidth: number;
+  mode: 'wait' | 'tempo' | 'listen';
+  hasExternalInput: boolean;
+}): PianoRangeMode {
+  const { minPitch, maxPitch, viewportWidth, mode, hasExternalInput } = params;
+  if (
+    typeof minPitch !== 'number' ||
+    typeof maxPitch !== 'number' ||
+    !Number.isFinite(minPitch) ||
+    !Number.isFinite(maxPitch) ||
+    (minPitch >= 60 && maxPitch <= 74)
+  ) {
+    return 'kid';
+  }
+  if (viewportWidth >= 700) return 'auto';
+  if (hasExternalInput) return 'auto';
+  if (mode === 'listen') return 'auto';
+  if (maxPitch - minPitch <= 24) return 'compact';
+  return 'compact';
+}
+
+export function initialOctaveShiftForScore(
+  minPitch: number,
+  maxPitch: number,
+  mode: 'kid' | 'compact',
+  openingPitches?: readonly number[],
+): number {
+  const sample = openingPitches && openingPitches.length > 0 ? openingPitches : [minPitch, maxPitch];
+  const valid: number[] = [];
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let i = 0; i < sample.length; i += 1) {
+    const p = sample[i];
+    if (!Number.isFinite(p)) continue;
+    valid.push(p);
+    if (p < lo) lo = p;
+    if (p > hi) hi = p;
+  }
+  if (valid.length === 0) return 0;
+
+  const sampleMid = (lo + hi) / 2;
+  let bestShift = 0;
+  let bestCovered = -1;
+  let bestMidDist = Infinity;
+  let bestAbsShift = Infinity;
+
+  for (const shift of AUTO_SHIFT_CANDIDATES) {
+    const range = computePianoRange(mode, undefined, undefined, shift);
+    let covered = 0;
+    for (let i = 0; i < valid.length; i += 1) {
+      const p = valid[i];
+      if (p >= range.minMidi && p <= range.maxMidi) {
+        covered += 1;
+      }
+    }
+    const rangeCenter = (range.minMidi + range.maxMidi) / 2;
+    const midDist = Math.abs(sampleMid - rangeCenter);
+    const absShift = Math.abs(shift);
+
+    const better =
+      covered > bestCovered ||
+      (covered === bestCovered &&
+        (midDist < bestMidDist || (midDist === bestMidDist && absShift < bestAbsShift)));
+
+    if (better) {
+      bestShift = shift;
+      bestCovered = covered;
+      bestMidDist = midDist;
+      bestAbsShift = absShift;
+    }
+  }
+
+  return bestShift;
+}

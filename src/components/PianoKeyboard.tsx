@@ -656,7 +656,7 @@ export function PianoKeyboard({
           onPointerUp={handlePointerUpOrCancel}
           onPointerCancel={handlePointerUpOrCancel}
           onLostPointerCapture={handlePointerUpOrCancel}
-          className="relative w-full h-40 sm:h-48 touch-none select-none bg-stone-950 overflow-hidden"
+          className="kid-piano-keys relative w-full h-40 sm:h-48 touch-none select-none bg-stone-950 overflow-hidden"
         >
           {layout.whiteKeys.map(renderWhiteKey)}
           {layout.blackKeys.map(renderBlackKey)}

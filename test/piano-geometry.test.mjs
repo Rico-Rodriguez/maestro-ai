@@ -205,3 +205,94 @@ test('measureAtBeat tracks bar numbers consistently across time-signature change
   assert.equal(measureAtBeat(delayedSig, 4, 4), 2);
   assert.equal(measureAtBeat(delayedSig, 4, 7), 3);
 });
+
+test('chooseSmartRangeMode adapts to score span, viewport width, input device, and mode', async () => {
+  const { chooseSmartRangeMode } = await loadGeomModule();
+
+  assert.equal(
+    chooseSmartRangeMode({ viewportWidth: 1024, mode: 'wait', hasExternalInput: false }),
+    'kid',
+  );
+  assert.equal(
+    chooseSmartRangeMode({
+      minPitch: 60,
+      maxPitch: 74,
+      viewportWidth: 1024,
+      mode: 'wait',
+      hasExternalInput: true,
+    }),
+    'kid',
+  );
+  assert.equal(
+    chooseSmartRangeMode({
+      minPitch: 36,
+      maxPitch: 84,
+      viewportWidth: 844,
+      mode: 'wait',
+      hasExternalInput: false,
+    }),
+    'auto',
+  );
+  assert.equal(
+    chooseSmartRangeMode({
+      minPitch: 36,
+      maxPitch: 84,
+      viewportWidth: 1024,
+      mode: 'wait',
+      hasExternalInput: false,
+    }),
+    'auto',
+  );
+  assert.equal(
+    chooseSmartRangeMode({
+      minPitch: 36,
+      maxPitch: 84,
+      viewportWidth: 390,
+      mode: 'wait',
+      hasExternalInput: true,
+    }),
+    'auto',
+  );
+  assert.equal(
+    chooseSmartRangeMode({
+      minPitch: 36,
+      maxPitch: 84,
+      viewportWidth: 390,
+      mode: 'listen',
+      hasExternalInput: false,
+    }),
+    'auto',
+  );
+  assert.equal(
+    chooseSmartRangeMode({
+      minPitch: 36,
+      maxPitch: 84,
+      viewportWidth: 390,
+      mode: 'wait',
+      hasExternalInput: false,
+    }),
+    'compact',
+  );
+  assert.equal(
+    chooseSmartRangeMode({
+      minPitch: 55,
+      maxPitch: 76,
+      viewportWidth: 390,
+      mode: 'tempo',
+      hasExternalInput: false,
+    }),
+    'compact',
+  );
+});
+
+test('initialOctaveShiftForScore centers cleanly on opening pitches', async () => {
+  const { initialOctaveShiftForScore } = await loadGeomModule();
+
+  assert.equal(initialOctaveShiftForScore(48, 84, 'kid', [60, 64, 67]), 0);
+  assert.equal(initialOctaveShiftForScore(48, 84, 'kid', [48, 52, 55]), -1);
+  assert.equal(initialOctaveShiftForScore(48, 84, 'kid', [72, 76, 79]), 1);
+  assert.equal(initialOctaveShiftForScore(36, 84, 'compact', [36, 40, 43, 48]), -1);
+  assert.equal(initialOctaveShiftForScore(36, 84, 'compact', [62, 65, 69, 72, 79]), 1);
+  assert.equal(initialOctaveShiftForScore(48, 72, 'compact', [60, 64]), 0);
+  assert.equal(initialOctaveShiftForScore(74, 82, 'compact'), 1);
+});
