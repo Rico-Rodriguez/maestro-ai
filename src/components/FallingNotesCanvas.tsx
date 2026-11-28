@@ -730,8 +730,11 @@ export function FallingNotesCanvas({
           }
         }
 
-        traceRoundedRect(ctx, 0, strikeY - 1.5, width, 3, 1.5);
-        ctx.fillStyle = isDark ? 'rgba(240, 101, 149, 0.35)' : 'rgba(214, 51, 108, 0.35)';
+        traceRoundedRect(ctx, 0, strikeY - 6, width, 12, 5);
+        ctx.fillStyle = isDark ? 'rgba(240, 101, 149, 0.19)' : 'rgba(214, 51, 108, 0.13)';
+        ctx.fill();
+        traceRoundedRect(ctx, 0, strikeY - 1, width, 2, 1);
+        ctx.fillStyle = isDark ? 'rgba(240, 101, 149, 0.44)' : 'rgba(183, 35, 85, 0.38)';
         ctx.fill();
 
         const drawOffscreenPill = (pitch: number, side: 'left' | 'right') => {

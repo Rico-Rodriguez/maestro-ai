@@ -10,6 +10,7 @@ import {
 const FRAME_INTERVAL_MS = 33;
 const NOTE_HOLD_MS = 280;
 const MAX_CENTS_FOR_NOTE = 45;
+const MIN_CLARITY_FOR_NOTE = 0.72;
 
 function toPitchReading(freq: number, clarity: number): MicPitchReading | null {
   const note = frequencyToNote(freq);
@@ -44,7 +45,7 @@ function processMicFrame(
 
   const gated = opts.shouldGate();
   const trackerInput =
-    !gated && freq > 0 && reading && Math.abs(reading.centsOff) < MAX_CENTS_FOR_NOTE
+    !gated && reading && reading.clarity >= MIN_CLARITY_FOR_NOTE && Math.abs(reading.centsOff) < MAX_CENTS_FOR_NOTE
       ? { midi: reading.midi, rms }
       : null;
   const { triggerMidi } = tracker.process(trackerInput, nowMs);
