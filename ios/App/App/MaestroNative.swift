@@ -83,7 +83,7 @@ final class NativeMicEngine {
         if #available(iOS 17.0, *) {
             AVAudioApplication.requestRecordPermission(completionHandler: onPermission)
         } else {
-            AVAudioSession.sharedInstance().requestRecordPermission(completionHandler: onPermission)
+            AVAudioSession.sharedInstance().requestRecordPermission(onPermission)
         }
     }
 
