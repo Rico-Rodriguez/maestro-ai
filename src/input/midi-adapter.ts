@@ -42,6 +42,10 @@ export class MidiInputController {
       return 'unsupported';
     }
 
+    if (globalThis.__maestroNativeMidi) {
+      return this.connect({ interactive: false });
+    }
+
     if (!navigator.permissions || typeof navigator.permissions.query !== 'function') {
       return this.state;
     }
@@ -63,25 +67,31 @@ export class MidiInputController {
     }
   }
 
-  async connect(): Promise<MidiAccessState> {
+  async connect(options?: { interactive?: boolean }): Promise<MidiAccessState> {
     if (typeof navigator === 'undefined' || typeof navigator.requestMIDIAccess !== 'function') {
       this.setState('unsupported', []);
       return 'unsupported';
     }
 
-    if (this.access) {
+    const interactive = options?.interactive ?? true;
+    const isNativeMidi = Boolean(globalThis.__maestroNativeMidi);
+
+    if (this.access && !(interactive && isNativeMidi)) {
       this.syncInputs();
       this.setState('ready', this.devices);
       return 'ready';
     }
 
-    if (this.inFlight) {
+    if (this.inFlight && !(interactive && isNativeMidi)) {
       return this.inFlight;
     }
 
     const callEpoch = this.epoch;
+    const midiOptions = (
+      isNativeMidi ? { sysex: false, presentBluetooth: interactive } : { sysex: false }
+    ) as MIDIOptions;
     const pending = navigator
-      .requestMIDIAccess({ sysex: false })
+      .requestMIDIAccess(midiOptions)
       .then((access): MidiAccessState => {
         if (callEpoch !== this.epoch) {
           return this.state;

@@ -145,3 +145,32 @@ test('createPitchOnsetTracker triggers on pitch changes and RMS re-attacks witho
     activeMidi: 64,
   });
 });
+
+test('detectPitchYin detects quiet acoustic harmonic piano signals (peak ~0.014, RMS ~0.008) within 25 cents', async () => {
+  const { computeRms, detectPitchYin } = await loadYinModule();
+  const sampleRate = 48000;
+  const bufferSize = 4096;
+
+  for (const midi of [45, 57, 60, 64, 69, 76, 84]) {
+    const targetFreq = midiToFreq(midi);
+    const raw = makePianoHarmonicBuffer(targetFreq, sampleRate, bufferSize);
+    let peak = 0;
+    for (let i = 0; i < raw.length; i += 1) {
+      const abs = Math.abs(raw[i]);
+      if (abs > peak) peak = abs;
+    }
+    const scale = 0.014 / peak;
+    const quiet = new Float32Array(bufferSize);
+    for (let i = 0; i < bufferSize; i += 1) {
+      quiet[i] = raw[i] * scale;
+    }
+    const rms = computeRms(quiet);
+    assert.ok(rms >= 0.005 && rms <= 0.012, `expected quiet RMS ~0.008, got ${rms}`);
+    const res = detectPitchYin(quiet, sampleRate);
+    assert.ok(res !== null, `expected pitch detection for MIDI ${midi}`);
+    assert.ok(
+      centsError(res.freq, targetFreq) <= 25,
+      `expected <= 25 cents for MIDI ${midi}, got ${centsError(res.freq, targetFreq).toFixed(2)}`,
+    );
+  }
+});

@@ -8,6 +8,15 @@ declare global {
   }
 
   var __maestroPrimeAudioSession: ((recording: boolean) => Promise<void>) | undefined;
+  var __maestroNativeMidi: boolean | undefined;
+  var __maestroResumeAudio: (() => void) | undefined;
+  var __maestroNativeMic:
+    | {
+        start: (
+          onFrame: (frame: { rms: number; freq: number; clarity: number }) => void,
+        ) => Promise<() => Promise<void>>;
+      }
+    | undefined;
   var __maestroSetSystemBars: ((dark: boolean) => Promise<void>) | undefined;
   var __maestroHaptic: ((style?: 'LIGHT' | 'MEDIUM') => void) | undefined;
   var __maestroIdle: ((disabled: boolean) => Promise<void>) | undefined;

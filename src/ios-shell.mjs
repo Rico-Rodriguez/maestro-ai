@@ -103,10 +103,19 @@ function syncMidiInputs(inputs, list) {
 
 async function installMidiPolyfill() {
   if (typeof navigator.requestMIDIAccess === 'function') return;
+  globalThis.__maestroNativeMidi = true;
   const inputs = new Map();
   let access = null;
   await MaestroMidi.addListener('message', (event) => {
-    const input = inputs.get(event && event.id);
+    let input = inputs.get(event && event.id);
+    if (!input || typeof input.onmidimessage !== 'function') {
+      for (const candidate of inputs.values()) {
+        if (typeof candidate.onmidimessage === 'function') {
+          input = candidate;
+          break;
+        }
+      }
+    }
     if (!input || typeof input.onmidimessage !== 'function') return;
     const bytes = event && Array.isArray(event.data) ? event.data : [];
     input.onmidimessage({ data: Uint8Array.from(bytes) });
@@ -117,8 +126,11 @@ async function installMidiPolyfill() {
       access.onstatechange({ target: access });
     }
   });
-  navigator.requestMIDIAccess = function requestMIDIAccess() {
-    const presentBluetooth = Boolean(navigator.userActivation && navigator.userActivation.isActive);
+  navigator.requestMIDIAccess = function requestMIDIAccess(options) {
+    const presentBluetooth =
+      typeof options?.presentBluetooth === 'boolean'
+        ? options.presentBluetooth
+        : Boolean(navigator.userActivation && navigator.userActivation.isActive);
     return MaestroMidi.requestAccess({ presentBluetooth }).then((result) => {
       syncMidiInputs(inputs, result && result.inputs);
       if (!access) {
@@ -140,6 +152,31 @@ export async function installNativeShell() {
   globalThis.__maestroPrimeAudioSession = (recording) => MaestroAudio.setSession({
     recording: Boolean(recording),
   });
+  globalThis.__maestroNativeMic = {
+    async start(onFrame) {
+      const handle = await MaestroAudio.addListener('pitch', (data) => {
+        onFrame({
+          rms: Number(data?.rms ?? 0),
+          freq: Number(data?.freq ?? 0),
+          clarity: Number(data?.clarity ?? 0),
+        });
+      });
+      try {
+        await MaestroAudio.startMic();
+      } catch (err) {
+        await handle.remove().catch(() => {});
+        throw err;
+      }
+      return async () => {
+        try {
+          await handle.remove();
+        } catch {}
+        try {
+          await MaestroAudio.stopMic();
+        } catch {}
+      };
+    },
+  };
   globalThis.__maestroSetSystemBars = (dark) => SystemBars.setStyle({
     style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light,
   });

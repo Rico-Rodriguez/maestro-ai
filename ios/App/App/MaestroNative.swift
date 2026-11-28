@@ -2,11 +2,13 @@ import AVFoundation
 import Capacitor
 import CoreAudioKit
 import CoreMIDI
+import QuartzCore
 import UIKit
 import WebKit
 
 enum MaestroAudioSession {
     private static var appliedRecording: Bool?
+    private(set) static var isRecording: Bool = false
 
     static func apply(recording: Bool, force: Bool = false) throws {
         if !force, appliedRecording == recording { return }
@@ -15,10 +17,10 @@ enum MaestroAudioSession {
             try session.setCategory(
                 .playAndRecord,
                 mode: .default,
-                options: [.defaultToSpeaker, .allowBluetoothA2DP]
+                options: [.defaultToSpeaker, .allowBluetoothA2DP, .mixWithOthers]
             )
         } else {
-            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         }
         // A short hardware buffer keeps the piano close to the finger.
         // A device that rejects it still keeps the playback category.
@@ -32,7 +34,258 @@ enum MaestroAudioSession {
         }
         try session.setActive(true)
         appliedRecording = recording
+        isRecording = recording
     }
+}
+
+final class NativeMicEngine {
+    private let analysisQueue = DispatchQueue(label: "com.rico.maestroai.pitch", qos: .userInteractive)
+    private var engine: AVAudioEngine?
+    private var rollingBuffer: [Float] = []
+    private var lastEmitTime: CFTimeInterval = 0
+    private var configObserver: NSObjectProtocol?
+    private var active = false
+    var isActive: Bool { active }
+    var onFrame: ((Double, Double, Double) -> Void)?
+
+    func start(completion: @escaping (Error?) -> Void) {
+        let onPermission: (Bool) -> Void = { [weak self] granted in
+            guard granted else {
+                let error = NSError(
+                    domain: "MaestroAudio",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied"]
+                )
+                DispatchQueue.main.async {
+                    completion(error)
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.stopEngineOnly()
+                self.removeConfigObserver()
+                self.active = true
+                do {
+                    try MaestroAudioSession.apply(recording: true, force: true)
+                    try self.startAudioEngine()
+                    completion(nil)
+                } catch {
+                    self.active = false
+                    self.removeConfigObserver()
+                    self.stopEngineOnly()
+                    try? MaestroAudioSession.apply(recording: false, force: true)
+                    completion(error)
+                }
+            }
+        }
+
+        if #available(iOS 17.0, *) {
+            AVAudioApplication.requestRecordPermission(completionHandler: onPermission)
+        } else {
+            AVAudioSession.sharedInstance().requestRecordPermission(completionHandler: onPermission)
+        }
+    }
+
+    func stop() {
+        active = false
+        removeConfigObserver()
+        stopEngineOnly()
+        try? MaestroAudioSession.apply(recording: false, force: true)
+    }
+
+    private func startAudioEngine() throws {
+        let engine = AVAudioEngine()
+        let inputNode = engine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
+        guard format.sampleRate > 0 && format.channelCount > 0 else {
+            throw NSError(
+                domain: "MaestroAudio",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Audio input unavailable"]
+            )
+        }
+
+        analysisQueue.async { [weak self] in
+            self?.rollingBuffer.removeAll(keepingCapacity: true)
+            self?.lastEmitTime = 0
+        }
+
+        let sampleRate = Double(format.sampleRate)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+            guard let self else { return }
+            let frameCount = Int(buffer.frameLength)
+            guard frameCount > 0, let channelData = buffer.floatChannelData else { return }
+            let channelCount = Int(buffer.format.channelCount)
+            var samples = [Float](repeating: 0, count: frameCount)
+            if channelCount <= 1 {
+                let src = channelData[0]
+                for i in 0..<frameCount {
+                    samples[i] = src[i]
+                }
+            } else {
+                let scale = 1.0 / Float(channelCount)
+                for c in 0..<channelCount {
+                    let src = channelData[c]
+                    for i in 0..<frameCount {
+                        samples[i] += src[i] * scale
+                    }
+                }
+            }
+            self.analysisQueue.async { [weak self] in
+                self?.processSamples(samples, sampleRate: sampleRate)
+            }
+        }
+
+        configObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, self.active else { return }
+            self.stopEngineOnly()
+            self.removeConfigObserver()
+            do {
+                try MaestroAudioSession.apply(recording: true, force: true)
+                try self.startAudioEngine()
+            } catch {
+                self.active = false
+                self.stopEngineOnly()
+            }
+        }
+
+        self.engine = engine
+        engine.prepare()
+        try engine.start()
+    }
+
+    private func processSamples(_ samples: [Float], sampleRate: Double) {
+        rollingBuffer.append(contentsOf: samples)
+        if rollingBuffer.count > 4096 {
+            rollingBuffer.removeFirst(rollingBuffer.count - 4096)
+        }
+        guard rollingBuffer.count >= 2048 else { return }
+        let now = CACurrentMediaTime()
+        guard now - lastEmitTime >= 0.032 else { return }
+        lastEmitTime = now
+        let (rms, freq, clarity) = analyzePitchYinSwift(samples: rollingBuffer, sampleRate: sampleRate)
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.active else { return }
+            self.onFrame?(rms, freq, clarity)
+        }
+    }
+
+    private func stopEngineOnly() {
+        guard let engine else { return }
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        engine.reset()
+        self.engine = nil
+    }
+
+    private func removeConfigObserver() {
+        if let observer = configObserver {
+            NotificationCenter.default.removeObserver(observer)
+            configObserver = nil
+        }
+    }
+}
+
+private func analyzePitchYinSwift(samples: [Float], sampleRate: Double) -> (Double, Double, Double) {
+    let minFreq = 27.0
+    let maxFreq = 4250.0
+    let rmsGate = 0.005
+    let threshold = 0.18
+    let fallback = 0.28
+
+    let count = samples.count
+    guard count > 0, sampleRate > 0 else { return (0, 0, 0) }
+
+    var sumSq = 0.0
+    for i in 0..<count {
+        let s = Double(samples[i])
+        sumSq += s * s
+    }
+    let rms = (sumSq / Double(count)).squareRoot()
+    guard rms.isFinite, rms >= rmsGate else {
+        return (rms.isFinite ? rms : 0, 0, 0)
+    }
+
+    let minLag = max(2, Int(floor(sampleRate / maxFreq)))
+    let maxLag = min(count / 2, Int(ceil(sampleRate / minFreq)))
+    guard maxLag > minLag + 2 else { return (rms, 0, 0) }
+
+    let windowSize = min(count / 2, count - maxLag)
+    guard windowSize > 0 else { return (rms, 0, 0) }
+
+    var diff = [Double](repeating: 0, count: maxLag + 1)
+    for tau in 1...maxLag {
+        var sum = 0.0
+        var j = 0
+        while j < windowSize {
+            let delta = Double(samples[j]) - Double(samples[j + tau])
+            sum += delta * delta
+            j += 2
+        }
+        diff[tau] = sum
+    }
+
+    var cmndf = [Double](repeating: 1, count: maxLag + 1)
+    var runningSum = 0.0
+    for tau in 1...maxLag {
+        runningSum += diff[tau]
+        cmndf[tau] = runningSum > 0 ? (diff[tau] * Double(tau)) / runningSum : 1
+    }
+
+    var bestTau = -1
+    var tau = minLag
+    while tau <= maxLag {
+        if cmndf[tau] < threshold {
+            while tau + 1 <= maxLag && cmndf[tau + 1] < cmndf[tau] {
+                tau += 1
+            }
+            bestTau = tau
+            break
+        }
+        tau += 1
+    }
+
+    if bestTau == -1 {
+        var minTau = minLag
+        var minVal = cmndf[minLag]
+        if minLag + 1 <= maxLag {
+            for t in (minLag + 1)...maxLag {
+                if cmndf[t] < minVal {
+                    minVal = cmndf[t]
+                    minTau = t
+                }
+            }
+        }
+        if minVal >= fallback {
+            return (rms, 0, 0)
+        }
+        bestTau = minTau
+    }
+
+    let bestVal = cmndf[bestTau]
+    var refinedTau = Double(bestTau)
+    if bestTau > 0 && bestTau < maxLag {
+        let s0 = cmndf[bestTau - 1]
+        let s1 = cmndf[bestTau]
+        let s2 = cmndf[bestTau + 1]
+        let denom = 2 * (s0 - 2 * s1 + s2)
+        if abs(denom) > 1e-12 {
+            let shift = (s0 - s2) / denom
+            if shift >= -1 && shift <= 1 {
+                refinedTau = Double(bestTau) + shift
+            }
+        }
+    }
+
+    guard refinedTau > 0 else { return (rms, 0, 0) }
+    let freq = sampleRate / refinedTau
+    let clarity = max(0, min(1, 1 - bestVal))
+    return (rms, freq, clarity)
 }
 
 @objc(MaestroAudioPlugin)
@@ -40,18 +293,51 @@ public class MaestroAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "MaestroAudioPlugin"
     public let jsName = "MaestroAudio"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "setSession", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "setSession", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startMic", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopMic", returnType: CAPPluginReturnPromise)
     ]
 
+    private let micEngine = NativeMicEngine()
+
+    @objc override public func load() {
+        super.load()
+        micEngine.onFrame = { [weak self] rms, freq, clarity in
+            self?.notifyListeners("pitch", data: [
+                "rms": rms,
+                "freq": freq,
+                "clarity": clarity
+            ])
+        }
+    }
+
     @objc func setSession(_ call: CAPPluginCall) {
-        let recording = call.getBool("recording") ?? false
+        let requested = call.getBool("recording") ?? false
         DispatchQueue.main.async {
+            let recording = requested || self.micEngine.isActive
             do {
                 try MaestroAudioSession.apply(recording: recording)
                 call.resolve()
             } catch {
                 call.reject(error.localizedDescription)
             }
+        }
+    }
+
+    @objc func startMic(_ call: CAPPluginCall) {
+        micEngine.start { error in
+            if let error {
+                call.reject(error.localizedDescription)
+            } else {
+                call.resolve([:])
+            }
+        }
+    }
+
+    @objc func stopMic(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.micEngine.stop()
+            call.resolve([:])
         }
     }
 }
@@ -80,16 +366,24 @@ final class MidiEngine {
         }
     }
 
-    private func refresh() {
+    func refresh() {
         queue.async { [weak self] in
             self?.refreshLocked()
         }
     }
 
     func currentInputs() -> [[String: Any]] {
-        (0..<MIDIGetNumberOfSources()).map { index in
-            describe(MIDIGetSource(index))
+        (0..<MIDIGetNumberOfSources()).compactMap { index in
+            let source = MIDIGetSource(index)
+            guard isOnline(source) else { return nil }
+            return describe(source)
         }
+    }
+
+    private func isOnline(_ endpoint: MIDIEndpointRef) -> Bool {
+        var offline: Int32 = 0
+        let status = MIDIObjectGetIntegerProperty(endpoint, kMIDIPropertyOffline, &offline)
+        return !(status == noErr && offline != 0)
     }
 
     private func refreshLocked() {
@@ -98,6 +392,7 @@ final class MidiEngine {
         let count = MIDIGetNumberOfSources()
         for index in 0..<count {
             let source = MIDIGetSource(index)
+            guard isOnline(source) else { continue }
             let unique = uniqueId(source)
             live[unique] = source
             if connected[unique] == nil {
@@ -116,9 +411,12 @@ final class MidiEngine {
 
     private func handle(_ packetList: UnsafePointer<MIDIPacketList>, refCon: UnsafeMutableRawPointer?) {
         let sourceId = String(Int32(truncatingIfNeeded: Int(bitPattern: refCon)))
-        var packet = packetList.pointee.packet
-        for _ in 0..<packetList.pointee.numPackets {
-            let bytes = midiBytes(packet)
+        guard let dataOffset = MemoryLayout<MIDIPacket>.offset(of: \MIDIPacket.data) else { return }
+        for packetPtr in packetList.unsafeSequence() {
+            let length = Int(packetPtr.pointee.length)
+            guard length > 0 else { continue }
+            let dataPtr = UnsafeRawPointer(packetPtr).advanced(by: dataOffset)
+            let bytes = Array(UnsafeRawBufferPointer(start: dataPtr, count: length))
             for message in splitMidi(bytes) {
                 let payload: [String: Any] = [
                     "id": sourceId,
@@ -128,7 +426,6 @@ final class MidiEngine {
                     self?.onMessage?(payload)
                 }
             }
-            packet = MIDIPacketNext(&packet).pointee
         }
     }
 
@@ -141,66 +438,110 @@ final class MidiEngine {
         return unique
     }
 
-    private func stringProperty(_ endpoint: MIDIEndpointRef, _ key: CFString, fallback: String) -> String {
+    private func stringProperty(_ endpoint: MIDIEndpointRef, _ key: CFString) -> String? {
         var value: Unmanaged<CFString>?
         let status = MIDIObjectGetStringProperty(endpoint, key, &value)
-        guard status == noErr, let value = value else { return fallback }
-        return value.takeRetainedValue() as String
+        guard status == noErr, let value else { return nil }
+        let text = (value.takeRetainedValue() as String).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
     }
 
     private func describe(_ endpoint: MIDIEndpointRef) -> [String: Any] {
-        [
+        let name = stringProperty(endpoint, kMIDIPropertyDisplayName)
+            ?? stringProperty(endpoint, kMIDIPropertyName)
+            ?? "MIDI keyboard"
+        let manufacturer = stringProperty(endpoint, kMIDIPropertyManufacturer) ?? "Generic MIDI"
+        return [
             "id": String(uniqueId(endpoint)),
-            "name": stringProperty(endpoint, kMIDIPropertyDisplayName, fallback: "MIDI keyboard"),
-            "manufacturer": stringProperty(endpoint, kMIDIPropertyManufacturer, fallback: "Generic MIDI"),
+            "name": name,
+            "manufacturer": manufacturer,
             "state": "connected"
         ]
     }
 }
 
-private func midiBytes(_ packet: MIDIPacket) -> [UInt8] {
-    let length = Int(packet.length)
-    guard length > 0 else { return [] }
-    return withUnsafeBytes(of: packet.data) { raw in
-        Array(raw.prefix(length))
+private func midiPayloadLength(for status: UInt8) -> Int {
+    switch status & 0xF0 {
+    case 0xC0, 0xD0:
+        return 1
+    default:
+        return 2
     }
 }
 
 private func splitMidi(_ bytes: [UInt8]) -> [[UInt8]] {
     var messages: [[UInt8]] = []
+    var runningStatus: UInt8 = 0
     var index = 0
     while index < bytes.count {
-        let status = bytes[index]
-        if status < 0x80 {
+        let byte = bytes[index]
+        if byte >= 0xF8 {
             index += 1
             continue
         }
-        if status == 0xF0 {
-            var end = index + 1
-            while end < bytes.count && bytes[end] != 0xF7 {
-                end += 1
+        if byte >= 0xF0 {
+            runningStatus = 0
+            if byte == 0xF0 {
+                var end = index + 1
+                while end < bytes.count && bytes[end] != 0xF7 {
+                    end += 1
+                }
+                index = min(bytes.count, end + 1)
+                continue
             }
-            index = min(bytes.count, end + 1)
+            let size = (byte == 0xF1 || byte == 0xF3) ? 2 : (byte == 0xF2 ? 3 : 1)
+            if index + size > bytes.count { break }
+            index += size
             continue
         }
-        let size: Int
-        switch status & 0xF0 {
-        case 0xC0, 0xD0:
-            size = 2
-        case 0xF0:
-            size = 1
-        default:
-            size = 3
+        if byte >= 0x80 {
+            runningStatus = byte
+            let payloadLength = midiPayloadLength(for: byte)
+            if index + 1 + payloadLength > bytes.count { break }
+            if payloadLength == 1 {
+                let d1 = bytes[index + 1]
+                if d1 < 0x80 {
+                    messages.append([byte, d1])
+                    index += 2
+                } else {
+                    index += 1
+                }
+            } else {
+                let d1 = bytes[index + 1]
+                let d2 = bytes[index + 2]
+                if d1 < 0x80 && d2 < 0x80 {
+                    messages.append([byte, d1, d2])
+                    index += 3
+                } else {
+                    index += 1
+                }
+            }
+            continue
         }
-        if index + size > bytes.count { break }
-        messages.append(Array(bytes[index..<(index + size)]))
-        index += size
+        if runningStatus == 0 {
+            index += 1
+            continue
+        }
+        let payloadLength = midiPayloadLength(for: runningStatus)
+        if payloadLength == 1 {
+            messages.append([runningStatus, byte])
+            index += 1
+        } else {
+            if index + 1 >= bytes.count { break }
+            let d2 = bytes[index + 1]
+            if d2 >= 0x80 {
+                index += 1
+                continue
+            }
+            messages.append([runningStatus, byte, d2])
+            index += 2
+        }
     }
     return messages
 }
 
 @objc(MaestroMidiPlugin)
-public class MaestroMidiPlugin: CAPPlugin, CAPBridgedPlugin {
+public class MaestroMidiPlugin: CAPPlugin, CAPBridgedPlugin, UIAdaptivePresentationControllerDelegate {
     public let identifier = "MaestroMidiPlugin"
     public let jsName = "MaestroMidi"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -233,9 +574,25 @@ public class MaestroMidiPlugin: CAPPlugin, CAPBridgedPlugin {
     private func presentBluetoothPicker() {
         guard let controller = bridge?.viewController, controller.presentedViewController == nil else { return }
         let browser = CABTMIDICentralViewController()
+        browser.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            barButtonSystemItem: .done,
+            target: self,
+            action: #selector(dismissBluetoothPicker)
+        )
         let navigation = UINavigationController(rootViewController: browser)
         navigation.modalPresentationStyle = .pageSheet
+        navigation.presentationController?.delegate = self
         controller.present(navigation, animated: true)
+    }
+
+    @objc private func dismissBluetoothPicker() {
+        bridge?.viewController?.dismiss(animated: true) { [weak self] in
+            self?.engine.refresh()
+        }
+    }
+
+    @objc public func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        engine.refresh()
     }
 }
 
@@ -302,6 +659,8 @@ class MaestroBridgeViewController: CAPBridgeViewController {
         let configuration = super.webViewConfiguration(for: instanceConfiguration)
         // WKWebsiteDataStore.default() is persistent, so localStorage survives relaunch.
         configuration.websiteDataStore = WKWebsiteDataStore.default()
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         return configuration
     }
 
@@ -342,7 +701,7 @@ class MaestroBridgeViewController: CAPBridgeViewController {
             let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             let type = raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:))
             guard type == .ended else { return }
-            try? MaestroAudioSession.apply(recording: false, force: true)
+            try? MaestroAudioSession.apply(recording: MaestroAudioSession.isRecording, force: true)
             self?.webView?.evaluateJavaScript("window.__maestroResumeAudio && window.__maestroResumeAudio()", completionHandler: nil)
         }
     }
