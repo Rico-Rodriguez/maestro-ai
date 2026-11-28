@@ -122,6 +122,7 @@ export class PianoAudioEngine {
   private fallbackVoices: FallbackVoice[] = [];
   private playbackTailUntilCtxTime = -Infinity;
   private playbackTailTimer: ReturnType<typeof setTimeout> | null = null;
+  private nextStopId = 1;
 
   ensureContext(): AudioContext {
     if (this.ctx && this.ctx.state !== 'closed') {
@@ -233,8 +234,10 @@ export class PianoAudioEngine {
     this.stopSustainedForPitch(pitch, time, source);
 
     const inst = this.getReadyInstrumentForVoice();
+    // Unique stopId isolates smplr voice stops from subsequent or overlapping voices on the same pitch.
+    const stopId = `${source}:${pitch}:${this.nextStopId++}`;
     const stopFn = inst
-      ? inst.start({ note: pitch, velocity: vel, time })
+      ? inst.start({ note: pitch, velocity: vel, time, stopId })
       : this.startFallbackVoice(ctx, pitch, vel, time);
 
     const entry: VoiceEntry = { midi: pitch, source, stopFn };
