@@ -13,7 +13,7 @@ export interface KidPrompt {
   progressRatio: number;
 }
 
-const CHEER_BADGES = ['Nice', 'Good', 'Spot on', 'Steady'] as const;
+const CHEER_BADGES = ['Lovely', 'Pretty', 'Yes', 'Beautiful'] as const;
 
 export function deriveKidPrompt(
   state: PracticeState,
@@ -37,11 +37,12 @@ export function deriveKidPrompt(
         text: hint.text,
       }
     : null;
+  const color = targetNote ? targetNote.colorName.toLowerCase() : null;
 
   if (state.finished) {
     return {
       mood: 'celebrating',
-      headline: 'Song complete',
+      headline: 'Your garden is full',
       targetNote: null,
       cheerBadge: 'Well played',
       starsEarned,
@@ -52,7 +53,7 @@ export function deriveKidPrompt(
   if (state.mode === 'listen') {
     return {
       mood: state.running ? 'dancing' : 'happy',
-      headline: state.running ? 'Listening along' : 'Press Play to hear the song',
+      headline: state.running ? 'Listen along' : 'Press play to hear it',
       targetNote: null,
       cheerBadge: null,
       starsEarned,
@@ -63,9 +64,7 @@ export function deriveKidPrompt(
   if (state.lastFeedback.status === 'miss') {
     return {
       mood: 'encouraging',
-      headline: targetNote
-        ? `Almost, tap ${targetNote.colorName.toLowerCase()} ${targetNote.letter}`
-        : 'Try the highlighted key',
+      headline: color ? `Try the ${color} key` : 'Try the lit key',
       targetNote,
       cheerBadge: null,
       starsEarned,
@@ -77,9 +76,7 @@ export function deriveKidPrompt(
     const cheerIndex = Math.max(0, state.stats.hits - 1) % CHEER_BADGES.length;
     return {
       mood: 'cheering',
-      headline: targetNote
-        ? `Next, ${targetNote.colorName.toLowerCase()} ${targetNote.letter}`
-        : 'Keep going',
+      headline: color ? `Next, the ${color} key` : 'Keep going',
       targetNote,
       cheerBadge: CHEER_BADGES[cheerIndex],
       starsEarned,
@@ -89,9 +86,7 @@ export function deriveKidPrompt(
 
   return {
     mood: 'happy',
-    headline: targetNote
-      ? `Tap ${targetNote.colorName.toLowerCase()} ${targetNote.letter}`
-      : 'Tap any key',
+    headline: color ? `Tap the ${color} key` : 'Tap any key',
     targetNote,
     cheerBadge: null,
     starsEarned,

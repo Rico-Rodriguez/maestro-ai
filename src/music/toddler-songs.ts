@@ -5,6 +5,7 @@ export interface ToddlerSongSpec {
   id: string;
   title: string;
   subtitle: string;
+  art: string;
   tempo: number;
   timeSignature: [number, number];
   melody: readonly (readonly [string, number])[];
@@ -36,6 +37,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     id: 'toddler:twinkle',
     title: 'Twinkle, Twinkle, Little Star',
     subtitle: 'Gentle bedtime favorite',
+    art: 'twinkle.jpg',
     tempo: 74,
     timeSignature: [4, 4],
     melody: [
@@ -57,6 +59,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     id: 'toddler:mary',
     title: 'Mary Had a Little Lamb',
     subtitle: 'Easy four-note melody',
+    art: 'mary.jpg',
     tempo: 80,
     timeSignature: [4, 4],
     melody: [
@@ -74,6 +77,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     id: 'toddler:baby-shark',
     title: 'Baby Shark',
     subtitle: 'Playful rhythmic pattern',
+    art: 'baby-shark.jpg',
     tempo: 88,
     timeSignature: [4, 4],
     melody: [
@@ -89,6 +93,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     id: 'toddler:row-boat',
     title: 'Row, Row, Row Your Boat',
     subtitle: 'Three-quarter time melody',
+    art: 'row-boat.jpg',
     tempo: 80,
     timeSignature: [3, 4],
     melody: [
@@ -106,6 +111,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     id: 'toddler:london-bridge',
     title: 'London Bridge',
     subtitle: 'Stepping folk tune',
+    art: 'london-bridge.jpg',
     tempo: 82,
     timeSignature: [4, 4],
     melody: [
@@ -123,6 +129,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     id: 'toddler:ode-to-joy',
     title: 'Ode to Joy',
     subtitle: 'Simple C-major melody',
+    art: 'ode-to-joy.jpg',
     tempo: 80,
     timeSignature: [4, 4],
     melody: [
@@ -137,6 +144,10 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     ],
   },
 ];
+
+export function songArtUrl(spec: ToddlerSongSpec): string {
+  return `${(import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'}art/songs/${spec.art}`;
+}
 
 export function getSongPreviewPitches(spec: ToddlerSongSpec, count = 6): number[] {
   const limit = Math.max(0, count);

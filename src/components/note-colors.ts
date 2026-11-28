@@ -1,4 +1,5 @@
-import type { Hand, TimeSigPoint } from '../music/types';
+import type { Hand, NoteEvent, TimeSigPoint } from '../music/types';
+import type { PracticeGrade } from '../practice/engine';
 
 export type ColorMode = 'rainbow' | 'hands';
 
@@ -331,4 +332,18 @@ export function measureAtBeat(
   }
 
   return measure;
+}
+
+export function gardenFromGrades(
+  events: readonly NoteEvent[],
+  grades: Record<string, PracticeGrade>,
+): { id: string; pitch: number; color: string }[] {
+  return [...events]
+    .filter((ev) => grades[ev.id]?.status === 'hit')
+    .sort((a, b) => a.onset - b.onset || a.pitch - b.pitch)
+    .map((ev) => ({
+      id: ev.id,
+      pitch: ev.pitch,
+      color: getKeyStickerColor(ev.pitch).bg,
+    }));
 }

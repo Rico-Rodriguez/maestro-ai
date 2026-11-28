@@ -4,6 +4,7 @@ import { readPracticeMidi } from '../music/midi-parser';
 import {
   buildToddlerScore,
   getSongPreviewPitches,
+  songArtUrl,
   TODDLER_SONGS,
 } from '../music/toddler-songs';
 import type { Score } from '../music/types';
@@ -77,6 +78,7 @@ export default function LibraryView({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [failedArtIds, setFailedArtIds] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const query = searchQuery.trim().toLowerCase();
@@ -142,17 +144,17 @@ export default function LibraryView({
   };
 
   const cardSurface = darkMode
-    ? 'bg-[#1c1a18] border-[#efe9de]/[0.08] text-[#efe9de]'
-    : 'bg-[#fdfbf7] border-[#1f1b16]/[0.08] text-[#1f1b16]';
-  const secondaryText = darkMode ? 'text-[#aaa398]' : 'text-[#5e554a]';
-  const mutedText = darkMode ? 'text-[#8a847a]' : 'text-[#7b7266]';
-  const hairlineBorder = darkMode ? 'border-[#efe9de]/[0.08]' : 'border-[#1f1b16]/[0.08]';
+    ? 'bg-[#1f1a22] border-[#f3eaf0]/[0.08] text-[#f3eaf0]'
+    : 'bg-[#fffdfb] border-[#2a1d22]/[0.08] text-[#2a1d22]';
+  const secondaryText = darkMode ? 'text-[#b9a9b4]' : 'text-[#6b5560]';
+  const mutedText = darkMode ? 'text-[#94838f]' : 'text-[#8a7680]';
+  const hairlineBorder = darkMode ? 'border-[#f3eaf0]/[0.08]' : 'border-[#2a1d22]/[0.08]';
   const subtleBtn = darkMode
-    ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#efe9de] hover:bg-[#2f2c28]'
-    : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#1f1b16] hover:bg-[#efe9df]';
+    ? 'border-[#f3eaf0]/[0.08] bg-[#2a2430] text-[#f3eaf0] hover:bg-[#352d3c]'
+    : 'border-[#2a1d22]/[0.08] bg-[#f6ebe6] text-[#2a1d22] hover:bg-[#ede0da]';
   const primaryBtn = darkMode
-    ? 'bg-[#efe9de] text-[#161513] hover:bg-white'
-    : 'bg-[#c85a32] text-white hover:bg-[#b44e29]';
+    ? 'bg-[#f06595] text-[#17131a] hover:bg-[#f47aa4]'
+    : 'bg-[#d6336c] text-white hover:bg-[#be2a5e]';
   const errorText = darkMode ? 'text-[#e5484d]' : 'text-[#dc2626]';
 
   return (
@@ -165,55 +167,82 @@ export default function LibraryView({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           {TODDLER_SONGS.map((song) => {
             const isPlaying = activeScoreId === song.id;
             const previewPitches = getSongPreviewPitches(song, 6);
+            const artFailed = Boolean(failedArtIds[song.id]);
             return (
-              <article
+              <button
                 key={song.id}
-                className={`flex flex-col justify-between rounded-[12px] border p-4 transition-colors duration-150 ${cardSurface} ${
+                type="button"
+                onClick={() => onOpenScore(buildToddlerScore(song))}
+                className={`group flex flex-col rounded-[20px] border p-3 text-left transition-colors duration-150 active:scale-[0.98] ${cardSurface} ${
                   isPlaying
                     ? darkMode
-                      ? 'border-[#e07047]'
-                      : 'border-[#c85a32]'
-                    : ''
+                      ? 'border-[#f06595]'
+                      : 'border-[#d6336c]'
+                    : darkMode
+                      ? 'hover:border-[#f3eaf0]/20'
+                      : 'hover:border-[#2a1d22]/20'
                 }`}
               >
-                <div>
-                  <div className="mb-3 flex items-center gap-1.5" aria-hidden="true">
-                    {previewPitches.map((pitch, idx) => (
-                      <span
-                        key={`${song.id}-dot-${idx}`}
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: getKeyStickerColor(pitch).bg }}
-                      />
-                    ))}
-                  </div>
-                  <h3 className="text-[15px] font-medium leading-snug">{song.title}</h3>
-                  <p className={`mt-1 text-[13px] ${secondaryText}`}>{song.subtitle}</p>
+                <div
+                  className={`relative aspect-square w-full overflow-hidden rounded-[16px] ${
+                    darkMode ? 'bg-[#2a2430]' : 'bg-[#f6ebe6]'
+                  }`}
+                >
+                  {!artFailed ? (
+                    <img
+                      src={songArtUrl(song)}
+                      alt={song.title}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                      onError={() =>
+                        setFailedArtIds((prev) => (prev[song.id] ? prev : { ...prev, [song.id]: true }))
+                      }
+                    />
+                  ) : (
+                    <div
+                      className="flex h-full w-full items-center justify-center gap-2 px-4"
+                      aria-hidden="true"
+                    >
+                      {previewPitches.map((pitch, idx) => (
+                        <span
+                          key={`${song.id}-fallback-${idx}`}
+                          className="h-3.5 w-3.5 rounded-full"
+                          style={{ backgroundColor: getKeyStickerColor(pitch).bg }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2">
-                  <span className={`font-mono text-xs tabular-nums ${mutedText}`}>
-                    {song.tempo} BPM · {song.timeSignature[0]}/{song.timeSignature[1]}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onOpenScore(buildToddlerScore(song))}
-                    className={`inline-flex h-9 items-center gap-2 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 active:scale-[0.98] ${
-                      isPlaying
-                        ? darkMode
-                          ? 'bg-[#4cc38a] text-[#161513] hover:bg-[#5cd099]'
-                          : 'bg-[#16a34a] text-white hover:bg-[#15803d]'
-                        : primaryBtn
-                    }`}
-                  >
-                    <Play className="h-4 w-4 fill-current" strokeWidth={1.5} />
-                    <span>{isPlaying ? 'Playing' : 'Play'}</span>
-                  </button>
+                <div className="mt-3 flex flex-1 flex-col justify-between gap-2">
+                  <div>
+                    <h3 className="text-[15px] font-semibold leading-snug">{song.title}</h3>
+                    <div className="mt-2 flex items-center gap-1.5" aria-hidden="true">
+                      {previewPitches.map((pitch, idx) => (
+                        <span
+                          key={`${song.id}-dot-${idx}`}
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: getKeyStickerColor(pitch).bg }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {isPlaying ? (
+                    <span
+                      className={`text-xs font-medium ${
+                        darkMode ? 'text-[#f06595]' : 'text-[#d6336c]'
+                      }`}
+                    >
+                      Playing
+                    </span>
+                  ) : null}
                 </div>
-              </article>
+              </button>
             );
           })}
         </div>
@@ -228,10 +257,10 @@ export default function LibraryView({
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <section className={`lg:col-span-7 rounded-[12px] border p-5 ${cardSurface}`}>
+          <section className={`lg:col-span-7 rounded-[20px] border p-5 ${cardSurface}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-base font-medium">Open from MuseScore</h3>
+                <h3 className="text-base font-semibold">Open from MuseScore</h3>
                 <p className={`mt-1 text-[13px] ${secondaryText}`}>
                   Paste a score link or open the bundled sample piece
                 </p>
@@ -240,7 +269,7 @@ export default function LibraryView({
                 type="button"
                 onClick={() => void onLoadSample()}
                 disabled={sampleLoading}
-                className={`inline-flex h-9 items-center gap-2 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${primaryBtn}`}
+                className={`inline-flex h-10 items-center gap-2 rounded-[12px] px-4 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${primaryBtn}`}
               >
                 {sampleLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
@@ -258,8 +287,8 @@ export default function LibraryView({
             {museScore.field}
           </section>
 
-          <section className={`lg:col-span-5 rounded-[12px] border p-5 ${cardSurface}`}>
-            <h3 className="text-base font-medium">Upload MIDI</h3>
+          <section className={`lg:col-span-5 rounded-[20px] border p-5 ${cardSurface}`}>
+            <h3 className="text-base font-semibold">Upload MIDI</h3>
             <p className={`mt-1 text-[13px] ${secondaryText}`}>
               Open a local <span className="font-mono">.mid</span> or{' '}
               <span className="font-mono">.midi</span> file in your browser
@@ -281,18 +310,18 @@ export default function LibraryView({
                   fileInputRef.current?.click();
                 }
               }}
-              className={`mt-4 flex cursor-pointer flex-col items-center justify-center rounded-[8px] border border-dashed px-4 py-6 text-center transition-colors duration-150 ${
+              className={`mt-4 flex cursor-pointer flex-col items-center justify-center rounded-[12px] border border-dashed px-4 py-6 text-center transition-colors duration-150 ${
                 dragging
                   ? darkMode
-                    ? 'border-[#e07047] bg-[#e07047]/10'
-                    : 'border-[#c85a32] bg-[#c85a32]/10'
+                    ? 'border-[#f06595] bg-[#f06595]/10'
+                    : 'border-[#d6336c] bg-[#d6336c]/10'
                   : darkMode
-                    ? 'border-[#efe9de]/[0.16] bg-[#161513] hover:border-[#efe9de]/30'
-                    : 'border-[#1f1b16]/[0.16] bg-[#f7f4ee] hover:border-[#1f1b16]/30'
+                    ? 'border-[#f3eaf0]/[0.16] bg-[#17131a] hover:border-[#f3eaf0]/30'
+                    : 'border-[#2a1d22]/[0.16] bg-[#fbf5f1] hover:border-[#2a1d22]/30'
               }`}
             >
               <Upload
-                className={`h-4 w-4 ${dragging ? (darkMode ? 'text-[#e07047]' : 'text-[#c85a32]') : secondaryText}`}
+                className={`h-4 w-4 ${dragging ? (darkMode ? 'text-[#f06595]' : 'text-[#d6336c]') : secondaryText}`}
                 strokeWidth={1.5}
               />
               <p className="mt-2 text-[13px] font-medium">
@@ -332,10 +361,10 @@ export default function LibraryView({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className={`h-9 w-full rounded-[8px] border pl-9 pr-3 text-[13px] focus:outline-none ${
+              className={`h-10 w-full rounded-[12px] border pl-9 pr-3 text-[13px] focus:outline-none ${
                 darkMode
-                  ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#efe9de] placeholder:text-[#8a847a] focus:border-[#e07047]/60'
-                  : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#1f1b16] placeholder:text-[#7b7266] focus:border-[#c85a32]/60'
+                  ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0] placeholder:text-[#94838f] focus:border-[#f06595]/60'
+                  : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22] placeholder:text-[#8a7680] focus:border-[#d6336c]/60'
               }`}
             />
           </div>
@@ -350,7 +379,7 @@ export default function LibraryView({
         {filteredSession.length > 0 ? (
           <section className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">
+              <h3 className="text-sm font-semibold">
                 Session scores{' '}
                 <span className={`font-mono text-xs tabular-nums ${mutedText}`}>
                   ({filteredSession.length})
@@ -364,23 +393,23 @@ export default function LibraryView({
                 return (
                   <article
                     key={score.id}
-                    className={`flex flex-col justify-between rounded-[12px] border p-4 transition-colors duration-150 ${cardSurface} ${
+                    className={`flex flex-col justify-between rounded-[16px] border p-4 transition-colors duration-150 ${cardSurface} ${
                       isCurrent
                         ? darkMode
-                          ? 'border-[#e07047]'
-                          : 'border-[#c85a32]'
+                          ? 'border-[#f06595]'
+                          : 'border-[#d6336c]'
                         : ''
                     }`}
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="line-clamp-2 text-[15px] font-medium leading-snug">
+                        <h4 className="line-clamp-2 text-[15px] font-semibold leading-snug">
                           {score.title}
                         </h4>
                         {isCurrent ? (
                           <span
                             className={`shrink-0 text-xs font-medium ${
-                              darkMode ? 'text-[#e07047]' : 'text-[#c85a32]'
+                              darkMode ? 'text-[#f06595]' : 'text-[#d6336c]'
                             }`}
                           >
                             Open
@@ -398,7 +427,7 @@ export default function LibraryView({
                       <button
                         type="button"
                         onClick={() => onOpenScore(score)}
-                        className={`inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 ${primaryBtn}`}
+                        className={`inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[12px] px-3 text-[13px] font-medium transition-colors duration-150 ${primaryBtn}`}
                       >
                         <Play className="h-4 w-4" strokeWidth={1.5} />
                         <span>Practice</span>
@@ -406,7 +435,7 @@ export default function LibraryView({
                       <button
                         type="button"
                         onClick={() => handleSessionPdf(score)}
-                        className={`inline-flex h-9 items-center justify-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${subtleBtn}`}
+                        className={`inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${subtleBtn}`}
                         title="Export sheet music PDF"
                       >
                         <FileDown className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
@@ -422,7 +451,7 @@ export default function LibraryView({
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">
+            <h3 className="text-sm font-semibold">
               Saved library{' '}
               <span className={`font-mono text-xs tabular-nums ${mutedText}`}>
                 ({filteredSaved.length})
@@ -438,7 +467,7 @@ export default function LibraryView({
           </div>
 
           {filteredSaved.length === 0 ? (
-            <div className={`rounded-[12px] border p-8 text-center ${cardSurface}`}>
+            <div className={`rounded-[16px] border p-8 text-center ${cardSurface}`}>
               <Music className={`mx-auto h-5 w-5 ${mutedText}`} strokeWidth={1.5} />
               <p className="mt-2 text-sm font-medium">
                 {museScore.scores.length === 0
@@ -459,10 +488,10 @@ export default function LibraryView({
                 return (
                   <article
                     key={row.scoreId}
-                    className={`flex flex-col justify-between rounded-[12px] border p-4 transition-colors duration-150 ${cardSurface}`}
+                    className={`flex flex-col justify-between rounded-[16px] border p-4 transition-colors duration-150 ${cardSurface}`}
                   >
                     <div>
-                      <h4 className="line-clamp-2 text-[15px] font-medium leading-snug">
+                      <h4 className="line-clamp-2 text-[15px] font-semibold leading-snug">
                         {row.title}
                       </h4>
                       <p className={`mt-1.5 font-mono text-xs tabular-nums ${mutedText}`}>
@@ -476,7 +505,7 @@ export default function LibraryView({
                         type="button"
                         disabled={museScore.busy}
                         onClick={() => void museScore.openSaved(row.scoreId)}
-                        className={`inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${primaryBtn}`}
+                        className={`inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[12px] px-3 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${primaryBtn}`}
                       >
                         <Play className="h-4 w-4" strokeWidth={1.5} />
                         <span>Practice</span>
@@ -485,7 +514,7 @@ export default function LibraryView({
                         type="button"
                         disabled={isPdfBusy}
                         onClick={() => void handleSavedPdf(row)}
-                        className={`inline-flex h-9 items-center justify-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${subtleBtn}`}
+                        className={`inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${subtleBtn}`}
                         title="Export sheet music PDF"
                       >
                         {isPdfBusy ? (
