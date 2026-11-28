@@ -202,3 +202,48 @@ test('gardenFromGrades returns hit notes only in ascending onset order with Chro
     { id: 'n3', pitch: 67, color: getKeyStickerColor(67).bg },
   ]);
 });
+
+test('Kids keyboards keep the pitches in a phrase reachable at every learning stage', async () => {
+  const { keyboardNotes, SONGS, STAGES, noteIdentity } = await loadTsModule('/src/music/kids-learning.ts');
+  assert.deepEqual(keyboardNotes('auto', 0), [60, 62, 64]);
+  assert.equal(keyboardNotes('auto', 1).length, 5);
+  assert.equal(keyboardNotes('auto', 2).length, 7);
+  assert.equal(keyboardNotes('full', 0).length, 88);
+  assert.equal(noteIdentity(69).shape, 'moon');
+  for (const { phrases, score } of SONGS) {
+    assert.deepEqual(phrases.flat(), score.events);
+    for (const phrase of phrases) {
+      assert.ok(phrase.length > 0 && phrase.length <= 4);
+      const pitches = phrase.map(({ pitch }) => pitch);
+      for (const [stage] of STAGES.entries()) {
+        assert.ok(pitches.every((pitch) => keyboardNotes('auto', stage, pitches).includes(pitch)));
+        assert.ok(pitches.every((pitch) => keyboardNotes('one', stage, pitches).includes(pitch)));
+      }
+    }
+  }
+});
+
+test('Kids progress separates independent and guided practice and keeps the best progress after a restart', async () => {
+  const { learningStage, loadKidsData, recordPractice, recordSkill, SONGS } = await loadTsModule('/src/music/kids-learning.ts');
+  const [song] = SONGS;
+  let data = recordPractice(loadKidsData(), song, 'guided', song.phrases[0].length);
+  assert.equal(learningStage(data), 0);
+  for (const skill of ['sounds', 'match', 'copy']) data = recordSkill(data, skill);
+  assert.equal(learningStage(data), 4);
+  data = recordPractice(data, song, 'guided', 0);
+  assert.deepEqual(data.songs[`${song.score.id}:guided`], { cursor: 0, best: 4 });
+  assert.equal(data.songs[`${song.score.id}:solo`], undefined);
+  data = recordPractice(data, song, 'solo', 4);
+  assert.equal(learningStage(data), 4);
+  data = recordSkill(data, 'rhythm');
+  assert.equal(learningStage(data), 5);
+  assert.ok(data.skills.includes('solo'));
+});
+
+test('Rhythm Bunny accepts approximate intervals and distinguishes a pause from repeated rapid taps', async () => {
+  const { BEAT_PATTERNS, echoesBeat } = await loadTsModule('/src/music/kids-learning.ts');
+  assert.ok(echoesBeat([250, 920, 1530], BEAT_PATTERNS[0]));
+  assert.ok(echoesBeat([500, 1050, 2000], BEAT_PATTERNS[1]));
+  assert.equal(echoesBeat([0, 35, 80], BEAT_PATTERNS[1]), false);
+  assert.equal(echoesBeat([0, 600], BEAT_PATTERNS[1]), false);
+});

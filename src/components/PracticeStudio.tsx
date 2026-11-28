@@ -1,3 +1,5 @@
+import StudioKidsSettings, { STUDIO_SECTIONS, type StudioSection } from './StudioKidsSettings';
+import type { KidsData, KidsSettings } from '../music/kids-learning';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   AudioLines,
@@ -77,9 +79,12 @@ export interface PracticeStudioProps {
   onExportPdf: (score: Score) => void;
   darkMode: boolean;
   onToggleDarkMode?: () => void;
-  showSettings?: boolean;
-  onToggleSettings?: () => void;
-  onCloseSettings?: () => void;
+  showSettings: boolean;
+  kidsData: KidsData;
+  onKidsSettings: (settings: Partial<KidsSettings>) => void;
+  muteLocalForMidi: boolean;
+  onMuteLocalForMidi: (mute: boolean) => void;
+  onCloseSettings: () => void;
   midiController: MidiInputController;
   midiState: MidiAccessState;
   midiDevices: MidiDeviceInfo[];
@@ -93,8 +98,6 @@ export interface PracticeStudioProps {
   viewActive: boolean;
   registerNoteHandler: (handler: ((event: NoteInput) => void) | null) => void;
   registerMicGate: (gate: (() => boolean) | null) => void;
-  kidLocked?: boolean;
-  onExitKidLock?: () => void;
 }
 
 const EMPTY_PRACTICE_STATE: PracticeState = {
@@ -126,9 +129,9 @@ const VOICE_OPTIONS: readonly { id: InstrumentVoice; label: string }[] = [
 ];
 
 const LAYOUT_OPTIONS: readonly { id: StudioViewLayout; label: string }[] = [
-  { id: 'falling', label: 'Falling' },
-  { id: 'notation', label: 'Sheet' },
-  { id: 'combined', label: 'Split' },
+  { id: 'falling', label: 'Falling notes' },
+  { id: 'notation', label: 'Sheet music' },
+  { id: 'combined', label: 'Both' },
 ];
 
 const HAND_OPTIONS: readonly { id: HandFilter; label: string }[] = [
@@ -208,8 +211,12 @@ export default function PracticeStudio({
   onExportPdf,
   darkMode,
   onToggleDarkMode,
-  showSettings: controlledShowSettings,
-  onCloseSettings,
+  showSettings,
+  kidsData,
+  onKidsSettings,
+  muteLocalForMidi,
+  onMuteLocalForMidi,
+  onCloseSettings: closeSettings,
   midiController,
   midiState,
   midiDevices,
@@ -223,7 +230,6 @@ export default function PracticeStudio({
   viewActive,
   registerNoteHandler,
   registerMicGate,
-  kidLocked = false,
 }: PracticeStudioProps) {
   const hasExternalInput = midiDevices.length > 0 || micActive;
   const [practiceState, setPracticeState] = useState<PracticeState>(() =>
@@ -265,25 +271,16 @@ export default function PracticeStudio({
   const [tempoScale, setTempoScale] = useState(0.85);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [guideSoundOn, setGuideSoundOn] = useState(true);
-  const [muteLocalForMidi, setMuteLocalForMidi] = useState(false);
+  const [section, setSection] = useState<StudioSection>('profile');
   const [headphonesMode, setHeadphonesMode] = useState(false);
   const [voice, setVoice] = useState<InstrumentVoice>('grand-piano');
   const [volume, setVolume] = useState(0.85);
-  const [internalShowSettings, setInternalShowSettings] = useState(false);
   const [liveBpm, setLiveBpm] = useState<number>(() => (score ? Math.round(score.tempo || 120) : 120));
   const [nudgeToken, setNudgeToken] = useState(0);
   const [wiggleToken, setWiggleToken] = useState(0);
   const [nudgeResetKey, setNudgeResetKey] = useState(0);
   const [artFailedId, setArtFailedId] = useState<string | null>(null);
 
-  const showSettings = controlledShowSettings ?? internalShowSettings;
-  const closeSettings = useCallback(() => {
-    if (onCloseSettings) {
-      onCloseSettings();
-    } else {
-      setInternalShowSettings(false);
-    }
-  }, [onCloseSettings]);
 
   const scoreRef = useRef<Score | null>(score);
   const practiceStateRef = useRef<PracticeState>(practiceState);
@@ -628,17 +625,24 @@ export default function PracticeStudio({
   shiftOctaveRef.current = shiftOctave;
 
   useEffect(() => {
+    if (!viewActive) return;
     return midiController.subscribe((event) => handleNoteInputRef.current(event));
-  }, [midiController]);
+  }, [midiController, viewActive]);
 
   useEffect(() => {
+    if (!viewActive) return;
     registerNoteHandler((event) => handleNoteInputRef.current(event));
     registerMicGate(() => !headphonesModeRef.current && pianoEngine.isPlaybackSounding());
     return () => {
       registerNoteHandler(null);
       registerMicGate(null);
+      schedulerRef.current?.pause();
+      pianoEngine.stopAll();
+      setUserPressedNotes(new Set());
+      setUserSustainDown(false);
+      dispatchPractice({ type: 'setRunning', running: false });
     };
-  }, [registerNoteHandler, registerMicGate]);
+  }, [registerNoteHandler, registerMicGate, viewActive, dispatchPractice]);
 
   useEffect(() => {
     if (!viewActive) return;
@@ -782,12 +786,6 @@ export default function PracticeStudio({
   }, [score, practiceState.mode, practiceState.running, practiceState.finished, nudgeResetKey]);
 
   useEffect(() => {
-    if (kidLocked) {
-      closeSettings();
-    }
-  }, [kidLocked, closeSettings]);
-
-  useEffect(() => {
     if (!score) return;
     if (rangeMode !== 'kid' && rangeMode !== 'compact') return;
 
@@ -826,17 +824,6 @@ export default function PracticeStudio({
     if (!score) return [];
     return score.events.slice(0, 4).map((ev) => getKeyStickerColor(ev.pitch).bg);
   }, [toddlerSpec, score]);
-
-  const seedWindow = useMemo(() => {
-    const chords = practiceState.chords;
-    if (chords.length === 0) return [];
-    const maxSeeds = 24;
-    const start =
-      chords.length <= maxSeeds
-        ? 0
-        : Math.max(0, Math.min(chords.length - maxSeeds, practiceState.cursor - 8));
-    return chords.slice(start, start + maxSeeds);
-  }, [practiceState.chords, practiceState.cursor]);
 
   const gardenFlowers = useMemo(() => {
     if (!score || !practiceState.finished) return [];
@@ -930,7 +917,6 @@ export default function PracticeStudio({
       colorMode={colorMode}
       showKeyStickers={true}
       flushTop={flushTop}
-      hideControls={colorMode === 'rainbow' || Boolean(kidLocked)}
       nudgeToken={nudgeToken}
       wiggleToken={wiggleToken}
     />
@@ -938,128 +924,7 @@ export default function PracticeStudio({
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-3">
-      <div
-        className={`flex flex-wrap items-center justify-between gap-3 rounded-[20px] border p-2 ${cardSurface}`}
-      >
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <button
-            type="button"
-            disabled={!score}
-            onClick={togglePlay}
-            aria-label={practiceState.running ? 'Pause' : 'Play'}
-            className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-colors duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 ${accentFill}`}
-          >
-            {practiceState.running ? (
-              <Pause className="h-6 w-6 fill-current" strokeWidth={1.5} />
-            ) : (
-              <Play className="h-6 w-6 fill-current" strokeWidth={1.5} />
-            )}
-          </button>
-
-          {score ? (
-            <div className="flex min-w-0 items-center gap-3">
-              <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] ${
-                  darkMode ? 'bg-[#2a2430]' : 'bg-[#f6ebe6]'
-                }`}
-              >
-                {toddlerSpec && artFailedId !== toddlerSpec.id ? (
-                  <img
-                    src={songArtUrl(toddlerSpec)}
-                    alt={toddlerSpec.title}
-                    className="h-full w-full object-cover"
-                    onError={() => setArtFailedId(toddlerSpec.id)}
-                  />
-                ) : thumbColors.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-1" aria-hidden="true">
-                    {thumbColors.map((bg, idx) => (
-                      <span
-                        key={`${score.id}-thumb-${idx}`}
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: bg }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Music2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
-                )}
-              </div>
-              <span className="truncate text-[15px] font-semibold">{score.title}</span>
-            </div>
-          ) : (
-            <span className="truncate text-[15px] font-semibold">Ready to play</span>
-          )}
-
-          <button
-            type="button"
-            disabled={!score}
-            onClick={handleRestart}
-            title="Start song over"
-            aria-label="Restart song"
-            className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 ${controlBtn}`}
-          >
-            <RotateCcw className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
-          </button>
-        </div>
-
-        {!kidLocked ? (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
-              <button
-                type="button"
-                onClick={() => handleModeChange('wait')}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 ${
-                  practiceState.mode === 'wait' ? segmentedActive : segmentedInactive
-                }`}
-              >
-                <HandIcon className="h-4 w-4" strokeWidth={1.5} />
-                <span>Play along</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleModeChange('listen')}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 ${
-                  practiceState.mode === 'listen' ? segmentedActive : segmentedInactive
-                }`}
-              >
-                <Ear className="h-4 w-4" strokeWidth={1.5} />
-                <span>Listen</span>
-              </button>
-              {practiceState.mode === 'tempo' ? (
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('tempo')}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 ${segmentedActive}`}
-                >
-                  <span>Tempo</span>
-                </button>
-              ) : null}
-            </div>
-
-            {score && songWiderThanKeys ? (
-              <button
-                type="button"
-                onClick={() => handleManualRangeModeChange('auto')}
-                className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
-              >
-                <Maximize2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
-                <span>Fit song</span>
-              </button>
-            ) : score && isNarrowSongFit ? (
-              <button
-                type="button"
-                onClick={() => handleManualRangeModeChange('compact')}
-                className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
-              >
-                <Minimize2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
-                <span>Bigger keys</span>
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      {showSettings && !kidLocked ? (
+      {showSettings ? (
         <section className={`rounded-[20px] border p-5 ${cardSurface}`}>
           <div className={`mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3 ${hairlineBorder}`}>
             <div>
@@ -1094,8 +959,16 @@ export default function PracticeStudio({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className={`space-y-4 ${drawerCard}`}>
+          <nav aria-label="Studio settings categories" className="mb-4 flex flex-wrap gap-2">
+            {STUDIO_SECTIONS.map(([id, label]) => (
+              <button key={id} type="button" aria-pressed={section === id} onClick={() => setSection(id)}
+                className={`min-h-10 rounded-xl border px-3 text-sm font-bold ${section === id ? accentFill : controlBtn}`}>{label}</button>
+            ))}
+          </nav>
+          <div key={section} className={`space-y-4 ${drawerCard}`}>
+            <h3 className="text-base font-extrabold">{STUDIO_SECTIONS.find(([id]) => id === section)?.[1]}</h3>
+            <StudioKidsSettings section={section} data={kidsData} onSettings={onKidsSettings} />
+            {section === "learning" && <>
               <div>
                 <div className="mb-1.5 text-xs font-medium">Practice mode</div>
                 <div className={`inline-flex flex-wrap items-center rounded-[12px] p-1 ${segmentedTrack}`}>
@@ -1113,49 +986,37 @@ export default function PracticeStudio({
                   ))}
                 </div>
               </div>
-
-              <div>
-                <div className="mb-1.5 text-xs font-medium">Speed</div>
-                <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
-                  <button
-                    type="button"
-                    onClick={() => setTempoScale(0.65)}
-                    className={`h-8 rounded-[8px] px-3 text-xs font-medium transition-colors duration-150 ${
-                      tempoScale <= 0.7 ? segmentedActive : segmentedInactive
-                    }`}
-                  >
-                    Slow
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTempoScale(0.85)}
-                    className={`h-8 rounded-[8px] px-3 text-xs font-medium transition-colors duration-150 ${
-                      tempoScale > 0.7 ? segmentedActive : segmentedInactive
-                    }`}
-                  >
-                    Normal
-                  </button>
+                <div>
+                  <div className="mb-1.5 text-xs font-medium">Hand focus</div>
+                  <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
+                    {HAND_OPTIONS.map((h) => (
+                      <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => handleHandChange(h.id)}
+                        className={`h-8 rounded-[8px] px-2.5 text-xs font-medium transition-colors duration-150 ${
+                          practiceState.handFilter === h.id ? segmentedActive : segmentedInactive
+                        }`}
+                      >
+                        {h.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <div className="mb-1.5 text-xs font-medium">View</div>
-                <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
-                  {LAYOUT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setViewLayout(opt.id)}
-                      className={`h-8 rounded-[8px] px-2.5 text-xs font-medium transition-colors duration-150 ${
-                        viewLayout === opt.id ? segmentedActive : segmentedInactive
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-medium">Guide piano</div>
+                  <div className={`text-[11px] ${mutedText}`}>Plays reference notes in Tempo mode</div>
                 </div>
+                <input
+                  type="checkbox"
+                  checked={guideSoundOn}
+                  onChange={(e) => setGuideSoundOn(e.target.checked)}
+                  className={`h-4 w-4 ${accentInput}`}
+                />
               </div>
-
+            </>}
+            {section === "piano" && <>
               <div>
                 <div className="mb-1.5 flex items-center justify-between text-xs font-medium">
                   <span>Key size</span>
@@ -1195,26 +1056,6 @@ export default function PracticeStudio({
                   ))}
                 </div>
               </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="mb-1.5 text-xs font-medium">Hand focus</div>
-                  <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
-                    {HAND_OPTIONS.map((h) => (
-                      <button
-                        key={h.id}
-                        type="button"
-                        onClick={() => handleHandChange(h.id)}
-                        className={`h-8 rounded-[8px] px-2.5 text-xs font-medium transition-colors duration-150 ${
-                          practiceState.handFilter === h.id ? segmentedActive : segmentedInactive
-                        }`}
-                      >
-                        {h.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div>
                   <div className="mb-1.5 text-xs font-medium">Note colors</div>
                   <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
@@ -1232,49 +1073,31 @@ export default function PracticeStudio({
                     ))}
                   </div>
                 </div>
-              </div>
-
-              {(sessionScores.length > 0 || unopenedSaved.length > 0) && (
-                <div>
-                  <div className="mb-1.5 text-xs font-medium">Switch score</div>
-                  <select
-                    aria-label="Open score"
-                    value={selectValue}
-                    disabled={scoreBusy}
-                    onChange={(e) => handleScoreDropdown(e.target.value)}
-                    className={`h-10 w-full truncate rounded-[12px] border px-3 text-xs font-medium focus:outline-none ${
-                      darkMode
-                        ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0]'
-                        : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22]'
+            </>}
+            {section === "sound" && <>
+              <div>
+                <div className="mb-1.5 text-xs font-medium">Speed</div>
+                <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
+                  <button
+                    type="button"
+                    onClick={() => setTempoScale(0.65)}
+                    className={`h-8 rounded-[8px] px-3 text-xs font-medium transition-colors duration-150 ${
+                      tempoScale <= 0.7 ? segmentedActive : segmentedInactive
                     }`}
                   >
-                    {!score || score.id.startsWith('toddler:') ? (
-                      <option value="">Choose uploaded or saved score</option>
-                    ) : null}
-                    {sessionScores.length > 0 ? (
-                      <optgroup label="Opened">
-                        {sessionScores.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.title}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ) : null}
-                    {unopenedSaved.length > 0 ? (
-                      <optgroup label="Saved library">
-                        {unopenedSaved.map((row) => (
-                          <option key={row.scoreId} value={`saved:${row.scoreId}`}>
-                            {row.title}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ) : null}
-                  </select>
+                    Slow
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTempoScale(0.85)}
+                    className={`h-8 rounded-[8px] px-3 text-xs font-medium transition-colors duration-150 ${
+                      tempoScale > 0.7 ? segmentedActive : segmentedInactive
+                    }`}
+                  >
+                    Normal
+                  </button>
                 </div>
-              )}
-            </div>
-
-            <div className={`space-y-4 ${drawerCard}`}>
+              </div>
               <div>
                 <div className="flex items-center justify-between text-xs font-medium">
                   <span>
@@ -1317,20 +1140,6 @@ export default function PracticeStudio({
                   className={`h-4 w-4 ${accentInput}`}
                 />
               </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-medium">Guide piano</div>
-                  <div className={`text-[11px] ${mutedText}`}>Plays reference notes in Tempo mode</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={guideSoundOn}
-                  onChange={(e) => setGuideSoundOn(e.target.checked)}
-                  className={`h-4 w-4 ${accentInput}`}
-                />
-              </div>
-
               <div>
                 <div className="text-xs font-medium">Audio</div>
                 <div className="mt-2 grid grid-cols-3 gap-2">
@@ -1371,70 +1180,8 @@ export default function PracticeStudio({
                   className={`mt-2 w-full ${accentInput}`}
                 />
               </div>
-
-              <div className={`space-y-2 border-t pt-3 ${hairlineBorder}`}>
-                <div className="flex items-center justify-between">
-                  <label className="inline-flex items-center gap-2 text-xs font-medium">
-                    <Repeat className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
-                    <span>Measure loop</span>
-                  </label>
-                  <input
-                    type="checkbox"
-                    disabled={!score}
-                    checked={practiceState.loop.enabled}
-                    onChange={(e) =>
-                      dispatchPractice({
-                        type: 'setLoop',
-                        loop: { enabled: e.target.checked },
-                      })
-                    }
-                    className={`h-4 w-4 ${accentInput}`}
-                  />
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className={mutedText}>Bars</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={totalMeasures}
-                    disabled={!score}
-                    value={practiceState.loop.startMeasure}
-                    onChange={(e) =>
-                      dispatchPractice({
-                        type: 'setLoop',
-                        loop: { startMeasure: Number(e.target.value) || 1 },
-                      })
-                    }
-                    className={`h-9 w-16 rounded-[12px] border px-2 font-mono text-xs tabular-nums ${
-                      darkMode
-                        ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0]'
-                        : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22]'
-                    }`}
-                  />
-                  <span className={mutedText}>to</span>
-                  <input
-                    type="number"
-                    min={practiceState.loop.startMeasure}
-                    max={totalMeasures}
-                    disabled={!score}
-                    value={practiceState.loop.endMeasure}
-                    onChange={(e) =>
-                      dispatchPractice({
-                        type: 'setLoop',
-                        loop: { endMeasure: Number(e.target.value) || totalMeasures },
-                      })
-                    }
-                    className={`h-9 w-16 rounded-[12px] border px-2 font-mono text-xs tabular-nums ${
-                      darkMode
-                        ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0]'
-                        : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22]'
-                    }`}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className={`space-y-4 ${drawerCard}`}>
+            </>}
+            {section === "connect" && <>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div>
@@ -1483,7 +1230,7 @@ export default function PracticeStudio({
                 <input
                   type="checkbox"
                   checked={muteLocalForMidi}
-                  onChange={(e) => setMuteLocalForMidi(e.target.checked)}
+                  onChange={(e) => onMuteLocalForMidi(e.target.checked)}
                   className={`h-4 w-4 ${accentInput}`}
                 />
               </div>
@@ -1561,7 +1308,124 @@ export default function PracticeStudio({
                   </p>
                 ) : null}
               </div>
-
+            </>}
+            {section === "music" && <>
+              <button type="button" className={`rounded-xl border px-3 py-2 text-sm font-bold ${controlBtn}`} onClick={onGoToLibrary}>Open library and uploads</button>
+              <div>
+                <div className="mb-1.5 text-xs font-medium">View</div>
+                <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
+                  {LAYOUT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setViewLayout(opt.id)}
+                      className={`h-8 rounded-[8px] px-2.5 text-xs font-medium transition-colors duration-150 ${
+                        viewLayout === opt.id ? segmentedActive : segmentedInactive
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(sessionScores.length > 0 || unopenedSaved.length > 0) && (
+                <div>
+                  <div className="mb-1.5 text-xs font-medium">Switch score</div>
+                  <select
+                    aria-label="Open score"
+                    value={selectValue}
+                    disabled={scoreBusy}
+                    onChange={(e) => handleScoreDropdown(e.target.value)}
+                    className={`h-10 w-full truncate rounded-[12px] border px-3 text-xs font-medium focus:outline-none ${
+                      darkMode
+                        ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0]'
+                        : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22]'
+                    }`}
+                  >
+                    {!score || score.id.startsWith('toddler:') ? (
+                      <option value="">Choose uploaded or saved score</option>
+                    ) : null}
+                    {sessionScores.length > 0 ? (
+                      <optgroup label="Opened">
+                        {sessionScores.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                    {unopenedSaved.length > 0 ? (
+                      <optgroup label="Saved library">
+                        {unopenedSaved.map((row) => (
+                          <option key={row.scoreId} value={`saved:${row.scoreId}`}>
+                            {row.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </select>
+                </div>
+              )}
+              <div className={`space-y-2 border-t pt-3 ${hairlineBorder}`}>
+                <div className="flex items-center justify-between">
+                  <label className="inline-flex items-center gap-2 text-xs font-medium">
+                    <Repeat className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                    <span>Measure loop</span>
+                  </label>
+                  <input
+                    type="checkbox"
+                    disabled={!score}
+                    checked={practiceState.loop.enabled}
+                    onChange={(e) =>
+                      dispatchPractice({
+                        type: 'setLoop',
+                        loop: { enabled: e.target.checked },
+                      })
+                    }
+                    className={`h-4 w-4 ${accentInput}`}
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={mutedText}>Bars</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalMeasures}
+                    disabled={!score}
+                    value={practiceState.loop.startMeasure}
+                    onChange={(e) =>
+                      dispatchPractice({
+                        type: 'setLoop',
+                        loop: { startMeasure: Number(e.target.value) || 1 },
+                      })
+                    }
+                    className={`h-9 w-16 rounded-[12px] border px-2 font-mono text-xs tabular-nums ${
+                      darkMode
+                        ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0]'
+                        : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22]'
+                    }`}
+                  />
+                  <span className={mutedText}>to</span>
+                  <input
+                    type="number"
+                    min={practiceState.loop.startMeasure}
+                    max={totalMeasures}
+                    disabled={!score}
+                    value={practiceState.loop.endMeasure}
+                    onChange={(e) =>
+                      dispatchPractice({
+                        type: 'setLoop',
+                        loop: { endMeasure: Number(e.target.value) || totalMeasures },
+                      })
+                    }
+                    className={`h-9 w-16 rounded-[12px] border px-2 font-mono text-xs tabular-nums ${
+                      darkMode
+                        ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0]'
+                        : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22]'
+                    }`}
+                  />
+                </div>
+              </div>
               <div className={`border-t pt-3 ${hairlineBorder}`}>
                 <button
                   type="button"
@@ -1573,231 +1437,323 @@ export default function PracticeStudio({
                   <span>Export sheet music PDF</span>
                 </button>
               </div>
-            </div>
+            </>}
           </div>
         </section>
-      ) : null}
-
-      {score ? (
-        <div
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-[16px] border px-4 py-3 ${cardSurface}`}
-        >
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            {kidPrompt.targetNote && !practiceState.finished && practiceState.mode !== 'listen' ? (
-              <span
-                style={{
-                  backgroundColor: kidPrompt.targetNote.bg,
-                  color: kidPrompt.targetNote.text,
-                }}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ring-2 ring-white"
+      ) : viewActive ? (
+        <>
+          <div
+            className={`flex flex-wrap items-center justify-between gap-3 rounded-[20px] border p-2 ${cardSurface}`}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <button
+                type="button"
+                disabled={!score}
+                onClick={togglePlay}
+                aria-label={practiceState.running ? 'Pause' : 'Play'}
+                className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-colors duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 ${accentFill}`}
               >
-                {kidPrompt.targetNote.letter}
-              </span>
-            ) : practiceState.finished ? (
-              <CheckCircle2 className={`h-4 w-4 shrink-0 ${positiveText}`} strokeWidth={1.5} />
-            ) : (
-              <Music2 className={`h-4 w-4 shrink-0 ${secondaryText}`} strokeWidth={1.5} />
-            )}
+                {practiceState.running ? (
+                  <Pause className="h-6 w-6 fill-current" strokeWidth={1.5} />
+                ) : (
+                  <Play className="h-6 w-6 fill-current" strokeWidth={1.5} />
+                )}
+              </button>
 
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-[15px] font-semibold">{kidPrompt.headline}</span>
-              {kidPrompt.cheerBadge ? (
-                <span className={`text-[13px] font-medium ${positiveText}`}>
-                  {kidPrompt.cheerBadge}
-                </span>
+              {score ? (
+                <div className="flex min-w-0 items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] ${
+                      darkMode ? 'bg-[#2a2430]' : 'bg-[#f6ebe6]'
+                    }`}
+                  >
+                    {toddlerSpec && artFailedId !== toddlerSpec.id ? (
+                      <img
+                        src={songArtUrl(toddlerSpec)}
+                        alt={toddlerSpec.title}
+                        className="h-full w-full object-cover"
+                        onError={() => setArtFailedId(toddlerSpec.id)}
+                      />
+                    ) : thumbColors.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-1" aria-hidden="true">
+                        {thumbColors.map((bg, idx) => (
+                          <span
+                            key={`${score.id}-thumb-${idx}`}
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: bg }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <Music2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                    )}
+                  </div>
+                  <span className="truncate text-[15px] font-semibold">{score.title}</span>
+                </div>
+              ) : (
+                <span className="truncate text-[15px] font-semibold">Ready to play</span>
+              )}
+
+              <button
+                type="button"
+                disabled={!score}
+                onClick={handleRestart}
+                title="Start song over"
+                aria-label="Restart song"
+                className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 ${controlBtn}`}
+              >
+                <RotateCcw className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className={`inline-flex items-center rounded-[12px] p-1 ${segmentedTrack}`}>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('wait')}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 ${
+                    practiceState.mode === 'wait' ? segmentedActive : segmentedInactive
+                  }`}
+                >
+                  <HandIcon className="h-4 w-4" strokeWidth={1.5} />
+                  <span>Play along</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('listen')}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 ${
+                    practiceState.mode === 'listen' ? segmentedActive : segmentedInactive
+                  }`}
+                >
+                  <Ear className="h-4 w-4" strokeWidth={1.5} />
+                  <span>Listen</span>
+                </button>
+                {practiceState.mode === 'tempo' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('tempo')}
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors duration-150 ${segmentedActive}`}
+                  >
+                    <span>Tempo</span>
+                  </button>
+                ) : null}
+              </div>
+
+              {score && songWiderThanKeys ? (
+                <button
+                  type="button"
+                  onClick={() => handleManualRangeModeChange('auto')}
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
+                >
+                  <Maximize2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                  <span>Fit song</span>
+                </button>
+              ) : score && isNarrowSongFit ? (
+                <button
+                  type="button"
+                  onClick={() => handleManualRangeModeChange('compact')}
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
+                >
+                  <Minimize2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                  <span>Bigger keys</span>
+                </button>
               ) : null}
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-1.5" aria-label="Song progress">
-            {seedWindow.map((chord) => {
-              const hitNote = chord.notes.find(
-                (n) => practiceState.grades[n.id]?.status === 'hit',
-              );
-              if (hitNote) {
-                return (
-                  <ChromaFlower
-                    key={chord.index}
-                    color={getKeyStickerColor(hitNote.pitch).bg}
-                    size={10}
-                    className="shrink-0"
-                  />
-                );
-              }
-              return (
-                <span
-                  key={chord.index}
-                  className={`h-[10px] w-[10px] shrink-0 rounded-full border ${
-                    darkMode
-                      ? 'border-[#f3eaf0]/20 bg-[#2a2430]'
-                      : 'border-[#2a1d22]/15 bg-[#f6ebe6]'
-                  }`}
-                />
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {score && practiceState.finished ? (
-        <div className={`flex flex-col gap-4 rounded-[20px] border p-5 ${cardSurface}`}>
-          <div>
-            <p className="text-[18px] font-semibold">You played {score.title}</p>
-            <p className={`mt-1 text-sm ${secondaryText}`}>{kidPrompt.headline}</p>
-          </div>
-
-          {gardenFlowers.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {gardenFlowers.map((flower, idx) => (
-                <ChromaFlower
-                  key={flower.id}
-                  color={flower.color}
-                  size={20}
-                  className="animate-garden-grow shrink-0"
-                  style={{ animationDelay: `${(idx % 6) * 40}ms` }}
-                />
-              ))}
-            </div>
-          ) : null}
-
-          {!kidLocked ? (
-            <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs tabular-nums ${mutedText}`}>
-              <span>
-                {practiceState.stats.hits}/{Math.max(1, practiceState.chords.length)} notes
-              </span>
-              <span>Accuracy {totalAttempts > 0 ? `${accuracyPct}%` : '—'}</span>
-              <span>
-                Avg offset{' '}
-                {practiceState.stats.offsetsMs.length > 0
-                  ? `${avgOffsetMs >= 0 ? '+' : ''}${avgOffsetMs} ms`
-                  : '—'}
-              </span>
-              <span>Best streak {practiceState.stats.bestStreak}</span>
-              <span>
-                Hardest measure {hardestMeasure !== null ? `Bar ${hardestMeasure}` : 'None'}
-              </span>
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleRestart}
-              className={`inline-flex h-10 items-center gap-2 rounded-[12px] px-4 text-[13px] font-medium transition-colors duration-150 active:scale-[0.97] ${accentFill}`}
+          {score ? (
+            <div
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-[16px] border px-4 py-3 ${cardSurface}`}
             >
-              <RotateCcw className="h-4 w-4" strokeWidth={1.5} />
-              <span>Play again</span>
-            </button>
-            {!kidLocked ? (
-              <button
-                type="button"
-                onClick={onGoToLibrary}
-                className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-4 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
-              >
-                <Library className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
-                <span>Choose a song</span>
-              </button>
-            ) : null}
-            {!kidLocked && hardestMeasure !== null ? (
-              <button
-                type="button"
-                onClick={handleDrillHardest}
-                className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-4 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
-              >
-                <Repeat className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
-                <span>Drill bar {hardestMeasure}</span>
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {!score ? (
-        <>
-          <div className={`flex flex-col items-center justify-center rounded-[20px] border px-6 py-12 text-center ${cardSurface}`}>
-            <h2 className="text-xl font-semibold">Ready at the bench</h2>
-            <p className={`mt-2 max-w-md text-xs leading-relaxed ${mutedText}`}>
-              Pick a starter song, open a saved score, or load the bundled sample piece
-            </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                disabled={sampleLoading}
-                onClick={() => void onLoadSample()}
-                className={`inline-flex h-10 items-center gap-2 rounded-[12px] px-4 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${accentFill}`}
-              >
-                {sampleLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                {kidPrompt.targetNote && !practiceState.finished && practiceState.mode !== 'listen' ? (
+                  <span
+                    style={{
+                      backgroundColor: kidPrompt.targetNote.bg,
+                      color: kidPrompt.targetNote.text,
+                    }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ring-2 ring-white"
+                  >
+                    {kidPrompt.targetNote.letter}
+                  </span>
+                ) : practiceState.finished ? (
+                  <CheckCircle2 className={`h-4 w-4 shrink-0 ${positiveText}`} strokeWidth={1.5} />
                 ) : (
-                  <Play className="h-4 w-4" strokeWidth={1.5} />
+                  <Music2 className={`h-4 w-4 shrink-0 ${secondaryText}`} strokeWidth={1.5} />
                 )}
-                <span>Load sample</span>
-              </button>
-              <button
-                type="button"
-                onClick={onGoToLibrary}
-                className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-4 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
-              >
-                <Library className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
-                <span>Browse songs</span>
-              </button>
-            </div>
-          </div>
 
-          {renderKeyboard(false)}
-        </>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {viewLayout === 'notation' || viewLayout === 'combined' ? (
-            <GrandStaff
-              score={score}
-              events={filteredEvents}
-              grades={practiceState.grades}
-              loop={practiceState.loop}
-              getLiveBeat={getLiveBeat}
-              onSeekBeat={handleSeekBeat}
-              onPreviewPitch={handlePreviewPitch}
-              darkMode={darkMode}
-            />
-          ) : null}
-
-          {viewLayout === 'falling' || viewLayout === 'combined' ? (
-            <div className={`flex flex-col overflow-hidden rounded-[20px] border ${hairlineBorder}`}>
-              <div
-                className={
-                  viewLayout === 'combined'
-                    ? 'h-36 sm:h-48 lg:h-56'
-                    : 'kid-falling-stage h-[44dvh] min-h-[270px] max-h-[500px]'
-                }
-              >
-                <FallingNotesCanvas
-                  events={filteredEvents}
-                  layout={pianoLayout}
-                  timeSignatures={score.timeSignatures}
-                  defaultBeatsPerMeasure={defaultBeatsPerMeasure}
-                  grades={practiceState.grades}
-                  getLiveBeat={getLiveBeat}
-                  darkMode={darkMode}
-                  colorMode={colorMode}
-                  onColorModeChange={setColorMode}
-                  flushBottom
-                  hideToolbar={colorMode === 'rainbow' || Boolean(kidLocked)}
-                  canShiftOctave={rangeMode === 'kid' || rangeMode === 'compact'}
-                  octaveShift={octaveShift}
-                  onOctaveShift={shiftOctave}
-                  expectedPitches={expectedPitches}
-                  playfulMode={colorMode === 'rainbow'}
-                  lookaheadOverride={tempoScale <= 0.7 ? 8 : 6}
-                />
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="text-[15px] font-semibold">{kidPrompt.headline}</span>
+                  {kidPrompt.cheerBadge ? (
+                    <span className={`text-[13px] font-medium ${positiveText}`}>
+                      {kidPrompt.cheerBadge}
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
-              {renderKeyboard(true)}
+              <progress className={`h-2 w-24 ${accentInput}`} aria-label="Song progress" max={1} value={kidPrompt.progressRatio} />
             </div>
+          ) : null}
+
+          {score && practiceState.finished ? (
+            <div className={`flex flex-col gap-4 rounded-[20px] border p-5 ${cardSurface}`}>
+              <div>
+                <p className="text-[18px] font-semibold">You played {score.title}</p>
+                <p className={`mt-1 text-sm ${secondaryText}`}>{kidPrompt.headline}</p>
+              </div>
+
+              {gardenFlowers.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {gardenFlowers.map((flower, idx) => (
+                    <ChromaFlower
+                      key={flower.id}
+                      color={flower.color}
+                      size={20}
+                      className="animate-garden-grow shrink-0"
+                      style={{ animationDelay: `${(idx % 6) * 40}ms` }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs tabular-nums ${mutedText}`}>
+                <span>
+                  {practiceState.stats.hits}/{Math.max(1, practiceState.chords.length)} notes
+                </span>
+                <span>Accuracy {totalAttempts > 0 ? `${accuracyPct}%` : '—'}</span>
+                <span>
+                  Avg offset{' '}
+                  {practiceState.stats.offsetsMs.length > 0
+                    ? `${avgOffsetMs >= 0 ? '+' : ''}${avgOffsetMs} ms`
+                    : '—'}
+                </span>
+                <span>Best streak {practiceState.stats.bestStreak}</span>
+                <span>
+                  Hardest measure {hardestMeasure !== null ? `Bar ${hardestMeasure}` : 'None'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRestart}
+                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] px-4 text-[13px] font-medium transition-colors duration-150 active:scale-[0.97] ${accentFill}`}
+                >
+                  <RotateCcw className="h-4 w-4" strokeWidth={1.5} />
+                  <span>Play again</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onGoToLibrary}
+                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-4 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
+                >
+                  <Library className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                  <span>Choose a song</span>
+                </button>
+                {hardestMeasure !== null ? (
+                  <button
+                    type="button"
+                    onClick={handleDrillHardest}
+                    className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-4 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
+                  >
+                    <Repeat className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                    <span>Drill bar {hardestMeasure}</span>
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {!score ? (
+            <>
+              <div className={`flex flex-col items-center justify-center rounded-[20px] border px-6 py-12 text-center ${cardSurface}`}>
+                <h2 className="text-xl font-semibold">Ready at the bench</h2>
+                <p className={`mt-2 max-w-md text-xs leading-relaxed ${mutedText}`}>
+                  Pick a starter song, open a saved score, or load the bundled sample piece
+                </p>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    disabled={sampleLoading}
+                    onClick={() => void onLoadSample()}
+                    className={`inline-flex h-10 items-center gap-2 rounded-[12px] px-4 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${accentFill}`}
+                  >
+                    {sampleLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+                    ) : (
+                      <Play className="h-4 w-4" strokeWidth={1.5} />
+                    )}
+                    <span>Load sample</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onGoToLibrary}
+                    className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-4 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
+                  >
+                    <Library className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                    <span>Browse songs</span>
+                  </button>
+                </div>
+              </div>
+
+              {renderKeyboard(false)}
+            </>
           ) : (
-            renderKeyboard(false)
+            <div className="flex flex-col gap-3">
+              {viewLayout === 'notation' || viewLayout === 'combined' ? (
+                <GrandStaff
+                  score={score}
+                  events={filteredEvents}
+                  grades={practiceState.grades}
+                  loop={practiceState.loop}
+                  getLiveBeat={getLiveBeat}
+                  onSeekBeat={handleSeekBeat}
+                  onPreviewPitch={handlePreviewPitch}
+                  darkMode={darkMode}
+                  colorMode={colorMode}
+                />
+              ) : null}
+
+              {viewLayout === 'falling' || viewLayout === 'combined' ? (
+                <div className={`flex flex-col overflow-hidden rounded-[20px] border ${hairlineBorder}`}>
+                  <div
+                    className={
+                      viewLayout === 'combined'
+                        ? 'h-36 sm:h-48 lg:h-56'
+                        : 'kid-falling-stage h-[44dvh] min-h-[270px] max-h-[500px]'
+                    }
+                  >
+                    <FallingNotesCanvas
+                      events={filteredEvents}
+                      layout={pianoLayout}
+                      timeSignatures={score.timeSignatures}
+                      defaultBeatsPerMeasure={defaultBeatsPerMeasure}
+                      grades={practiceState.grades}
+                      getLiveBeat={getLiveBeat}
+                      darkMode={darkMode}
+                      colorMode={colorMode}
+                      onColorModeChange={setColorMode}
+                      flushBottom
+                      hideToolbar={colorMode === 'rainbow'}
+                      canShiftOctave={rangeMode === 'kid' || rangeMode === 'compact'}
+                      octaveShift={octaveShift}
+                      onOctaveShift={shiftOctave}
+                      expectedPitches={expectedPitches}
+                      playfulMode={colorMode === 'rainbow'}
+                      lookaheadOverride={tempoScale <= 0.7 ? 8 : 6}
+                    />
+                  </div>
+
+                  {renderKeyboard(true)}
+                </div>
+              ) : (
+                renderKeyboard(false)
+              )}
+            </div>
           )}
-        </div>
-      )}
+        </>
+      ) : null}
     </div>
   );
 }

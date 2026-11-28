@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Lock, LockOpen, Mic, MicOff, Music2, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowLeft, Library, Music2, SlidersHorizontal } from 'lucide-react';
 import { pianoEngine, type AudioEngineStatus } from './audio/piano-engine';
 import LibraryView, { type MuseScoreController } from './components/LibraryView';
+import MaestroKids from './components/MaestroKids';
 import PracticeStudio from './components/PracticeStudio';
+import type { RegisterInput } from './components/kids-audio';
 import { MicInputController } from './input/mic-adapter';
 import { MidiInputController } from './input/midi-adapter';
 import type {
@@ -12,41 +14,13 @@ import type {
   NoteInput,
 } from './input/types';
 import { readPracticeMidi } from './music/midi-parser';
+import { loadKidsData, saveKidsData, type KidsData } from './music/kids-learning';
 import { DEFAULT_TODDLER_SCORE } from './music/toddler-songs';
 import type { Score } from './music/types';
 import { useMuseScorePaste } from './musescore-paste';
 import { renderScorePdf } from './score-pdf.mjs';
 
 type AppTab = 'practice' | 'library';
-
-const UNLOCK_HOLD_MS = 900;
-
-function PianoMark() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      width="20"
-      height="20"
-      fill="none"
-      aria-hidden="true"
-      className="shrink-0"
-    >
-      <rect
-        x="1.75"
-        y="3.25"
-        width="16.5"
-        height="13.5"
-        rx="2.5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <line x1="7.25" y1="3.5" x2="7.25" y2="16.5" stroke="currentColor" strokeWidth="1.2" />
-      <line x1="12.75" y1="3.5" x2="12.75" y2="16.5" stroke="currentColor" strokeWidth="1.2" />
-      <rect x="5.75" y="3.5" width="3" height="7.5" rx="0.75" fill="currentColor" />
-      <rect x="11.25" y="3.5" width="3" height="7.5" rx="0.75" fill="currentColor" />
-    </svg>
-  );
-}
 
 function pdfFileName(title: string): string {
   const cleaned = title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').trim() || 'score';
@@ -84,7 +58,11 @@ function downloadScorePdf(score: Score): void {
 
 export default function App() {
   const [tab, setTab] = useState<AppTab>('practice');
-  const [kidLocked, setKidLocked] = useState(false);
+  const [inStudio, setInStudio] = useState(false);
+  const [studioOpened, setStudioOpened] = useState(false);
+  const [kidsData, setKidsData] = useState(loadKidsData);
+  const kidsDataRef = useRef(kidsData);
+  const [muteLocalForMidi, setMuteLocalForMidi] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [sessionScores, setSessionScores] = useState<Score[]>([]);
@@ -92,7 +70,6 @@ export default function App() {
   const [sampleLoading, setSampleLoading] = useState(false);
   const [sampleError, setSampleError] = useState<string | null>(null);
   const [pdfNotice, setPdfNotice] = useState<string | null>(null);
-  const [unlockProgress, setUnlockProgress] = useState(0);
 
   const [midiController] = useState(() => new MidiInputController());
   const [midiState, setMidiState] = useState<MidiAccessState>('unknown');
@@ -111,7 +88,21 @@ export default function App() {
 
   const noteHandlerRef = useRef<((event: NoteInput) => void) | null>(null);
   const micGateRef = useRef<(() => boolean) | null>(null);
-  const unlockRafRef = useRef<number>(0);
+  const kidsNoteHandler = useRef<Parameters<RegisterInput>[0]>(null);
+  const kidsMicGate = useRef<Parameters<RegisterInput>[1]>(null);
+
+  const updateKids = useCallback((apply: (data: KidsData) => KidsData) => {
+    const next = apply(kidsDataRef.current);
+    if (next === kidsDataRef.current) return;
+    kidsDataRef.current = next;
+    saveKidsData(next);
+    setKidsData(next);
+  }, []);
+
+  const registerKidsInput = useCallback<RegisterInput>((listener, gate) => {
+    kidsNoteHandler.current = listener;
+    kidsMicGate.current = gate;
+  }, []);
 
   const registerNoteHandler = useCallback((handler: ((event: NoteInput) => void) | null) => {
     noteHandlerRef.current = handler;
@@ -122,10 +113,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.body.style.backgroundColor = darkMode ? '#17131a' : '#fbf5f1';
-    document.body.style.color = darkMode ? '#f3eaf0' : '#2a1d22';
-    void globalThis.__maestroSetSystemBars?.(darkMode)?.catch?.(() => {});
-  }, [darkMode]);
+    const night = inStudio && darkMode;
+    document.body.style.backgroundColor = night ? '#17131a' : '#faf4ec';
+    document.body.style.color = night ? '#f3eaf0' : '#38252d';
+    void globalThis.__maestroSetSystemBars?.(night)?.catch?.(() => {});
+  }, [darkMode, inStudio]);
 
   useEffect(() => {
     const unlock = () => {
@@ -168,43 +160,9 @@ export default function App() {
   }, [micController]);
 
   useEffect(() => {
-    if (!kidLocked) {
-      cancelAnimationFrame(unlockRafRef.current);
-      setUnlockProgress(0);
-      return;
-    }
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setKidLocked(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      cancelAnimationFrame(unlockRafRef.current);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [kidLocked]);
-
-  const beginHoldToUnlock = useCallback(() => {
-    cancelAnimationFrame(unlockRafRef.current);
-    const startMs = performance.now();
-    const tick = (nowMs: number) => {
-      const progress = Math.min(1, (nowMs - startMs) / UNLOCK_HOLD_MS);
-      setUnlockProgress(progress);
-      if (progress >= 1) {
-        setUnlockProgress(0);
-        setKidLocked(false);
-        return;
-      }
-      unlockRafRef.current = requestAnimationFrame(tick);
-    };
-    unlockRafRef.current = requestAnimationFrame(tick);
-  }, []);
-
-  const cancelHoldToUnlock = useCallback(() => {
-    cancelAnimationFrame(unlockRafRef.current);
-    setUnlockProgress(0);
-  }, []);
+    if (inStudio) return;
+    return midiController.subscribe((event) => kidsNoteHandler.current?.(event));
+  }, [midiController, inStudio]);
 
   const openScoreInPractice = useCallback((song: Score) => {
     if (!song.id.startsWith('toddler:')) {
@@ -304,9 +262,8 @@ export default function App() {
         audioContext: pianoEngine.getContext() ?? undefined,
         onLevel: setMicLevel,
         onPitch: (reading) => setMicPitch(reading),
-        onNote: (event) => noteHandlerRef.current?.(event),
-        shouldGate: () =>
-          micGateRef.current ? micGateRef.current() : pianoEngine.isPlaybackSounding(),
+        onNote: (event) => (kidsNoteHandler.current ?? noteHandlerRef.current)?.(event),
+        shouldGate: () => (kidsMicGate.current ?? micGateRef.current)?.() ?? true,
       });
       await pianoEngine.setRecordingSession(true);
       setMicActive(true);
@@ -340,269 +297,87 @@ export default function App() {
     }
   }, []);
 
-  const hasDeviceActive = midiDevices.length > 0 || micActive;
-
-  const headerButtonClass = darkMode
-    ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#f3eaf0] hover:bg-[#2a2430]'
-    : 'border-[#2a1d22]/[0.08] bg-[#fffdfb] text-[#2a1d22] hover:bg-[#f6ebe6]';
-
-  const mutedIconClass = darkMode ? 'text-[#b9a9b4]' : 'text-[#6b5560]';
+  const headerButton = `inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-bold ${darkMode ? 'border-white/10 bg-white/5 aria-pressed:border-[#f06595] aria-pressed:text-[#f06595]' : 'border-[#e9dcd0] bg-[#fffbf6] aria-pressed:border-[#b72355] aria-pressed:text-[#b72355]'}`;
 
   return (
-    <div
-      className={`min-h-screen transition-colors duration-150 ${
-        darkMode ? 'bg-[#17131a] text-[#f3eaf0]' : 'bg-[#fbf5f1] text-[#2a1d22]'
-      }`}
-    >
-      <header
-        className={`sticky top-0 z-30 border-b ${
-          darkMode
-            ? 'border-[#f3eaf0]/[0.08] bg-[#17131a]/95'
-            : 'border-[#2a1d22]/[0.08] bg-[#fbf5f1]/95'
-        } backdrop-blur-sm`}
-      >
-        <div className="mx-auto flex h-14 max-w-[1440px] flex-nowrap items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex shrink-0 items-center gap-2.5">
-            <PianoMark />
-            <span className="text-[17px] font-semibold leading-none tracking-[-0.01em]">
-              Maestro
-            </span>
+    <>
+      {!inStudio && <MaestroKids data={kidsData} update={updateKids} register={registerKidsInput}
+        midiSound={!muteLocalForMidi} openStudio={() => {
+          setInStudio(true);
+          setStudioOpened(true);
+          setTab('practice');
+          setShowSettings(true);
+          window.scrollTo(0, 0);
+        }} />}
+      {studioOpened && <div hidden={!inStudio}
+        className={`min-h-screen ${darkMode ? 'bg-[#17131a] text-[#f3eaf0]' : 'bg-[#faf4ec] text-[#38252d]'}`}>
+        <header className={`border-b ${darkMode ? 'border-white/10' : 'border-[#e9dcd0] bg-[#fffbf6]'}`}>
+          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6">
+            <h1 className="flex items-center gap-2 text-lg font-black"><Music2 size={21} /> Maestro Studio</h1>
+            <nav aria-label="Maestro Studio" className="flex flex-wrap gap-1.5">
+              <button type="button" className={headerButton} aria-pressed={tab === 'practice' && !showSettings}
+                onClick={() => { setTab('practice'); setShowSettings(false); }}>Practice</button>
+              <button type="button" className={headerButton} aria-pressed={tab === 'library'}
+                onClick={() => { setTab('library'); setShowSettings(false); }}><Library size={16} /> Library</button>
+              <button type="button" className={headerButton} aria-pressed={tab === 'practice' && showSettings}
+                onClick={() => { setTab('practice'); setShowSettings(true); }}><SlidersHorizontal size={16} /> Settings</button>
+              <button type="button" className={headerButton} onClick={() => setInStudio(false)}><ArrowLeft size={16} /> Maestro Kids</button>
+            </nav>
+          </div>
+        </header>
+        {pdfNotice && <p role="status" className="px-4 py-2 text-center text-sm">{pdfNotice}</p>}
+        {midiNotice && <p role="status" className="px-4 py-2 text-center text-sm">{midiNotice}</p>}
+        <main className="px-4 py-4 sm:px-6 sm:py-6">
+          <div className={tab === 'practice' ? '' : 'hidden'}>
+            <PracticeStudio
+              score={activeScore}
+              sessionScores={sessionScores}
+              savedScores={museScore.scores}
+              scoreBusy={museScore.busy}
+              onSelectScore={openScoreInPractice}
+              onOpenSavedScore={(scoreId) => void museScore.openSaved(scoreId)}
+              onGoToLibrary={() => setTab('library')}
+              onLoadSample={handleLoadSample}
+              sampleLoading={sampleLoading}
+              onExportPdf={handleExportPdf}
+              darkMode={darkMode}
+              onToggleDarkMode={() => setDarkMode((prev) => !prev)}
+              showSettings={showSettings}
+              kidsData={kidsData}
+              onKidsSettings={(settings) => updateKids((previous) => ({ ...previous, settings: { ...previous.settings, ...settings } }))}
+              muteLocalForMidi={muteLocalForMidi}
+              onMuteLocalForMidi={setMuteLocalForMidi}
+              onCloseSettings={() => setShowSettings(false)}
+              midiController={midiController}
+              midiState={midiState}
+              midiDevices={midiDevices}
+              onConnectMidi={() => void handleConnectMidi()}
+              micActive={micActive}
+              micPitch={micPitch}
+              micLevel={micLevel}
+              micError={micError}
+              onToggleMic={() => void handleToggleMic()}
+              audioStatus={audioStatus}
+              viewActive={inStudio && tab === 'practice' && !showSettings}
+              registerNoteHandler={registerNoteHandler}
+              registerMicGate={registerMicGate}
+            />
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            {kidLocked ? (
-              <button
-                type="button"
-                onPointerDown={beginHoldToUnlock}
-                onPointerUp={cancelHoldToUnlock}
-                onPointerLeave={cancelHoldToUnlock}
-                onPointerCancel={cancelHoldToUnlock}
-                title="Press and hold to unlock controls (or press Escape)"
-                className={`relative inline-flex h-10 items-center gap-2 overflow-hidden rounded-[12px] border px-3 text-xs font-medium transition-colors duration-150 select-none touch-none ${
-                  darkMode
-                    ? 'border-[#f3eaf0]/[0.12] bg-[#1f1a22] text-[#f3eaf0]'
-                    : 'border-[#2a1d22]/[0.12] bg-[#fffdfb] text-[#2a1d22]'
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none absolute inset-y-0 left-0 transition-none ${
-                    darkMode ? 'bg-[#f3eaf0]/15' : 'bg-[#2a1d22]/10'
-                  }`}
-                  style={{ width: `${Math.round(unlockProgress * 100)}%` }}
-                />
-                <LockOpen className={`relative h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
-                <span className="relative">Hold to unlock</span>
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setTab((prev) => (prev === 'practice' ? 'library' : 'practice'))}
-                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
-                    tab === 'library'
-                      ? darkMode
-                        ? 'border-[#f06595] bg-[#f06595] text-[#17131a] hover:bg-[#f47aa4]'
-                        : 'border-[#d6336c] bg-[#d6336c] text-white hover:bg-[#be2a5e]'
-                      : headerButtonClass
-                  }`}
-                >
-                  <Music2
-                    className={`h-4 w-4 ${tab === 'library' ? 'text-current' : mutedIconClass}`}
-                    strokeWidth={1.5}
-                  />
-                  <span>{tab === 'practice' ? 'Songs' : 'Piano'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => void handleToggleMic()}
-                  title={micActive ? 'Stop acoustic microphone' : 'Enable acoustic microphone'}
-                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
-                    micActive
-                      ? darkMode
-                        ? 'border-[#4cc38a]/40 bg-[#4cc38a]/10 text-[#4cc38a]'
-                        : 'border-[#16a34a]/40 bg-[#16a34a]/10 text-[#16a34a]'
-                      : headerButtonClass
-                  }`}
-                >
-                  {micActive ? (
-                    <Mic className="h-4 w-4" strokeWidth={1.5} />
-                  ) : (
-                    <MicOff className={`h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
-                  )}
-                  {micActive ? (
-                    <>
-                      <span className="max-w-[48px] truncate font-mono text-xs tabular-nums sm:max-w-none">
-                        {micPitch ? micPitch.name : 'On'}
-                      </span>
-                      <span
-                        aria-hidden="true"
-                        className={`h-1.5 w-6 overflow-hidden rounded-full ${
-                          darkMode ? 'bg-[#2a2430]' : 'bg-[#f6ebe6]'
-                        }`}
-                      >
-                        <span
-                          className={`block h-full rounded-full transition-[width] duration-75 ${
-                            darkMode ? 'bg-[#4cc38a]' : 'bg-[#16a34a]'
-                          }`}
-                          style={{ width: `${Math.round(micLevel * 100)}%` }}
-                        />
-                      </span>
-                    </>
-                  ) : (
-                    <span className="hidden sm:inline">Mic</span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTab('practice');
-                    setShowSettings(false);
-                    setKidLocked(true);
-                  }}
-                  title="Lock controls for focused practice"
-                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${headerButtonClass}`}
-                >
-                  <Lock className={`h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
-                  <span className="hidden sm:inline">Lock</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (tab !== 'practice') {
-                      setTab('practice');
-                      setShowSettings(true);
-                    } else {
-                      setShowSettings((prev) => !prev);
-                    }
-                  }}
-                  title="Studio settings"
-                  className={`inline-flex h-10 items-center gap-2 rounded-[12px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
-                    showSettings && tab === 'practice'
-                      ? darkMode
-                        ? 'border-[#f06595]/60 bg-[#2a2430] text-[#f3eaf0]'
-                        : 'border-[#d6336c]/50 bg-[#f6ebe6] text-[#2a1d22]'
-                      : headerButtonClass
-                  }`}
-                >
-                  <SlidersHorizontal className={`h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
-                  <span className="hidden sm:inline">Settings</span>
-                  {hasDeviceActive ? (
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        darkMode ? 'bg-[#4cc38a]' : 'bg-[#16a34a]'
-                      }`}
-                    />
-                  ) : null}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {pdfNotice ? (
-          <div
-            className={`border-t px-4 py-2 text-center text-xs font-medium ${
-              darkMode
-                ? 'border-[#e5484d]/30 bg-[#e5484d]/10 text-[#e5484d]'
-                : 'border-[#dc2626]/20 bg-[#dc2626]/10 text-[#dc2626]'
-            }`}
-          >
-            {pdfNotice}
-          </div>
-        ) : null}
-        {micError ? (
-          <div
-            className={`flex items-center justify-center gap-2 border-t px-4 py-2 text-xs font-medium ${
-              darkMode
-                ? 'border-[#e5484d]/30 bg-[#e5484d]/10 text-[#e5484d]'
-                : 'border-[#dc2626]/20 bg-[#dc2626]/10 text-[#dc2626]'
-            }`}
-          >
-            <span>{micError}</span>
-            <button
-              type="button"
-              onClick={() => setMicError(null)}
-              aria-label="Dismiss microphone notice"
-              className="rounded-[8px] p-1 hover:bg-black/5"
-            >
-              <X className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-          </div>
-        ) : null}
-        {midiNotice ? (
-          <div
-            className={`flex items-center justify-center gap-2 border-t px-4 py-2 text-xs font-medium ${
-              darkMode
-                ? 'border-[#f3eaf0]/[0.08] bg-[#1f1a22] text-[#b9a9b4]'
-                : 'border-[#2a1d22]/[0.08] bg-[#f6ebe6] text-[#6b5560]'
-            }`}
-          >
-            <span>{midiNotice}</span>
-            <button
-              type="button"
-              onClick={() => setMidiNotice(null)}
-              aria-label="Dismiss MIDI notice"
-              className="rounded-[8px] p-1 hover:bg-black/5"
-            >
-              <X className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-          </div>
-        ) : null}
-      </header>
-
-      <main className="px-4 py-4 sm:px-6 sm:py-6">
-        <div className={tab === 'practice' ? '' : 'hidden'}>
-          <PracticeStudio
-            score={activeScore}
-            sessionScores={sessionScores}
-            savedScores={museScore.scores}
-            scoreBusy={museScore.busy}
-            onSelectScore={openScoreInPractice}
-            onOpenSavedScore={(scoreId) => void museScore.openSaved(scoreId)}
-            onGoToLibrary={() => setTab('library')}
-            onLoadSample={handleLoadSample}
-            sampleLoading={sampleLoading}
-            onExportPdf={handleExportPdf}
-            darkMode={darkMode}
-            onToggleDarkMode={() => setDarkMode((prev) => !prev)}
-            showSettings={showSettings}
-            onToggleSettings={() => setShowSettings((prev) => !prev)}
-            onCloseSettings={() => setShowSettings(false)}
-            midiController={midiController}
-            midiState={midiState}
-            midiDevices={midiDevices}
-            onConnectMidi={() => void handleConnectMidi()}
-            micActive={micActive}
-            micPitch={micPitch}
-            micLevel={micLevel}
-            micError={micError}
-            onToggleMic={() => void handleToggleMic()}
-            audioStatus={audioStatus}
-            viewActive={tab === 'practice'}
-            registerNoteHandler={registerNoteHandler}
-            registerMicGate={registerMicGate}
-            kidLocked={kidLocked}
-            onExitKidLock={() => setKidLocked(false)}
-          />
-        </div>
-
-        {!kidLocked && tab === 'library' ? (
-          <LibraryView
-            darkMode={darkMode}
-            museScore={museScore}
-            sessionScores={sessionScores}
-            activeScoreId={activeScore?.id ?? null}
-            onOpenScore={openScoreInPractice}
-            onLoadSample={handleLoadSample}
-            sampleLoading={sampleLoading}
-            sampleError={sampleError}
-          />
-        ) : null}
-      </main>
-    </div>
+          {inStudio && tab === 'library' ? (
+            <LibraryView
+              darkMode={darkMode}
+              museScore={museScore}
+              sessionScores={sessionScores}
+              activeScoreId={activeScore?.id ?? null}
+              onOpenScore={openScoreInPractice}
+              onLoadSample={handleLoadSample}
+              sampleLoading={sampleLoading}
+              sampleError={sampleError}
+            />
+          ) : null}
+        </main>
+      </div>}
+    </>
   );
 }

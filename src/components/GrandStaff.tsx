@@ -11,6 +11,7 @@ import { getStaffYOffset } from '../music/pitch';
 import type { NoteEvent, Score, TimeSigPoint } from '../music/types';
 import type { PracticeGrade } from '../practice/engine';
 import { groupStaffEvents, layoutStaffGroup } from '../staff-layout.mjs';
+import { getKeyStickerColor, type ColorMode } from './note-colors';
 import {
   buildBeamGroups,
   computeBeamLine,
@@ -28,6 +29,7 @@ export interface GrandStaffProps {
   onSeekBeat: (beat: number) => void;
   onPreviewPitch?: (pitch: number) => void;
   darkMode: boolean;
+  colorMode?: ColorMode;
 }
 
 interface MeasureSpan {
@@ -252,6 +254,7 @@ export function GrandStaff({
   onSeekBeat,
   onPreviewPitch,
   darkMode: _studioDarkMode,
+  colorMode = 'hands',
 }: GrandStaffProps) {
   const fadeGradId = useId();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1052,8 +1055,9 @@ export function GrandStaff({
                     const accidentalX = ev.cx - 12 - ev.accidentalLane * 8;
 
                     let noteColor = ev.originalHand === 'R' ? rhHex : lhHex;
-                    if (grade?.status === 'hit') noteColor = '#059669';
-                    if (grade?.status === 'miss') noteColor = '#be123c';
+                    if (colorMode === 'rainbow') noteColor = getKeyStickerColor(ev.pitch).bg;
+                    else if (grade?.status === 'hit') noteColor = '#059669';
+                    else if (grade?.status === 'miss') noteColor = '#be123c';
 
                     const dotY = Math.abs(ev.stepOffset) % 2 === 0 ? ev.cy - 2.5 : ev.cy;
                     const pitchLabel = `${ev.step}${ev.alter > 0 ? '#' : ev.alter < 0 ? 'b' : ''}`;

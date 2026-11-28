@@ -73,6 +73,7 @@ export function attachKeyboardInput(opts: KeyboardInputOptions): () => void {
     }
 
     if (e.code === 'Space') {
+      if (e.target instanceof Element && e.target.closest('button, a, [role="button"]')) return;
       e.preventDefault();
       opts.onTogglePlay();
       return;
