@@ -5,9 +5,6 @@ export interface ToddlerSongSpec {
   id: string;
   title: string;
   subtitle: string;
-  emoji: string;
-  accentBg: string;
-  accentBorder: string;
   tempo: number;
   timeSignature: [number, number];
   melody: readonly (readonly [string, number])[];
@@ -39,9 +36,6 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     id: 'toddler:twinkle',
     title: 'Twinkle, Twinkle, Little Star',
     subtitle: 'Gentle bedtime favorite',
-    emoji: '⭐',
-    accentBg: 'bg-amber-100/90',
-    accentBorder: 'border-amber-300',
     tempo: 74,
     timeSignature: [4, 4],
     melody: [
@@ -62,10 +56,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
   {
     id: 'toddler:mary',
     title: 'Mary Had a Little Lamb',
-    subtitle: 'Easy 4-note singalong',
-    emoji: '🐑',
-    accentBg: 'bg-sky-100/90',
-    accentBorder: 'border-sky-300',
+    subtitle: 'Easy four-note melody',
     tempo: 80,
     timeSignature: [4, 4],
     melody: [
@@ -82,10 +73,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
   {
     id: 'toddler:baby-shark',
     title: 'Baby Shark',
-    subtitle: 'Bouncy doo-doo-doo riff',
-    emoji: '🦈',
-    accentBg: 'bg-cyan-100/90',
-    accentBorder: 'border-cyan-300',
+    subtitle: 'Playful rhythmic pattern',
     tempo: 88,
     timeSignature: [4, 4],
     melody: [
@@ -100,10 +88,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
   {
     id: 'toddler:row-boat',
     title: 'Row, Row, Row Your Boat',
-    subtitle: 'Swaying 3/4 river song',
-    emoji: '⛵',
-    accentBg: 'bg-teal-100/90',
-    accentBorder: 'border-teal-300',
+    subtitle: 'Three-quarter time melody',
     tempo: 80,
     timeSignature: [3, 4],
     melody: [
@@ -120,10 +105,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
   {
     id: 'toddler:london-bridge',
     title: 'London Bridge',
-    subtitle: 'Cheerful stepping melody',
-    emoji: '🌉',
-    accentBg: 'bg-rose-100/90',
-    accentBorder: 'border-rose-300',
+    subtitle: 'Stepping folk tune',
     tempo: 82,
     timeSignature: [4, 4],
     melody: [
@@ -140,10 +122,7 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
   {
     id: 'toddler:ode-to-joy',
     title: 'Ode to Joy',
-    subtitle: 'Beethoven for little hands',
-    emoji: '🌈',
-    accentBg: 'bg-purple-100/90',
-    accentBorder: 'border-purple-300',
+    subtitle: 'Simple C-major melody',
     tempo: 80,
     timeSignature: [4, 4],
     melody: [
@@ -158,6 +137,11 @@ export const TODDLER_SONGS: readonly ToddlerSongSpec[] = [
     ],
   },
 ];
+
+export function getSongPreviewPitches(spec: ToddlerSongSpec, count = 6): number[] {
+  const limit = Math.max(0, count);
+  return spec.melody.slice(0, limit).map(([rawName]) => parsePitchNameToMidi(rawName));
+}
 
 export function buildToddlerScore(spec: ToddlerSongSpec): Score {
   const [num, den] = spec.timeSignature;

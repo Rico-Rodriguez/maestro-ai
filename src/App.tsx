@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Lock, LockOpen, Mic, MicOff, Music2, Settings, Sparkles, X } from 'lucide-react';
+import { Lock, LockOpen, Mic, MicOff, Music2, SlidersHorizontal, X } from 'lucide-react';
 import { pianoEngine, type AudioEngineStatus } from './audio/piano-engine';
 import LibraryView, { type MuseScoreController } from './components/LibraryView';
 import PracticeStudio from './components/PracticeStudio';
@@ -20,6 +20,33 @@ import { renderScorePdf } from './score-pdf.mjs';
 type AppTab = 'practice' | 'library';
 
 const UNLOCK_HOLD_MS = 900;
+
+function PianoMark() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      width="20"
+      height="20"
+      fill="none"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <rect
+        x="1.75"
+        y="3.25"
+        width="16.5"
+        height="13.5"
+        rx="2.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <line x1="7.25" y1="3.5" x2="7.25" y2="16.5" stroke="currentColor" strokeWidth="1.2" />
+      <line x1="12.75" y1="3.5" x2="12.75" y2="16.5" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="5.75" y="3.5" width="3" height="7.5" rx="0.75" fill="currentColor" />
+      <rect x="11.25" y="3.5" width="3" height="7.5" rx="0.75" fill="currentColor" />
+    </svg>
+  );
+}
 
 function pdfFileName(title: string): string {
   const cleaned = title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').trim() || 'score';
@@ -95,8 +122,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.body.style.backgroundColor = darkMode ? '#141936' : '#fffbf0';
-    document.body.style.color = darkMode ? '#fef3c7' : '#451a03';
+    document.body.style.backgroundColor = darkMode ? '#161513' : '#f7f4ee';
+    document.body.style.color = darkMode ? '#efe9de' : '#1f1b16';
     void globalThis.__maestroSetSystemBars?.(darkMode)?.catch?.(() => {});
   }, [darkMode]);
 
@@ -210,12 +237,12 @@ export default function App() {
       const url = `${baseUrl}library/4197961.mid`;
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Sample download failed (${response.status}).`);
+        throw new Error(`Sample download failed (${response.status})`);
       }
       const bytes = await response.arrayBuffer();
       const read = readPracticeMidi(bytes, "Merry-Go-Round of Life (Howl's Moving Castle).mid");
       if (!read.ok) {
-        throw new Error('Sample MIDI file could not be parsed.');
+        throw new Error('Sample MIDI file could not be parsed');
       }
       const sampleScore: Score = {
         ...read.song,
@@ -224,7 +251,7 @@ export default function App() {
       };
       openScoreInPractice(sampleScore);
     } catch (err) {
-      setSampleError(err instanceof Error ? err.message : 'Could not load sample score.');
+      setSampleError(err instanceof Error ? err.message : 'Could not load sample score');
     } finally {
       setSampleLoading(false);
     }
@@ -240,15 +267,15 @@ export default function App() {
     if (state === 'unsupported') {
       setMidiNotice(
         globalThis.__maestroNativeMidi
-          ? 'MIDI unavailable on this device.'
-          : 'Web MIDI is not supported in this browser. Use Chrome/Edge or the iOS app.',
+          ? 'MIDI unavailable on this device'
+          : 'Web MIDI is not supported in this browser. Use Chrome, Edge, or the iOS app.',
       );
     } else if (state === 'denied') {
       setMidiNotice('MIDI permission denied. Check browser or Bluetooth settings.');
     } else if (state === 'ready') {
       setMidiNotice(
         globalThis.__maestroNativeMidi
-          ? 'No MIDI keyboard detected yet. Plug in a USB-MIDI adapter or pair one in the Bluetooth MIDI picker.'
+          ? 'No MIDI keyboard detected yet. Plug in a USB-MIDI adapter or pair one in Bluetooth MIDI.'
           : 'MIDI ready, but no keyboard detected. Plug in a USB-MIDI keyboard and try again.',
       );
     }
@@ -293,13 +320,13 @@ export default function App() {
       if (name === 'NotAllowedError' || name === 'SecurityError') {
         setMicError(
           globalThis.__maestroNativeMic
-            ? 'Microphone permission denied. Enable it in iOS Settings -> Maestro AI -> Microphone.'
-            : 'Microphone permission denied. Allow mic access in your browser settings.',
+            ? 'Microphone permission denied. Enable it in iOS Settings under Maestro.'
+            : 'Microphone permission denied. Allow mic access in browser settings.',
         );
       } else if (name === 'NotFoundError') {
-        setMicError('No microphone found on this device.');
+        setMicError('No microphone found on this device');
       } else {
-        setMicError('Could not start microphone input.');
+        setMicError('Could not start microphone input');
       }
     }
   }, [micActive, micController]);
@@ -309,38 +336,40 @@ export default function App() {
     try {
       downloadScorePdf(score);
     } catch (err) {
-      setPdfNotice(err instanceof Error ? err.message : 'Could not generate PDF.');
+      setPdfNotice(err instanceof Error ? err.message : 'Could not generate PDF');
     }
   }, []);
 
   const hasDeviceActive = midiDevices.length > 0 || micActive;
 
+  const headerButtonClass = darkMode
+    ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#efe9de] hover:bg-[#262421]'
+    : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#1f1b16] hover:bg-[#efe9df]';
+
+  const mutedIconClass = darkMode ? 'text-[#aaa398]' : 'text-[#5e554a]';
+
   return (
     <div
-      className={`min-h-screen transition-colors ${
-        darkMode
-          ? 'bg-gradient-to-b from-[#141936] via-[#171d40] to-[#111630] text-amber-50'
-          : 'bg-gradient-to-b from-[#fffbf0] via-[#fffdf7] to-[#f4f9ff] text-amber-950'
+      className={`min-h-screen transition-colors duration-150 ${
+        darkMode ? 'bg-[#161513] text-[#efe9de]' : 'bg-[#f7f4ee] text-[#1f1b16]'
       }`}
     >
       <header
-        className={`sticky top-0 z-30 border-b backdrop-blur-md ${
+        className={`sticky top-0 z-30 border-b ${
           darkMode
-            ? 'border-indigo-900/70 bg-[#141936]/90'
-            : 'border-amber-200/80 bg-[#fffbf0]/90'
-        }`}
+            ? 'border-[#efe9de]/[0.08] bg-[#161513]/95'
+            : 'border-[#1f1b16]/[0.08] bg-[#f7f4ee]/95'
+        } backdrop-blur-sm`}
       >
-        <div className="mx-auto flex max-w-[1440px] flex-nowrap items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-2.5">
+        <div className="mx-auto flex h-14 max-w-[1440px] flex-nowrap items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex shrink-0 items-center gap-2.5">
-            <div className="animate-kid-bob flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 via-amber-400 to-sky-400 text-white shadow-sm ring-2 ring-white/80">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <span className="font-display text-xl font-bold leading-none tracking-tight sm:text-2xl">
-              Little Maestro
+            <PianoMark />
+            <span className="text-[17px] font-medium leading-none tracking-[-0.01em]">
+              Maestro
             </span>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {kidLocked ? (
               <button
                 type="button"
@@ -348,35 +377,40 @@ export default function App() {
                 onPointerUp={cancelHoldToUnlock}
                 onPointerLeave={cancelHoldToUnlock}
                 onPointerCancel={cancelHoldToUnlock}
-                title="Press and hold to unlock grown-up controls (or press Escape)"
-                className={`relative inline-flex items-center gap-1.5 overflow-hidden rounded-2xl border px-3.5 py-2 text-xs font-bold shadow-sm transition select-none touch-none ${
+                title="Press and hold to unlock controls (or press Escape)"
+                className={`relative inline-flex h-9 items-center gap-2 overflow-hidden rounded-[8px] border px-3 text-xs font-medium transition-colors duration-150 select-none touch-none ${
                   darkMode
-                    ? 'border-amber-400/50 bg-indigo-950/80 text-amber-200'
-                    : 'border-amber-300 bg-white text-amber-900'
+                    ? 'border-[#efe9de]/[0.12] bg-[#1c1a18] text-[#efe9de]'
+                    : 'border-[#1f1b16]/[0.12] bg-[#fdfbf7] text-[#1f1b16]'
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-y-0 left-0 bg-amber-400/35 transition-none"
+                  className={`pointer-events-none absolute inset-y-0 left-0 transition-none ${
+                    darkMode ? 'bg-[#efe9de]/15' : 'bg-[#1f1b16]/10'
+                  }`}
                   style={{ width: `${Math.round(unlockProgress * 100)}%` }}
                 />
-                <LockOpen className="relative h-3.5 w-3.5" />
-                <span className="relative">Hold to Unlock</span>
+                <LockOpen className={`relative h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
+                <span className="relative">Hold to unlock</span>
               </button>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => setTab((prev) => (prev === 'practice' ? 'library' : 'practice'))}
-                  className={`inline-flex items-center gap-1.5 rounded-2xl border-b-2 border px-3 py-1.5 text-xs font-bold transition active:translate-y-[1px] ${
+                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
                     tab === 'library'
-                      ? 'border-sky-400 bg-sky-500 text-white shadow-sm'
-                      : darkMode
-                        ? 'border-indigo-800 bg-indigo-900/70 text-amber-100 hover:bg-indigo-800/80'
-                        : 'border-amber-300 bg-white text-amber-900 shadow-sm hover:bg-amber-50'
+                      ? darkMode
+                        ? 'border-[#efe9de] bg-[#efe9de] text-[#161513]'
+                        : 'border-[#c85a32] bg-[#c85a32] text-white hover:bg-[#b44e29]'
+                      : headerButtonClass
                   }`}
                 >
-                  <Music2 className="h-3.5 w-3.5" />
+                  <Music2
+                    className={`h-4 w-4 ${tab === 'library' ? 'text-current' : mutedIconClass}`}
+                    strokeWidth={1.5}
+                  />
                   <span>{tab === 'practice' ? 'Songs' : 'Piano'}</span>
                 </button>
 
@@ -384,30 +418,34 @@ export default function App() {
                   type="button"
                   onClick={() => void handleToggleMic()}
                   title={micActive ? 'Stop acoustic microphone' : 'Enable acoustic microphone'}
-                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-xs font-bold transition ${
+                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
                     micActive
                       ? darkMode
-                        ? 'border-emerald-400/70 bg-emerald-500/15 text-emerald-300'
-                        : 'border-emerald-500/70 bg-emerald-500/15 text-emerald-700'
-                      : darkMode
-                        ? 'border-indigo-800 bg-indigo-900/70 text-amber-100 hover:bg-indigo-800/80'
-                        : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
+                        ? 'border-[#4cc38a]/40 bg-[#4cc38a]/10 text-[#4cc38a]'
+                        : 'border-[#16a34a]/40 bg-[#16a34a]/10 text-[#16a34a]'
+                      : headerButtonClass
                   }`}
                 >
-                  {micActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                  {micActive ? (
+                    <Mic className="h-4 w-4" strokeWidth={1.5} />
+                  ) : (
+                    <MicOff className={`h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
+                  )}
                   {micActive ? (
                     <>
-                      <span className="max-w-[44px] truncate sm:max-w-none">
+                      <span className="max-w-[48px] truncate font-mono text-xs tabular-nums sm:max-w-none">
                         {micPitch ? micPitch.name : 'On'}
                       </span>
                       <span
                         aria-hidden="true"
                         className={`h-1.5 w-6 overflow-hidden rounded-full ${
-                          darkMode ? 'bg-indigo-950' : 'bg-amber-100'
+                          darkMode ? 'bg-[#262421]' : 'bg-[#efe9df]'
                         }`}
                       >
                         <span
-                          className="block h-full rounded-full bg-emerald-500 transition-[width] duration-75"
+                          className={`block h-full rounded-full transition-[width] duration-75 ${
+                            darkMode ? 'bg-[#4cc38a]' : 'bg-[#16a34a]'
+                          }`}
                           style={{ width: `${Math.round(micLevel * 100)}%` }}
                         />
                       </span>
@@ -424,15 +462,11 @@ export default function App() {
                     setShowSettings(false);
                     setKidLocked(true);
                   }}
-                  title="Lock controls for toddler practice"
-                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-xs font-bold transition ${
-                    darkMode
-                      ? 'border-indigo-800 bg-indigo-900/70 text-amber-100 hover:bg-indigo-800/80'
-                      : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
-                  }`}
+                  title="Lock controls for focused practice"
+                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${headerButtonClass}`}
                 >
-                  <Lock className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Kid Lock</span>
+                  <Lock className={`h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
+                  <span className="hidden sm:inline">Lock</span>
                 </button>
 
                 <button
@@ -445,21 +479,23 @@ export default function App() {
                       setShowSettings((prev) => !prev);
                     }
                   }}
-                  title="Grown-up studio settings"
-                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-xs font-bold transition ${
+                  title="Studio settings"
+                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${
                     showSettings && tab === 'practice'
                       ? darkMode
-                        ? 'border-amber-400 bg-amber-400/20 text-amber-200'
-                        : 'border-amber-400 bg-amber-400/20 text-amber-800'
-                      : darkMode
-                        ? 'border-indigo-800 bg-indigo-900/70 text-amber-100 hover:bg-indigo-800/80'
-                        : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
+                        ? 'border-[#e07047]/60 bg-[#262421] text-[#efe9de]'
+                        : 'border-[#c85a32]/50 bg-[#efe9df] text-[#1f1b16]'
+                      : headerButtonClass
                   }`}
                 >
-                  <Settings className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Grown-ups</span>
+                  <SlidersHorizontal className={`h-4 w-4 ${mutedIconClass}`} strokeWidth={1.5} />
+                  <span className="hidden sm:inline">Settings</span>
                   {hasDeviceActive ? (
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        darkMode ? 'bg-[#4cc38a]' : 'bg-[#16a34a]'
+                      }`}
+                    />
                   ) : null}
                 </button>
               </>
@@ -468,27 +504,41 @@ export default function App() {
         </div>
 
         {pdfNotice ? (
-          <div className="border-t border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-center text-xs font-medium text-rose-500">
+          <div
+            className={`border-t px-4 py-2 text-center text-xs font-medium ${
+              darkMode
+                ? 'border-[#e5484d]/30 bg-[#e5484d]/10 text-[#e5484d]'
+                : 'border-[#dc2626]/20 bg-[#dc2626]/10 text-[#dc2626]'
+            }`}
+          >
             {pdfNotice}
           </div>
         ) : null}
         {micError ? (
-          <div className="flex items-center justify-center gap-2 border-t border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-xs font-medium text-rose-500">
+          <div
+            className={`flex items-center justify-center gap-2 border-t px-4 py-2 text-xs font-medium ${
+              darkMode
+                ? 'border-[#e5484d]/30 bg-[#e5484d]/10 text-[#e5484d]'
+                : 'border-[#dc2626]/20 bg-[#dc2626]/10 text-[#dc2626]'
+            }`}
+          >
             <span>{micError}</span>
             <button
               type="button"
               onClick={() => setMicError(null)}
               aria-label="Dismiss microphone notice"
-              className="rounded p-0.5 hover:bg-rose-500/20"
+              className="rounded-[6px] p-1 hover:bg-black/5"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" strokeWidth={1.5} />
             </button>
           </div>
         ) : null}
         {midiNotice ? (
           <div
-            className={`flex items-center justify-center gap-2 border-t border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-medium ${
-              darkMode ? 'text-amber-300' : 'text-amber-800'
+            className={`flex items-center justify-center gap-2 border-t px-4 py-2 text-xs font-medium ${
+              darkMode
+                ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#aaa398]'
+                : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#5e554a]'
             }`}
           >
             <span>{midiNotice}</span>
@@ -496,15 +546,15 @@ export default function App() {
               type="button"
               onClick={() => setMidiNotice(null)}
               aria-label="Dismiss MIDI notice"
-              className="rounded p-0.5 hover:bg-amber-500/20"
+              className="rounded-[6px] p-1 hover:bg-black/5"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" strokeWidth={1.5} />
             </button>
           </div>
         ) : null}
       </header>
 
-      <main className="px-2.5 py-2 sm:px-6 sm:py-4">
+      <main className="px-4 py-4 sm:px-6 sm:py-6">
         <div className={tab === 'practice' ? '' : 'hidden'}>
           <PracticeStudio
             score={activeScore}

@@ -32,14 +32,24 @@ test('all 6 TODDLER_SONGS convert via buildToddlerScore into white-key C4..D5 sc
     DEFAULT_TODDLER_SCORE,
     buildToddlerScore,
     findToddlerSongSpec,
+    getSongPreviewPitches,
   } = await loadTsModule('/src/music/toddler-songs.ts');
 
   assert.equal(TODDLER_SONGS.length, 6);
   assert.equal(DEFAULT_TODDLER_SCORE.id, 'toddler:twinkle');
-  assert.equal(findToddlerSongSpec('toddler:baby-shark')?.emoji, '🦈');
+  assert.equal(findToddlerSongSpec('toddler:baby-shark')?.title, 'Baby Shark');
   assert.equal(findToddlerSongSpec('missing'), undefined);
 
   for (const spec of TODDLER_SONGS) {
+    assert.equal('emoji' in spec, false, `${spec.id} must not have emoji property`);
+    const previewPitches = getSongPreviewPitches(spec, 6);
+    assert.equal(previewPitches.length, 6, `${spec.id} preview must return 6 pitches`);
+    for (const pitch of previewPitches) {
+      const pc = ((pitch % 12) + 12) % 12;
+      assert.equal(BLACK_PCS.has(pc), false, `${spec.id} preview pitch ${pitch} must be white key`);
+      assert.ok(pitch >= 60 && pitch <= 74, `${spec.id} preview pitch ${pitch} out of C4..D5`);
+    }
+
     const score = buildToddlerScore(spec);
     assert.equal(score.id, spec.id);
     assert.equal(score.title, spec.title);
@@ -67,7 +77,7 @@ test('all 6 TODDLER_SONGS convert via buildToddlerScore into white-key C4..D5 sc
   }
 });
 
-test('deriveKidPrompt covers all mascot moods, avoids harsh words, and tracks stars/progress', async () => {
+test('deriveKidPrompt covers all mascot moods, avoids exclamation marks and harsh words, and tracks stars/progress', async () => {
   const { DEFAULT_TODDLER_SCORE } = await loadTsModule('/src/music/toddler-songs.ts');
   const {
     createPracticeState,
@@ -76,6 +86,15 @@ test('deriveKidPrompt covers all mascot moods, avoids harsh words, and tracks st
   } = await loadTsModule('/src/practice/engine.ts');
   const { deriveKidPrompt } = await loadTsModule('/src/components/kid-feedback.ts');
 
+  const assertCalmPrompt = (prompt) => {
+    assert.ok(!prompt.headline.includes('!'), `headline must not contain !: ${prompt.headline}`);
+    assert.ok(!prompt.headline.includes('Wrong note'));
+    assert.ok(!prompt.headline.includes('Missed'));
+    if (prompt.cheerBadge) {
+      assert.ok(!prompt.cheerBadge.includes('!'), `cheerBadge must not contain !: ${prompt.cheerBadge}`);
+    }
+  };
+
   let state = createPracticeState(DEFAULT_TODDLER_SCORE, { mode: 'wait' });
   const idlePrompt = deriveKidPrompt(state, getExpectedNotes(state));
   assert.equal(idlePrompt.mood, 'happy');
@@ -83,7 +102,7 @@ test('deriveKidPrompt covers all mascot moods, avoids harsh words, and tracks st
   assert.equal(idlePrompt.targetNote?.colorName, 'Red');
   assert.equal(idlePrompt.starsEarned, 0);
   assert.equal(idlePrompt.progressRatio, 0);
-  assert.ok(!idlePrompt.headline.includes('Wrong note'));
+  assertCalmPrompt(idlePrompt);
 
   state = reducePractice(state, { type: 'noteOn', pitch: 60 }, DEFAULT_TODDLER_SCORE);
   const cheerPrompt = deriveKidPrompt(state, getExpectedNotes(state));
@@ -91,21 +110,22 @@ test('deriveKidPrompt covers all mascot moods, avoids harsh words, and tracks st
   assert.ok(cheerPrompt.cheerBadge !== null);
   assert.equal(cheerPrompt.starsEarned, 1);
   assert.ok(cheerPrompt.progressRatio > 0 && cheerPrompt.progressRatio < 1);
-  assert.ok(!cheerPrompt.headline.includes('Wrong note'));
+  assertCalmPrompt(cheerPrompt);
 
   state = reducePractice(state, { type: 'noteOn', pitch: 62 }, DEFAULT_TODDLER_SCORE);
   const encouragingPrompt = deriveKidPrompt(state, getExpectedNotes(state));
   assert.equal(encouragingPrompt.mood, 'encouraging');
-  assert.ok(encouragingPrompt.headline.startsWith('Almost!'));
-  assert.ok(!encouragingPrompt.headline.includes('Wrong note'));
-  assert.ok(!encouragingPrompt.headline.includes('Missed'));
+  assert.ok(encouragingPrompt.headline.startsWith('Almost, tap '));
+  assertCalmPrompt(encouragingPrompt);
 
   let listenState = createPracticeState(DEFAULT_TODDLER_SCORE, { mode: 'listen' });
   const listenIdlePrompt = deriveKidPrompt(listenState, []);
   assert.equal(listenIdlePrompt.mood, 'happy');
+  assertCalmPrompt(listenIdlePrompt);
   listenState = reducePractice(listenState, { type: 'setRunning', running: true }, DEFAULT_TODDLER_SCORE);
   const dancingPrompt = deriveKidPrompt(listenState, []);
   assert.equal(dancingPrompt.mood, 'dancing');
+  assertCalmPrompt(dancingPrompt);
 
   let finishState = createPracticeState(DEFAULT_TODDLER_SCORE, { mode: 'wait' });
   for (const ev of DEFAULT_TODDLER_SCORE.events) {
@@ -113,10 +133,11 @@ test('deriveKidPrompt covers all mascot moods, avoids harsh words, and tracks st
   }
   const celebratingPrompt = deriveKidPrompt(finishState, getExpectedNotes(finishState));
   assert.equal(celebratingPrompt.mood, 'celebrating');
-  assert.equal(celebratingPrompt.headline, 'Hooray! You played the song!');
-  assert.equal(celebratingPrompt.cheerBadge, 'Super Star!');
+  assert.equal(celebratingPrompt.headline, 'Song complete');
+  assert.equal(celebratingPrompt.cheerBadge, 'Well played');
   assert.equal(celebratingPrompt.progressRatio, 1);
   assert.equal(celebratingPrompt.starsEarned, DEFAULT_TODDLER_SCORE.events.length);
+  assertCalmPrompt(celebratingPrompt);
 });
 
 test('getKidNoteHint returns toddler-friendly color names, letters, and lane tints', async () => {
