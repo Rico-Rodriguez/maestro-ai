@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Lock, LockOpen, Mic, MicOff, Moon, Music2, Sun, Usb, X } from 'lucide-react';
+import { Lock, LockOpen, Mic, MicOff, Music2, Settings, Sparkles, X } from 'lucide-react';
 import { pianoEngine, type AudioEngineStatus } from './audio/piano-engine';
 import LibraryView, { type MuseScoreController } from './components/LibraryView';
 import PracticeStudio from './components/PracticeStudio';
@@ -12,11 +12,14 @@ import type {
   NoteInput,
 } from './input/types';
 import { readPracticeMidi } from './music/midi-parser';
+import { DEFAULT_TODDLER_SCORE } from './music/toddler-songs';
 import type { Score } from './music/types';
 import { useMuseScorePaste } from './musescore-paste';
 import { renderScorePdf } from './score-pdf.mjs';
 
 type AppTab = 'practice' | 'library';
+
+const UNLOCK_HOLD_MS = 900;
 
 function pdfFileName(title: string): string {
   const cleaned = title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').trim() || 'score';
@@ -55,12 +58,14 @@ function downloadScorePdf(score: Score): void {
 export default function App() {
   const [tab, setTab] = useState<AppTab>('practice');
   const [kidLocked, setKidLocked] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [sessionScores, setSessionScores] = useState<Score[]>([]);
-  const [activeScore, setActiveScore] = useState<Score | null>(null);
+  const [activeScore, setActiveScore] = useState<Score | null>(DEFAULT_TODDLER_SCORE);
   const [sampleLoading, setSampleLoading] = useState(false);
   const [sampleError, setSampleError] = useState<string | null>(null);
   const [pdfNotice, setPdfNotice] = useState<string | null>(null);
+  const [unlockProgress, setUnlockProgress] = useState(0);
 
   const [midiController] = useState(() => new MidiInputController());
   const [midiState, setMidiState] = useState<MidiAccessState>('unknown');
@@ -79,6 +84,7 @@ export default function App() {
 
   const noteHandlerRef = useRef<((event: NoteInput) => void) | null>(null);
   const micGateRef = useRef<(() => boolean) | null>(null);
+  const unlockRafRef = useRef<number>(0);
 
   const registerNoteHandler = useCallback((handler: ((event: NoteInput) => void) | null) => {
     noteHandlerRef.current = handler;
@@ -89,8 +95,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.body.style.backgroundColor = darkMode ? '#0c0a09' : '#f6f3ec';
-    document.body.style.color = darkMode ? '#f5f5f4' : '#1c1917';
+    document.body.style.backgroundColor = darkMode ? '#141936' : '#fffbf0';
+    document.body.style.color = darkMode ? '#fef3c7' : '#451a03';
     void globalThis.__maestroSetSystemBars?.(darkMode)?.catch?.(() => {});
   }, [darkMode]);
 
@@ -134,16 +140,57 @@ export default function App() {
     };
   }, [micController]);
 
-  const openScoreInPractice = useCallback((song: Score) => {
-    setSessionScores((prev) => {
-      const idx = prev.findIndex((item) => item.id === song.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = song;
-        return next;
+  useEffect(() => {
+    if (!kidLocked) {
+      cancelAnimationFrame(unlockRafRef.current);
+      setUnlockProgress(0);
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setKidLocked(false);
       }
-      return [song, ...prev];
-    });
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      cancelAnimationFrame(unlockRafRef.current);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [kidLocked]);
+
+  const beginHoldToUnlock = useCallback(() => {
+    cancelAnimationFrame(unlockRafRef.current);
+    const startMs = performance.now();
+    const tick = (nowMs: number) => {
+      const progress = Math.min(1, (nowMs - startMs) / UNLOCK_HOLD_MS);
+      setUnlockProgress(progress);
+      if (progress >= 1) {
+        setUnlockProgress(0);
+        setKidLocked(false);
+        return;
+      }
+      unlockRafRef.current = requestAnimationFrame(tick);
+    };
+    unlockRafRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  const cancelHoldToUnlock = useCallback(() => {
+    cancelAnimationFrame(unlockRafRef.current);
+    setUnlockProgress(0);
+  }, []);
+
+  const openScoreInPractice = useCallback((song: Score) => {
+    if (!song.id.startsWith('toddler:')) {
+      setSessionScores((prev) => {
+        const idx = prev.findIndex((item) => item.id === song.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = song;
+          return next;
+        }
+        return [song, ...prev];
+      });
+    }
     setActiveScore(song);
     setTab('practice');
   }, []);
@@ -266,137 +313,85 @@ export default function App() {
     }
   }, []);
 
-  const midiBadgeLabel =
-    midiDevices.length > 0
-      ? `${midiDevices.length} MIDI`
-      : midiState === 'ready'
-        ? 'MIDI Ready'
-        : midiState === 'denied'
-          ? 'MIDI Blocked'
-          : midiState === 'unsupported'
-            ? 'No WebMIDI'
-            : 'Connect MIDI';
+  const hasDeviceActive = midiDevices.length > 0 || micActive;
 
   return (
     <div
       className={`min-h-screen transition-colors ${
-        darkMode ? 'bg-stone-950 text-stone-100' : 'bg-[#f6f3ec] text-stone-900'
+        darkMode
+          ? 'bg-gradient-to-b from-[#141936] via-[#171d40] to-[#111630] text-amber-50'
+          : 'bg-gradient-to-b from-[#fffbf0] via-[#fffdf7] to-[#f4f9ff] text-amber-950'
       }`}
     >
       <header
         className={`sticky top-0 z-30 border-b backdrop-blur-md ${
           darkMode
-            ? 'border-stone-800/80 bg-stone-950/90'
-            : 'border-stone-200/90 bg-[#f6f3ec]/90'
+            ? 'border-indigo-900/70 bg-[#141936]/90'
+            : 'border-amber-200/80 bg-[#fffbf0]/90'
         }`}
       >
         <div className="mx-auto flex max-w-[1440px] flex-nowrap items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-2.5">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-            <div className="flex shrink-0 items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-600 text-stone-950 shadow-sm sm:h-8 sm:w-8">
-                <Music2 className="h-4 w-4" />
-              </div>
-              <div>
-                <span className="font-display text-xl leading-none tracking-tight sm:text-2xl">
-                  Maestro
-                </span>
-                <span
-                  className={`ml-2 hidden text-[11px] font-medium uppercase tracking-widest md:inline ${
-                    darkMode ? 'text-stone-400' : 'text-stone-500'
-                  }`}
-                >
-                  Conservatory Studio
-                </span>
-              </div>
+          <div className="flex shrink-0 items-center gap-2.5">
+            <div className="animate-kid-bob flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 via-amber-400 to-sky-400 text-white shadow-sm ring-2 ring-white/80">
+              <Sparkles className="h-4 w-4" />
             </div>
-
-            {!kidLocked ? (
-              <nav
-                aria-label="Primary"
-                className={`inline-flex shrink-0 items-center rounded-xl border p-0.5 ${
-                  darkMode ? 'border-stone-800 bg-stone-900' : 'border-stone-200 bg-stone-200/60'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setTab('practice')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition sm:px-3.5 ${
-                    tab === 'practice'
-                      ? darkMode
-                        ? 'bg-stone-800 text-amber-300 shadow-sm'
-                        : 'bg-white text-stone-900 shadow-sm'
-                      : darkMode
-                        ? 'text-stone-400 hover:text-stone-200'
-                        : 'text-stone-600 hover:text-stone-900'
-                  }`}
-                >
-                  Practice
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTab('library')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition sm:px-3.5 ${
-                    tab === 'library'
-                      ? darkMode
-                        ? 'bg-stone-800 text-amber-300 shadow-sm'
-                        : 'bg-white text-stone-900 shadow-sm'
-                      : darkMode
-                        ? 'text-stone-400 hover:text-stone-200'
-                        : 'text-stone-600 hover:text-stone-900'
-                  }`}
-                >
-                  Library
-                </button>
-              </nav>
-            ) : null}
+            <span className="font-display text-xl font-bold leading-none tracking-tight sm:text-2xl">
+              Little Maestro
+            </span>
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {kidLocked ? (
               <button
                 type="button"
-                onClick={() => setKidLocked(false)}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                onPointerDown={beginHoldToUnlock}
+                onPointerUp={cancelHoldToUnlock}
+                onPointerLeave={cancelHoldToUnlock}
+                onPointerCancel={cancelHoldToUnlock}
+                title="Press and hold to unlock grown-up controls (or press Escape)"
+                className={`relative inline-flex items-center gap-1.5 overflow-hidden rounded-2xl border px-3.5 py-2 text-xs font-bold shadow-sm transition select-none touch-none ${
                   darkMode
-                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
-                    : 'border-amber-600/30 bg-amber-100 text-amber-900 hover:bg-amber-200'
+                    ? 'border-amber-400/50 bg-indigo-950/80 text-amber-200'
+                    : 'border-amber-300 bg-white text-amber-900'
                 }`}
               >
-                <LockOpen className="h-3.5 w-3.5" />
-                <span>Unlock</span>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-0 bg-amber-400/35 transition-none"
+                  style={{ width: `${Math.round(unlockProgress * 100)}%` }}
+                />
+                <LockOpen className="relative h-3.5 w-3.5" />
+                <span className="relative">Hold to Unlock</span>
               </button>
             ) : (
               <>
                 <button
                   type="button"
-                  onClick={() => void handleConnectMidi()}
-                  title={
-                    midiDevices.length > 0
-                      ? midiDevices.map((d) => d.name).join(', ')
-                      : 'Connect Web MIDI keyboard'
-                  }
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
-                    midiDevices.length > 0
-                      ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
+                  onClick={() => setTab((prev) => (prev === 'practice' ? 'library' : 'practice'))}
+                  className={`inline-flex items-center gap-1.5 rounded-2xl border-b-2 border px-3 py-1.5 text-xs font-bold transition active:translate-y-[1px] ${
+                    tab === 'library'
+                      ? 'border-sky-400 bg-sky-500 text-white shadow-sm'
                       : darkMode
-                        ? 'border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800'
-                        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
+                        ? 'border-indigo-800 bg-indigo-900/70 text-amber-100 hover:bg-indigo-800/80'
+                        : 'border-amber-300 bg-white text-amber-900 shadow-sm hover:bg-amber-50'
                   }`}
                 >
-                  <Usb className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{midiBadgeLabel}</span>
+                  <Music2 className="h-3.5 w-3.5" />
+                  <span>{tab === 'practice' ? 'Songs' : 'Piano'}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => void handleToggleMic()}
                   title={micActive ? 'Stop acoustic microphone' : 'Enable acoustic microphone'}
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
+                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-xs font-bold transition ${
                     micActive
-                      ? 'border-rose-500/40 bg-rose-500/15 text-rose-400'
+                      ? darkMode
+                        ? 'border-emerald-400/70 bg-emerald-500/15 text-emerald-300'
+                        : 'border-emerald-500/70 bg-emerald-500/15 text-emerald-700'
                       : darkMode
-                        ? 'border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800'
-                        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
+                        ? 'border-indigo-800 bg-indigo-900/70 text-amber-100 hover:bg-indigo-800/80'
+                        : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
                   }`}
                 >
                   {micActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
@@ -408,11 +403,11 @@ export default function App() {
                       <span
                         aria-hidden="true"
                         className={`h-1.5 w-6 overflow-hidden rounded-full ${
-                          darkMode ? 'bg-stone-800' : 'bg-stone-300'
+                          darkMode ? 'bg-indigo-950' : 'bg-amber-100'
                         }`}
                       >
                         <span
-                          className="block h-full rounded-full bg-emerald-400 transition-[width] duration-75"
+                          className="block h-full rounded-full bg-emerald-500 transition-[width] duration-75"
                           style={{ width: `${Math.round(micLevel * 100)}%` }}
                         />
                       </span>
@@ -426,13 +421,14 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setTab('practice');
+                    setShowSettings(false);
                     setKidLocked(true);
                   }}
                   title="Lock controls for toddler practice"
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition sm:px-2.5 ${
+                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-xs font-bold transition ${
                     darkMode
-                      ? 'border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800'
-                      : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
+                      ? 'border-indigo-800 bg-indigo-900/70 text-amber-100 hover:bg-indigo-800/80'
+                      : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
                   }`}
                 >
                   <Lock className="h-3.5 w-3.5" />
@@ -441,18 +437,30 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => setDarkMode((prev) => !prev)}
-                  aria-label={
-                    darkMode ? 'Switch to Warm Ivory Paper theme' : 'Switch to Dark Concert Studio theme'
-                  }
-                  title={darkMode ? 'Warm Ivory Paper' : 'Dark Concert Studio'}
-                  className={`inline-flex items-center justify-center rounded-xl border p-1.5 transition ${
-                    darkMode
-                      ? 'border-stone-800 bg-stone-900 text-amber-300 hover:bg-stone-800'
-                      : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-100'
+                  onClick={() => {
+                    if (tab !== 'practice') {
+                      setTab('practice');
+                      setShowSettings(true);
+                    } else {
+                      setShowSettings((prev) => !prev);
+                    }
+                  }}
+                  title="Grown-up studio settings"
+                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-xs font-bold transition ${
+                    showSettings && tab === 'practice'
+                      ? darkMode
+                        ? 'border-amber-400 bg-amber-400/20 text-amber-200'
+                        : 'border-amber-400 bg-amber-400/20 text-amber-800'
+                      : darkMode
+                        ? 'border-indigo-800 bg-indigo-900/70 text-amber-100 hover:bg-indigo-800/80'
+                        : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
                   }`}
                 >
-                  {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  <Settings className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Grown-ups</span>
+                  {hasDeviceActive ? (
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  ) : null}
                 </button>
               </>
             )}
@@ -460,12 +468,12 @@ export default function App() {
         </div>
 
         {pdfNotice ? (
-          <div className="border-t border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-center text-xs font-medium text-rose-400">
+          <div className="border-t border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-center text-xs font-medium text-rose-500">
             {pdfNotice}
           </div>
         ) : null}
         {micError ? (
-          <div className="flex items-center justify-center gap-2 border-t border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-xs font-medium text-rose-400">
+          <div className="flex items-center justify-center gap-2 border-t border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-xs font-medium text-rose-500">
             <span>{micError}</span>
             <button
               type="button"
@@ -478,7 +486,11 @@ export default function App() {
           </div>
         ) : null}
         {midiNotice ? (
-          <div className="flex items-center justify-center gap-2 border-t border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-medium text-amber-400">
+          <div
+            className={`flex items-center justify-center gap-2 border-t border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-medium ${
+              darkMode ? 'text-amber-300' : 'text-amber-800'
+            }`}
+          >
             <span>{midiNotice}</span>
             <button
               type="button"
@@ -506,6 +518,10 @@ export default function App() {
             sampleLoading={sampleLoading}
             onExportPdf={handleExportPdf}
             darkMode={darkMode}
+            onToggleDarkMode={() => setDarkMode((prev) => !prev)}
+            showSettings={showSettings}
+            onToggleSettings={() => setShowSettings((prev) => !prev)}
+            onCloseSettings={() => setShowSettings(false)}
             midiController={midiController}
             midiState={midiState}
             midiDevices={midiDevices}

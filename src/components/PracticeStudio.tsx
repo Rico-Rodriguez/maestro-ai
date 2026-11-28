@@ -7,14 +7,17 @@ import {
   Loader2,
   Mic,
   MicOff,
+  Moon,
   Pause,
   Play,
   Repeat,
   RotateCcw,
-  SlidersHorizontal,
   Sparkles,
+  Star,
+  Sun,
   Usb,
   Volume2,
+  X,
 } from 'lucide-react';
 import { pianoEngine, type AudioEngineStatus, type InstrumentVoice } from '../audio/piano-engine';
 import { PlaybackScheduler } from '../audio/scheduler';
@@ -22,15 +25,14 @@ import { attachKeyboardInput } from '../input/keyboard-adapter';
 import type { MidiInputController } from '../input/midi-adapter';
 import type { MicPitchReading, MidiAccessState, MidiDeviceInfo, NoteInput } from '../input/types';
 import { bpmAtBeat } from '../music/midi-parser';
+import { findToddlerSongSpec } from '../music/toddler-songs';
 import type { Hand, Score } from '../music/types';
 import {
   createPracticeState,
-  formatNextChip,
   getAccuracyPercent,
   getAverageOffsetMs,
   getExpectedNotes,
   getHardestMeasure,
-  PRACTICE_MODES,
   reducePractice,
   type HandFilter,
   type PracticeAction,
@@ -39,8 +41,10 @@ import {
 } from '../practice/engine';
 import FallingNotesCanvas from './FallingNotesCanvas';
 import GrandStaff from './GrandStaff';
+import { deriveKidPrompt } from './kid-feedback';
 import type { SavedMuseScore } from './LibraryView';
-import { measureAtBeat, type ColorMode } from './note-colors';
+import MascotBuddy from './MascotBuddy';
+import { type ColorMode } from './note-colors';
 import {
   autoOctaveShiftForPitches,
   buildPianoLayout,
@@ -63,6 +67,10 @@ export interface PracticeStudioProps {
   sampleLoading: boolean;
   onExportPdf: (score: Score) => void;
   darkMode: boolean;
+  onToggleDarkMode?: () => void;
+  showSettings?: boolean;
+  onToggleSettings?: () => void;
+  onCloseSettings?: () => void;
   midiController: MidiInputController;
   midiState: MidiAccessState;
   midiDevices: MidiDeviceInfo[];
@@ -109,9 +117,9 @@ const VOICE_OPTIONS: readonly { id: InstrumentVoice; label: string }[] = [
 ];
 
 const LAYOUT_OPTIONS: readonly { id: StudioViewLayout; label: string }[] = [
-  { id: 'combined', label: 'Split' },
   { id: 'falling', label: 'Falling' },
   { id: 'notation', label: 'Sheet' },
+  { id: 'combined', label: 'Split' },
 ];
 
 const HAND_OPTIONS: readonly { id: HandFilter; label: string }[] = [
@@ -133,6 +141,14 @@ const COLOR_MODE_OPTIONS: readonly { id: ColorMode; label: string }[] = [
   { id: 'hands', label: 'Hands' },
 ];
 
+const GROWNUP_PRACTICE_MODES: readonly { id: PracticeMode; label: string }[] = [
+  { id: 'wait', label: 'Learn (Wait)' },
+  { id: 'tempo', label: 'Keep Time (Tempo)' },
+  { id: 'listen', label: 'Listen' },
+];
+
+const CELEBRATION_ARPEGGIO = [72, 76, 79, 84] as const;
+
 export default function PracticeStudio({
   score,
   sessionScores,
@@ -145,6 +161,10 @@ export default function PracticeStudio({
   sampleLoading,
   onExportPdf,
   darkMode,
+  onToggleDarkMode,
+  showSettings: controlledShowSettings,
+  onToggleSettings,
+  onCloseSettings,
   midiController,
   midiState,
   midiDevices,
@@ -165,23 +185,28 @@ export default function PracticeStudio({
   );
   const [userPressedNotes, setUserPressedNotes] = useState<Set<number>>(() => new Set());
   const [userSustainDown, setUserSustainDown] = useState(false);
-  const [rangeMode, setRangeMode] = useState<PianoRangeMode>(() =>
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 'compact' : 'auto',
-  );
+  const [rangeMode, setRangeMode] = useState<PianoRangeMode>('kid');
   const [octaveShift, setOctaveShift] = useState(0);
-  const [viewLayout, setViewLayout] = useState<StudioViewLayout>(() =>
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 'falling' : 'combined',
-  );
+  const [viewLayout, setViewLayout] = useState<StudioViewLayout>('falling');
   const [colorMode, setColorMode] = useState<ColorMode>('rainbow');
-  const [tempoScale, setTempoScale] = useState(1);
+  const [tempoScale, setTempoScale] = useState(0.85);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [guideSoundOn, setGuideSoundOn] = useState(true);
   const [muteLocalForMidi, setMuteLocalForMidi] = useState(false);
   const [headphonesMode, setHeadphonesMode] = useState(false);
   const [voice, setVoice] = useState<InstrumentVoice>('grand-piano');
   const [volume, setVolume] = useState(0.85);
-  const [showSettings, setShowSettings] = useState(false);
+  const [internalShowSettings, setInternalShowSettings] = useState(false);
   const [liveBpm, setLiveBpm] = useState<number>(() => (score ? Math.round(score.tempo || 120) : 120));
+
+  const showSettings = controlledShowSettings ?? internalShowSettings;
+  const closeSettings = useCallback(() => {
+    if (onCloseSettings) {
+      onCloseSettings();
+    } else {
+      setInternalShowSettings(false);
+    }
+  }, [onCloseSettings]);
 
   const scoreRef = useRef<Score | null>(score);
   const practiceStateRef = useRef<PracticeState>(practiceState);
@@ -192,6 +217,8 @@ export default function PracticeStudio({
   const muteLocalForMidiRef = useRef(muteLocalForMidi);
   const headphonesModeRef = useRef(headphonesMode);
   const octaveShiftRef = useRef(octaveShift);
+  const prevFinishedRef = useRef(false);
+  const celebrationTimersRef = useRef<number[]>([]);
 
   scoreRef.current = score;
   tempoScaleRef.current = tempoScale;
@@ -200,6 +227,13 @@ export default function PracticeStudio({
   muteLocalForMidiRef.current = muteLocalForMidi;
   headphonesModeRef.current = headphonesMode;
   octaveShiftRef.current = octaveShift;
+
+  const clearCelebrationTimers = useCallback(() => {
+    for (const timerId of celebrationTimersRef.current) {
+      window.clearTimeout(timerId);
+    }
+    celebrationTimersRef.current = [];
+  }, []);
 
   const dispatchPractice = useCallback((action: PracticeAction): PracticeState => {
     const activeScore = scoreRef.current;
@@ -254,6 +288,8 @@ export default function PracticeStudio({
   }, [dispatchPractice]);
 
   useEffect(() => {
+    clearCelebrationTimers();
+    prevFinishedRef.current = false;
     const next = score
       ? createPracticeState(score, {
           mode: practiceStateRef.current.mode,
@@ -272,7 +308,35 @@ export default function PracticeStudio({
       handFilter: next.handFilter,
       loop: next.loop,
     });
-  }, [score]);
+  }, [score, clearCelebrationTimers]);
+
+  useEffect(() => {
+    return () => {
+      clearCelebrationTimers();
+    };
+  }, [clearCelebrationTimers]);
+
+  useEffect(() => {
+    if (!practiceState.finished) {
+      prevFinishedRef.current = false;
+      return;
+    }
+    if (!prevFinishedRef.current && practiceState.mode !== 'listen') {
+      prevFinishedRef.current = true;
+      clearCelebrationTimers();
+      void pianoEngine.unlockFromGesture();
+      CELEBRATION_ARPEGGIO.forEach((midi, idx) => {
+        const onTimer = window.setTimeout(() => {
+          pianoEngine.noteOn(midi, 88, undefined, 'playback');
+          const offTimer = window.setTimeout(() => {
+            pianoEngine.noteOff(midi, undefined, 'playback');
+          }, 260);
+          celebrationTimersRef.current.push(offTimer);
+        }, idx * 110);
+        celebrationTimersRef.current.push(onTimer);
+      });
+    }
+  }, [practiceState.finished, practiceState.mode, clearCelebrationTimers]);
 
   useEffect(() => {
     schedulerRef.current?.updateConfig({
@@ -405,10 +469,11 @@ export default function PracticeStudio({
     const wasFinished = prev.finished;
     const next = dispatchPractice({ type: 'setRunning', running: true });
     if (wasFinished) {
+      clearCelebrationTimers();
       schedulerRef.current?.seekBeat(next.beat);
     }
     schedulerRef.current?.play();
-  }, [dispatchPractice]);
+  }, [dispatchPractice, clearCelebrationTimers]);
 
   const togglePlayRef = useRef(togglePlay);
   togglePlayRef.current = togglePlay;
@@ -445,10 +510,11 @@ export default function PracticeStudio({
 
   const handleRestart = useCallback(() => {
     if (!scoreRef.current) return;
+    clearCelebrationTimers();
     schedulerRef.current?.pause();
     const next = dispatchPractice({ type: 'reset' });
     schedulerRef.current?.seekBeat(next.beat);
-  }, [dispatchPractice]);
+  }, [dispatchPractice, clearCelebrationTimers]);
 
   const handleModeChange = useCallback(
     (mode: PracticeMode) => {
@@ -467,10 +533,11 @@ export default function PracticeStudio({
   const handleSeekBeat = useCallback(
     (beat: number) => {
       if (!scoreRef.current) return;
+      clearCelebrationTimers();
       dispatchPractice({ type: 'seek', beat });
       schedulerRef.current?.seekBeat(beat);
     },
-    [dispatchPractice],
+    [dispatchPractice, clearCelebrationTimers],
   );
 
   const handlePreviewPitch = useCallback((pitch: number) => {
@@ -539,6 +606,16 @@ export default function PracticeStudio({
     return getExpectedNotes(practiceState);
   }, [score, practiceState]);
 
+  const expectedPitches = useMemo(() => {
+    if (practiceState.mode === 'listen' || practiceState.finished) return [];
+    return expectedNotes.map((n) => n.pitch);
+  }, [practiceState.mode, practiceState.finished, expectedNotes]);
+
+  const kidPrompt = useMemo(
+    () => deriveKidPrompt(practiceState, expectedNotes),
+    [practiceState, expectedNotes],
+  );
+
   const defaultBeatsPerMeasure = useMemo(() => {
     if (!score) return 4;
     const [num, den] = score.timeSignature;
@@ -547,9 +624,9 @@ export default function PracticeStudio({
 
   useEffect(() => {
     if (kidLocked) {
-      setShowSettings(false);
+      closeSettings();
     }
-  }, [kidLocked]);
+  }, [kidLocked, closeSettings]);
 
   useEffect(() => {
     if (!score) return;
@@ -580,11 +657,9 @@ export default function PracticeStudio({
   const accuracyPct = getAccuracyPercent(practiceState.stats);
   const avgOffsetMs = getAverageOffsetMs(practiceState.stats);
   const hardestMeasure = getHardestMeasure(practiceState.stats);
-  const nextChip = formatNextChip(expectedNotes);
   const totalMeasures = score ? Math.max(1, score.totalMeasures) : 1;
-  const currentBar = score
-    ? measureAtBeat(score.timeSignatures, defaultBeatsPerMeasure, practiceState.beat)
-    : 1;
+  const activeToddlerSpec = findToddlerSongSpec(score?.id ?? null);
+  const songEmoji = activeToddlerSpec?.emoji ?? '🎹';
 
   const unopenedSaved = useMemo(() => {
     const openIds = new Set(sessionScores.map((s) => s.id));
@@ -603,6 +678,7 @@ export default function PracticeStudio({
 
   const handleDrillHardest = () => {
     if (!score || hardestMeasure === null) return;
+    clearCelebrationTimers();
     setTempoScale(0.75);
     const loop = { enabled: true, startMeasure: hardestMeasure, endMeasure: hardestMeasure };
     dispatchPractice({ type: 'setLoop', loop });
@@ -615,24 +691,26 @@ export default function PracticeStudio({
   };
 
   const surface = darkMode
-    ? 'bg-stone-900/80 border-stone-800 text-stone-100'
-    : 'bg-white/90 border-stone-200 text-stone-900 shadow-sm';
+    ? 'bg-[#1a2042]/90 border-indigo-800/70 text-amber-50'
+    : 'bg-white/95 border-amber-200/80 text-amber-950 shadow-sm';
+  const drawerCard = darkMode
+    ? 'rounded-2xl border border-indigo-800/70 bg-[#141936]/75 p-3.5'
+    : 'rounded-2xl border border-amber-200/80 bg-[#fffbf0]/90 p-3.5';
   const pillGroup = darkMode
-    ? 'bg-stone-950/90 border-stone-800'
-    : 'bg-stone-100 border-stone-200';
+    ? 'bg-[#141936]/90 border-indigo-800/80'
+    : 'bg-amber-100/70 border-amber-200/90';
   const pillInactive = darkMode
-    ? 'text-stone-400 hover:text-stone-200'
-    : 'text-stone-600 hover:text-stone-900';
+    ? 'text-indigo-200/75 hover:text-amber-100'
+    : 'text-amber-800/75 hover:text-amber-950';
   const pillActive = darkMode
-    ? 'bg-stone-800 text-amber-300 shadow-sm'
-    : 'bg-white text-stone-900 shadow-sm';
-  const mutedText = darkMode ? 'text-stone-400' : 'text-stone-500';
+    ? 'bg-indigo-700 text-amber-200 shadow-sm'
+    : 'bg-white text-amber-950 shadow-sm';
+  const mutedText = darkMode ? 'text-indigo-200/70' : 'text-amber-800/70';
   const subtleBtn = darkMode
-    ? 'border-stone-700 bg-stone-800/80 text-stone-200 hover:bg-stone-700'
-    : 'border-stone-200 bg-stone-100 text-stone-700 hover:bg-stone-200';
+    ? 'border-indigo-700/80 bg-indigo-900/60 text-amber-100 hover:bg-indigo-800'
+    : 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100';
 
   const selectValue = score ? score.id : '';
-  const hasDeviceActive = midiDevices.length > 0 || micActive;
 
   const renderKeyboard = (flushTop: boolean) => (
     <PianoKeyboard
@@ -642,7 +720,7 @@ export default function PracticeStudio({
       octaveShift={octaveShift}
       onOctaveShift={shiftOctave}
       userPressedNotes={userPressedNotes}
-      expectedNotes={practiceState.mode === 'listen' ? [] : expectedNotes}
+      expectedNotes={practiceState.mode === 'listen' || practiceState.finished ? [] : expectedNotes}
       getPlaybackPitches={getPlaybackPitches}
       getPlaybackSustain={getPlaybackSustain}
       userSustainDown={userSustainDown}
@@ -653,29 +731,35 @@ export default function PracticeStudio({
       colorMode={colorMode}
       showKeyStickers={true}
       flushTop={flushTop}
-      hideControls={Boolean(kidLocked)}
+      hideControls={colorMode === 'rainbow' || Boolean(kidLocked)}
     />
   );
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-2.5">
-      {kidLocked ? (
-        <div className={`flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 ${surface}`}>
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 rounded-3xl border px-3 py-2 sm:px-4 ${surface}`}
+      >
+        <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={!score}
             onClick={togglePlay}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-stone-950 shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className={`inline-flex shrink-0 items-center gap-2 rounded-2xl border-b-4 px-4 py-2 text-sm font-extrabold shadow-sm transition active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40 ${
+              practiceState.running
+                ? 'border-amber-600 bg-amber-400 text-amber-950 hover:bg-amber-300'
+                : 'border-emerald-700 bg-emerald-500 text-white hover:bg-emerald-400'
+            }`}
           >
             {practiceState.running ? (
               <>
-                <Pause className="h-4 w-4" />
-                Pause
+                <Pause className="h-4 w-4 fill-current" />
+                <span>Pause</span>
               </>
             ) : (
               <>
-                <Play className="h-4 w-4" />
-                Play
+                <Play className="h-4 w-4 fill-current" />
+                <span>Play</span>
               </>
             )}
           </button>
@@ -684,221 +768,186 @@ export default function PracticeStudio({
             type="button"
             disabled={!score}
             onClick={handleRestart}
-            title="Restart"
-            className={`inline-flex shrink-0 items-center justify-center rounded-xl border p-2.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
+            title="Start song over"
+            aria-label="Restart song"
+            className={`inline-flex shrink-0 items-center justify-center rounded-2xl border border-b-4 p-2 transition active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
           >
             <RotateCcw className="h-4 w-4" />
           </button>
-
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {score ? score.title : 'Ready to Play'}
-          </span>
-        </div>
-      ) : (
-        <div className={`flex flex-col gap-2 rounded-2xl border px-2.5 py-2 sm:px-3 lg:flex-row lg:items-center lg:justify-between ${surface}`}>
-        <div className="flex w-full items-center gap-1.5 sm:w-auto sm:flex-1 sm:gap-2">
-          <button
-            type="button"
-            disabled={!score}
-            onClick={togglePlay}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-stone-950 shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3.5"
-          >
-            {practiceState.running ? (
-              <>
-                <Pause className="h-3.5 w-3.5" />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play className="h-3.5 w-3.5" />
-                Play
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
-            disabled={!score}
-            onClick={handleRestart}
-            title="Restart"
-            className={`inline-flex shrink-0 items-center justify-center rounded-xl border p-1.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
-
-          <select
-            aria-label="Open score"
-            value={selectValue}
-            disabled={scoreBusy}
-            onChange={(e) => handleScoreDropdown(e.target.value)}
-            className={`min-w-0 flex-1 truncate rounded-xl border px-2 py-1.5 text-xs font-medium focus:outline-none sm:max-w-[220px] sm:px-2.5 ${
-              darkMode
-                ? 'border-stone-800 bg-stone-950 text-stone-100'
-                : 'border-stone-200 bg-stone-50 text-stone-800'
-            }`}
-          >
-            {!score ? <option value="">Select a score…</option> : null}
-            {sessionScores.length > 0 ? (
-              <optgroup label="Opened">
-                {sessionScores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.title}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-            {unopenedSaved.length > 0 ? (
-              <optgroup label="Saved Library">
-                {unopenedSaved.map((row) => (
-                  <option key={row.scoreId} value={`saved:${row.scoreId}`}>
-                    {row.title}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-          </select>
-
-          <button
-            type="button"
-            onClick={() => setShowSettings((prev) => !prev)}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition sm:hidden ${
-              showSettings
-                ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
-                : subtleBtn
-            }`}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span>Studio</span>
-            <span
-              className={`h-2 w-2 rounded-full ${
-                hasDeviceActive ? 'bg-emerald-400' : 'bg-stone-500/60'
-              }`}
-            />
-          </button>
         </div>
 
-        <div className="flex w-full items-center justify-between gap-1.5 sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
-          <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
-            {PRACTICE_MODES.map((m) => (
+        {kidLocked ? (
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+            <span className="truncate font-display text-sm font-bold sm:text-base">
+              {songEmoji} {score ? score.title : 'Ready to Play'}
+            </span>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className={`inline-flex items-center rounded-2xl border p-0.5 ${pillGroup}`}>
               <button
-                key={m.id}
                 type="button"
-                title={m.hint}
-                onClick={() => handleModeChange(m.id)}
-                className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition sm:px-2.5 sm:text-xs ${
-                  practiceState.mode === m.id ? pillActive : pillInactive
+                onClick={() => handleModeChange('wait')}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                  practiceState.mode === 'wait' ? pillActive : pillInactive
                 }`}
               >
-                {m.label}
+                Learn
               </button>
-            ))}
-          </div>
-
-          <div className={`hidden items-center rounded-xl border p-0.5 sm:inline-flex ${pillGroup}`}>
-            {HAND_OPTIONS.map((h) => (
               <button
-                key={h.id}
                 type="button"
-                onClick={() => handleHandChange(h.id)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                  practiceState.handFilter === h.id ? pillActive : pillInactive
+                onClick={() => handleModeChange('listen')}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                  practiceState.mode === 'listen' ? pillActive : pillInactive
                 }`}
               >
-                {h.label}
+                Listen
               </button>
-            ))}
-          </div>
+              {practiceState.mode === 'tempo' ? (
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('tempo')}
+                  className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${pillActive}`}
+                >
+                  Tempo
+                </button>
+              ) : null}
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setShowSettings((prev) => !prev)}
-            className={`hidden items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-xs font-medium transition sm:inline-flex ${subtleBtn}`}
-            title="Tempo & studio settings"
-          >
-            <span>{effectiveBpm} BPM</span>
-            {tempoScale !== 1 ? (
-              <span className="text-amber-400">{Math.round(tempoScale * 100)}%</span>
-            ) : null}
-          </button>
-
-          <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
-            {LAYOUT_OPTIONS.map((opt) => (
+            <div className={`inline-flex items-center rounded-2xl border p-0.5 ${pillGroup}`}>
               <button
-                key={opt.id}
                 type="button"
-                onClick={() => setViewLayout(opt.id)}
-                className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition sm:px-2.5 sm:text-xs ${
-                  viewLayout === opt.id ? pillActive : pillInactive
+                onClick={() => setTempoScale(0.65)}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                  tempoScale <= 0.7 ? pillActive : pillInactive
                 }`}
               >
-                {opt.label}
+                🐢 Slow
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setTempoScale(0.85)}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                  tempoScale > 0.7 ? pillActive : pillInactive
+                }`}
+              >
+                🐰 Normal
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onGoToLibrary}
+              title="Pick a different song"
+              className={`inline-flex max-w-[190px] items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-xs font-bold transition sm:max-w-[260px] ${subtleBtn}`}
+            >
+              <span className="shrink-0">{songEmoji}</span>
+              <span className="truncate">{score ? score.title : 'Pick a Song'}</span>
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setShowSettings((prev) => !prev)}
-            className={`hidden items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition sm:inline-flex ${
-              showSettings
-                ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
-                : subtleBtn
-            }`}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span>Studio</span>
-            <span
-              className={`h-2 w-2 rounded-full ${
-                hasDeviceActive ? 'bg-emerald-400' : 'bg-stone-500/60'
-              }`}
-            />
-          </button>
-
-          <button
-            type="button"
-            disabled={!score}
-            onClick={() => score && onExportPdf(score)}
-            title="Export sheet music PDF"
-            className={`hidden items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex ${subtleBtn}`}
-          >
-            <FileDown className="h-3.5 w-3.5" />
-            <span>PDF</span>
-          </button>
-        </div>
+        )}
       </div>
-      )}
 
       {showSettings && !kidLocked ? (
-        <section className={`rounded-2xl border p-4 ${surface}`}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/40 pb-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold">Hand Focus</span>
-                <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
-                  {HAND_OPTIONS.map((h) => (
+        <section className={`rounded-3xl border p-4 ${surface}`}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-amber-300/30 pb-2.5">
+            <div>
+              <h2 className="font-display text-lg font-bold">Grown-up Studio Settings</h2>
+              <p className={`text-xs ${mutedText}`}>
+                Fine-tune practice mode, keyboard size, audio, MIDI, and acoustic mic.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {onToggleDarkMode ? (
+                <button
+                  type="button"
+                  onClick={onToggleDarkMode}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold transition ${subtleBtn}`}
+                >
+                  {darkMode ? <Sun className="h-3.5 w-3.5 text-amber-300" /> : <Moon className="h-3.5 w-3.5" />}
+                  <span>{darkMode ? 'Sunny Day' : 'Cozy Night'}</span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={closeSettings}
+                aria-label="Close settings"
+                className={`inline-flex items-center justify-center rounded-xl border p-1.5 transition ${subtleBtn}`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
+            <div className={`space-y-3 ${drawerCard}`}>
+              <div>
+                <div className="mb-1.5 text-xs font-bold">Practice Mode</div>
+                <div className={`inline-flex flex-wrap items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                  {GROWNUP_PRACTICE_MODES.map((m) => (
                     <button
-                      key={h.id}
+                      key={m.id}
                       type="button"
-                      onClick={() => handleHandChange(h.id)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                        practiceState.handFilter === h.id ? pillActive : pillInactive
+                      onClick={() => handleModeChange(m.id)}
+                      className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                        practiceState.mode === m.id ? pillActive : pillInactive
                       }`}
                     >
-                      {h.label}
+                      {m.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold">Key Size</span>
+              <div>
+                <div className="mb-1.5 text-xs font-bold">View</div>
                 <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                  {LAYOUT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setViewLayout(opt.id)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                        viewLayout === opt.id ? pillActive : pillInactive
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1.5 flex items-center justify-between text-xs font-bold">
+                  <span>Key Size</span>
+                  {(rangeMode === 'kid' || rangeMode === 'compact') && (
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={octaveShift <= -2}
+                        onClick={() => shiftOctave(-1)}
+                        className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold disabled:opacity-40 ${subtleBtn}`}
+                      >
+                        -8va
+                      </button>
+                      <button
+                        type="button"
+                        disabled={octaveShift >= 2}
+                        onClick={() => shiftOctave(1)}
+                        className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold disabled:opacity-40 ${subtleBtn}`}
+                      >
+                        +8va
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className={`inline-flex flex-wrap items-center rounded-xl border p-0.5 ${pillGroup}`}>
                   {KEY_SIZE_OPTIONS.map((opt) => (
                     <button
                       key={opt.mode}
                       type="button"
                       onClick={() => setRangeMode(opt.mode)}
-                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${
+                      className={`rounded-lg px-2 py-1 text-xs font-bold transition ${
                         rangeMode === opt.mode ? pillActive : pillInactive
                       }`}
                     >
@@ -908,41 +957,89 @@ export default function PracticeStudio({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold">Colors</span>
-                <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
-                  {COLOR_MODE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setColorMode(opt.id)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                        colorMode === opt.id ? pillActive : pillInactive
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="mb-1 text-xs font-bold">Hand Focus</div>
+                  <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                    {HAND_OPTIONS.map((h) => (
+                      <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => handleHandChange(h.id)}
+                        className={`rounded-lg px-2 py-1 text-xs font-bold transition ${
+                          practiceState.handFilter === h.id ? pillActive : pillInactive
+                        }`}
+                      >
+                        {h.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1 text-xs font-bold">Colors</div>
+                  <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                    {COLOR_MODE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setColorMode(opt.id)}
+                        className={`rounded-lg px-2 py-1 text-xs font-bold transition ${
+                          colorMode === opt.id ? pillActive : pillInactive
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              {(sessionScores.length > 0 || unopenedSaved.length > 0) && (
+                <div>
+                  <div className="mb-1 text-xs font-bold">Switch Grown-up Score</div>
+                  <select
+                    aria-label="Open score"
+                    value={selectValue}
+                    disabled={scoreBusy}
+                    onChange={(e) => handleScoreDropdown(e.target.value)}
+                    className={`w-full truncate rounded-xl border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${
+                      darkMode
+                        ? 'border-indigo-800 bg-[#1a2042] text-amber-50'
+                        : 'border-amber-200 bg-white text-amber-950'
+                    }`}
+                  >
+                    {!score || score.id.startsWith('toddler:') ? (
+                      <option value="">Choose uploaded or saved score…</option>
+                    ) : null}
+                    {sessionScores.length > 0 ? (
+                      <optgroup label="Opened">
+                        {sessionScores.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                    {unopenedSaved.length > 0 ? (
+                      <optgroup label="Saved Library">
+                        {unopenedSaved.map((row) => (
+                          <option key={row.scoreId} value={`saved:${row.scoreId}`}>
+                            {row.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </select>
+                </div>
+              )}
             </div>
 
-            <button
-              type="button"
-              disabled={!score}
-              onClick={() => score && onExportPdf(score)}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              <span>Export PDF</span>
-            </button>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="space-y-3">
+            <div className={`space-y-3 ${drawerCard}`}>
               <div>
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span>Tempo Speed</span>
-                  <span className="font-mono text-amber-400">{Math.round(tempoScale * 100)}%</span>
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>Tempo Speed ({effectiveBpm} BPM)</span>
+                  <span className="font-mono text-amber-500">{Math.round(tempoScale * 100)}%</span>
                 </div>
                 <input
                   type="range"
@@ -953,12 +1050,12 @@ export default function PracticeStudio({
                   onChange={(e) => setTempoScale(Number(e.target.value))}
                   className="mt-1.5 w-full accent-amber-500"
                 />
-                <div className="mt-1 flex items-center justify-between text-[11px] text-stone-400">
+                <div className={`mt-1 flex items-center justify-between text-[11px] ${mutedText}`}>
                   <span>40%</span>
                   <button
                     type="button"
                     onClick={() => setTempoScale(1)}
-                    className="hover:text-amber-400"
+                    className="font-semibold hover:text-amber-500"
                   >
                     Reset 100%
                   </button>
@@ -966,10 +1063,74 @@ export default function PracticeStudio({
                 </div>
               </div>
 
-              <div className="space-y-2 border-t border-stone-800/60 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold">Metronome Click</span>
+                <input
+                  type="checkbox"
+                  checked={metronomeOn}
+                  onChange={(e) => setMetronomeOn(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold">Guide Piano</div>
+                  <div className={`text-[11px] ${mutedText}`}>Plays reference notes in Tempo mode</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={guideSoundOn}
+                  onChange={(e) => setGuideSoundOn(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+              </div>
+
+              <div>
+                <div className="text-xs font-bold">Piano Voice</div>
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                  {VOICE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setVoice(opt.id)}
+                      className={`rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${
+                        voice === opt.id
+                          ? darkMode
+                            ? 'border-amber-400 bg-amber-400/20 text-amber-200'
+                            : 'border-amber-500 bg-amber-400/20 text-amber-900'
+                          : subtleBtn
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Volume2 className="h-3.5 w-3.5 text-amber-500" />
+                    Volume
+                  </span>
+                  <span className="font-mono text-[11px]">{Math.round(volume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.02}
+                  value={volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                  className="mt-1 w-full accent-amber-500"
+                />
+              </div>
+
+              <div className="space-y-2 border-t border-amber-300/30 pt-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="inline-flex items-center gap-2 text-xs font-semibold">
-                    <Repeat className="h-3.5 w-3.5 text-amber-400" />
+                  <label className="inline-flex items-center gap-1.5 text-xs font-bold">
+                    <Repeat className="h-3.5 w-3.5 text-amber-500" />
                     <span>Measure Loop</span>
                   </label>
                   <input
@@ -1001,8 +1162,8 @@ export default function PracticeStudio({
                     }
                     className={`w-16 rounded-lg border px-2 py-1 font-mono text-xs ${
                       darkMode
-                        ? 'border-stone-800 bg-stone-950 text-stone-100'
-                        : 'border-stone-200 bg-stone-50 text-stone-900'
+                        ? 'border-indigo-800 bg-[#1a2042] text-amber-50'
+                        : 'border-amber-200 bg-white text-amber-950'
                     }`}
                   />
                   <span className={mutedText}>to</span>
@@ -1020,84 +1181,20 @@ export default function PracticeStudio({
                     }
                     className={`w-16 rounded-lg border px-2 py-1 font-mono text-xs ${
                       darkMode
-                        ? 'border-stone-800 bg-stone-950 text-stone-100'
-                        : 'border-stone-200 bg-stone-50 text-stone-900'
+                        ? 'border-indigo-800 bg-[#1a2042] text-amber-50'
+                        : 'border-amber-200 bg-white text-amber-950'
                     }`}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold">Metronome Click</span>
-                <input
-                  type="checkbox"
-                  checked={metronomeOn}
-                  onChange={(e) => setMetronomeOn(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold">Guide Piano</div>
-                  <div className={`text-[11px] ${mutedText}`}>Plays reference notes in Tempo mode</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={guideSoundOn}
-                  onChange={(e) => setGuideSoundOn(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-              </div>
-
-              <div>
-                <div className="text-xs font-semibold">Piano Voice</div>
-                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                  {VOICE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setVoice(opt.id)}
-                      className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
-                        voice === opt.id
-                          ? 'border-amber-500 bg-amber-500/15 text-amber-300'
-                          : subtleBtn
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Volume2 className="h-3.5 w-3.5 text-amber-400" />
-                    Volume
-                  </span>
-                  <span className="font-mono text-[11px]">{Math.round(volume * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.02}
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
-                  className="mt-1 w-full accent-amber-500"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3">
+            <div className={`space-y-3 ${drawerCard}`}>
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <div className="inline-flex items-center gap-1.5 text-xs font-semibold">
-                      <Usb className="h-3.5 w-3.5 text-amber-400" />
+                    <div className="inline-flex items-center gap-1.5 text-xs font-bold">
+                      <Usb className="h-3.5 w-3.5 text-amber-500" />
                       MIDI Keyboard
                     </div>
                     <div className={`text-[11px] ${mutedText}`}>
@@ -1115,7 +1212,7 @@ export default function PracticeStudio({
                   <button
                     type="button"
                     onClick={onConnectMidi}
-                    className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${subtleBtn}`}
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-bold transition ${subtleBtn}`}
                   >
                     {midiState === 'ready' && midiDevices.length === 0
                       ? 'Connect / Scan'
@@ -1133,7 +1230,7 @@ export default function PracticeStudio({
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-semibold">Mute local sound for MIDI</div>
+                  <div className="text-xs font-bold">Mute local sound for MIDI</div>
                   <div className={`text-[11px] ${mutedText}`}>
                     Use digital piano speakers without double audio
                   </div>
@@ -1146,14 +1243,14 @@ export default function PracticeStudio({
                 />
               </div>
 
-              <div className="space-y-2 border-t border-stone-800/60 pt-3">
+              <div className="space-y-2 border-t border-amber-300/30 pt-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <div className="inline-flex items-center gap-1.5 text-xs font-semibold">
-                      <AudioLines className="h-3.5 w-3.5 text-amber-400" />
+                    <div className="inline-flex items-center gap-1.5 text-xs font-bold">
+                      <AudioLines className="h-3.5 w-3.5 text-amber-500" />
                       Acoustic Mic
                     </div>
-                    <div className="font-mono text-[11px] text-amber-400">
+                    <div className="font-mono text-[11px] text-amber-500">
                       {micActive
                         ? micPitch
                           ? `${micPitch.name} · ${micPitch.centsOff >= 0 ? '+' : ''}${micPitch.centsOff}¢`
@@ -1166,7 +1263,7 @@ export default function PracticeStudio({
                   <button
                     type="button"
                     onClick={onToggleMic}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
                       micActive
                         ? 'bg-rose-600 text-white hover:bg-rose-500'
                         : 'bg-emerald-600 text-white hover:bg-emerald-500'
@@ -1184,7 +1281,7 @@ export default function PracticeStudio({
                   </div>
                   <div
                     className={`h-1.5 w-full overflow-hidden rounded-full ${
-                      darkMode ? 'bg-stone-800' : 'bg-stone-200'
+                      darkMode ? 'bg-indigo-950' : 'bg-amber-100'
                     }`}
                   >
                     <div
@@ -1195,8 +1292,8 @@ export default function PracticeStudio({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <label className="inline-flex items-center gap-1.5 text-xs font-semibold">
-                    <Headphones className="h-3.5 w-3.5 text-stone-400" />
+                  <label className="inline-flex items-center gap-1.5 text-xs font-bold">
+                    <Headphones className="h-3.5 w-3.5 text-amber-500" />
                     Using Headphones
                   </label>
                   <input
@@ -1207,11 +1304,19 @@ export default function PracticeStudio({
                   />
                 </div>
 
-                <p className={`text-[11px] leading-snug ${mutedText}`}>
-                  Monophonic pitch detection (one note at a time). Automatically pauses during speaker
-                  playback unless headphones are enabled.
-                </p>
-                {micError ? <p className="text-[11px] font-medium text-rose-400">{micError}</p> : null}
+                {micError ? <p className="text-[11px] font-medium text-rose-500">{micError}</p> : null}
+              </div>
+
+              <div className="border-t border-amber-300/30 pt-2.5">
+                <button
+                  type="button"
+                  disabled={!score}
+                  onClick={() => score && onExportPdf(score)}
+                  className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                  <span>Export Sheet Music PDF</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1219,77 +1324,91 @@ export default function PracticeStudio({
       ) : null}
 
       {score ? (
-        <div className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-1.5 text-xs ${surface}`}>
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span
-              className={`h-2 w-2 shrink-0 rounded-full ${
-                practiceState.lastFeedback.status === 'hit'
-                  ? 'bg-emerald-400'
-                  : practiceState.lastFeedback.status === 'miss'
-                    ? 'bg-rose-400'
-                    : 'bg-amber-400'
-              }`}
-            />
-            <span className="truncate font-medium">
-              {practiceState.mode === 'listen'
-                ? practiceState.running
-                  ? `Listening · Bar ${currentBar}`
-                  : 'Press Play to listen.'
-                : practiceState.mode === 'wait' &&
-                    practiceState.lastFeedback.status === 'hit' &&
-                    practiceState.stats.streak >= 3
-                  ? `Awesome! ⭐ ${practiceState.stats.streak} in a row · ${practiceState.lastFeedback.text}`
-                  : practiceState.lastFeedback.text ||
-                    PRACTICE_MODES.find((m) => m.id === practiceState.mode)?.idle}
-            </span>
+        <div className={`rounded-3xl border px-3.5 py-2.5 sm:px-4 ${surface}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <MascotBuddy mood={kidPrompt.mood} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-display text-base font-bold leading-tight sm:text-lg">
+                    {kidPrompt.headline}
+                  </span>
+                  {kidPrompt.targetNote ? (
+                    <span
+                      style={{
+                        backgroundColor: kidPrompt.targetNote.bg,
+                        color: kidPrompt.targetNote.text,
+                      }}
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold shadow-sm ring-2 ring-white/80"
+                    >
+                      {kidPrompt.targetNote.colorName} {kidPrompt.targetNote.letter}
+                    </span>
+                  ) : null}
+                  {kidPrompt.cheerBadge ? (
+                    <span
+                      key={`${kidPrompt.starsEarned}-${kidPrompt.cheerBadge}`}
+                      className="animate-kid-pop inline-flex items-center rounded-full bg-gradient-to-r from-amber-300 to-rose-300 px-2.5 py-0.5 text-xs font-extrabold text-amber-950 shadow-sm"
+                    >
+                      {kidPrompt.cheerBadge}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-100/90 px-3 py-1 text-xs font-extrabold text-amber-900 shadow-sm">
+              <span>⭐ {kidPrompt.starsEarned}</span>
+            </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] sm:gap-3 sm:text-xs">
-            {practiceState.mode !== 'listen' ? (
-              <>
-                <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-400">
-                  {nextChip}
-                </span>
-                <span className="hidden sm:inline">
-                  <span className={mutedText}>Hits </span>
-                  <strong>{practiceState.stats.hits}</strong>
-                </span>
-                <span>
-                  <span className={mutedText}>Acc </span>
-                  <strong>{totalAttempts > 0 ? `${accuracyPct}%` : '—'}</strong>
-                </span>
-                <span>
-                  <span className={mutedText}>Streak </span>
-                  <strong>{practiceState.stats.streak}</strong>
-                </span>
-              </>
-            ) : null}
+          <div
+            aria-label="Song progress"
+            className={`mt-2 h-2.5 w-full overflow-hidden rounded-full ${
+              darkMode ? 'bg-indigo-950/90' : 'bg-amber-100'
+            }`}
+          >
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-rose-400 via-amber-400 via-emerald-400 via-sky-400 to-purple-400 transition-[width] duration-300"
+              style={{ width: `${Math.round(kidPrompt.progressRatio * 100)}%` }}
+            />
           </div>
         </div>
       ) : null}
 
       {score && practiceState.finished ? (
         <div
-          className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl border px-5 py-4 ${
+          className={`flex flex-col items-center justify-between gap-4 rounded-3xl border-2 p-5 sm:flex-row ${
             darkMode
-              ? 'border-amber-500/40 bg-amber-500/10 text-stone-100'
-              : 'border-amber-600/30 bg-amber-50 text-stone-900'
+              ? 'border-amber-400/50 bg-[#1d244c] text-amber-50'
+              : 'border-amber-300 bg-gradient-to-r from-amber-50 via-rose-50/70 to-sky-50 text-amber-950 shadow-sm'
           }`}
         >
-          <div>
-            <p className="font-display text-2xl">You played it! 🌟</p>
-            <div className="mt-1 flex flex-wrap items-center gap-4 font-mono text-xs">
-              <span>Accuracy: {totalAttempts > 0 ? `${accuracyPct}%` : '—'}</span>
-              <span>
-                Avg Offset:{' '}
-                {practiceState.stats.offsetsMs.length > 0
-                  ? `${avgOffsetMs >= 0 ? '+' : ''}${avgOffsetMs} ms`
-                  : '—'}
-              </span>
-              <span>Best Streak: {practiceState.stats.bestStreak}</span>
-              <span>
-                Hardest Measure: {hardestMeasure !== null ? `Bar ${hardestMeasure}` : 'None'}
-              </span>
+          <div className="flex items-center gap-4">
+            <MascotBuddy mood="celebrating" size="lg" />
+            <div>
+              <div className="mb-1 flex items-center gap-1 text-amber-400">
+                <Star className="h-5 w-5 fill-amber-400" />
+                <Star className="h-6 w-6 fill-amber-400" />
+                <Star className="h-5 w-5 fill-amber-400" />
+              </div>
+              <p className="font-display text-2xl font-bold sm:text-3xl">
+                Hooray! You played {score.title}!
+              </p>
+              {!kidLocked ? (
+                <div className={`mt-1.5 flex flex-wrap items-center gap-3 font-mono text-xs ${mutedText}`}>
+                  <span>Accuracy: {totalAttempts > 0 ? `${accuracyPct}%` : '—'}</span>
+                  <span>
+                    Avg Offset:{' '}
+                    {practiceState.stats.offsetsMs.length > 0
+                      ? `${avgOffsetMs >= 0 ? '+' : ''}${avgOffsetMs} ms`
+                      : '—'}
+                  </span>
+                  <span>Best Streak: {practiceState.stats.bestStreak}</span>
+                  <span>
+                    Hardest Measure: {hardestMeasure !== null ? `Bar ${hardestMeasure}` : 'None'}
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -1297,16 +1416,26 @@ export default function PracticeStudio({
             <button
               type="button"
               onClick={handleRestart}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-semibold text-stone-950 transition hover:bg-amber-500"
+              className="inline-flex items-center gap-1.5 rounded-2xl border-b-4 border-emerald-700 bg-emerald-500 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-emerald-400 active:translate-y-[1px]"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Play Again
+              <RotateCcw className="h-4 w-4" />
+              Play Again!
             </button>
-            {hardestMeasure !== null ? (
+            {!kidLocked ? (
+              <button
+                type="button"
+                onClick={onGoToLibrary}
+                className="inline-flex items-center gap-1.5 rounded-2xl border-b-4 border-amber-600 bg-amber-400 px-4 py-2.5 text-sm font-extrabold text-amber-950 transition hover:bg-amber-300 active:translate-y-[1px]"
+              >
+                <Library className="h-4 w-4" />
+                Pick Another Song!
+              </button>
+            ) : null}
+            {!kidLocked && hardestMeasure !== null ? (
               <button
                 type="button"
                 onClick={handleDrillHardest}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${subtleBtn}`}
+                className={`inline-flex items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-xs font-bold transition ${subtleBtn}`}
               >
                 <Repeat className="h-3.5 w-3.5" />
                 Drill Bar {hardestMeasure} at 75%
@@ -1318,18 +1447,17 @@ export default function PracticeStudio({
 
       {!score ? (
         <>
-          <div className={`flex flex-col items-center justify-center rounded-2xl border px-6 py-12 text-center ${surface}`}>
-            <h2 className="font-display text-3xl tracking-tight">Ready at the Bench</h2>
+          <div className={`flex flex-col items-center justify-center rounded-3xl border px-6 py-12 text-center ${surface}`}>
+            <h2 className="font-display text-3xl font-bold tracking-tight">Ready at the Bench</h2>
             <p className={`mt-2 max-w-md text-xs leading-relaxed ${mutedText}`}>
-              Open a saved score or local MIDI file from the Library, or load the bundled sample
-              piece to start practicing with interactive notation and falling notes.
+              Pick a toddler starter song, open a saved score, or load the bundled sample piece.
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
                 disabled={sampleLoading}
                 onClick={() => void onLoadSample()}
-                className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-stone-950 shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-4 py-2 text-xs font-bold text-amber-950 shadow-sm transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {sampleLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1341,10 +1469,10 @@ export default function PracticeStudio({
               <button
                 type="button"
                 onClick={onGoToLibrary}
-                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-semibold transition ${subtleBtn}`}
+                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-bold transition ${subtleBtn}`}
               >
                 <Library className="h-3.5 w-3.5" />
-                Browse Library
+                Browse Songs
               </button>
             </div>
           </div>
@@ -1369,8 +1497,8 @@ export default function PracticeStudio({
           {viewLayout === 'falling' || viewLayout === 'combined' ? (
             <div
               className={[
-                'flex flex-col overflow-hidden rounded-2xl border',
-                darkMode ? 'border-stone-800' : 'border-stone-300/80',
+                'flex flex-col overflow-hidden rounded-3xl border-2 shadow-sm',
+                darkMode ? 'border-indigo-800/80' : 'border-amber-200/90',
               ].join(' ')}
             >
               <div
@@ -1391,10 +1519,13 @@ export default function PracticeStudio({
                   colorMode={colorMode}
                   onColorModeChange={setColorMode}
                   flushBottom
-                  hideToolbar={Boolean(kidLocked)}
+                  hideToolbar={colorMode === 'rainbow' || Boolean(kidLocked)}
                   canShiftOctave={rangeMode === 'kid' || rangeMode === 'compact'}
                   octaveShift={octaveShift}
                   onOctaveShift={shiftOctave}
+                  expectedPitches={expectedPitches}
+                  playfulMode={colorMode === 'rainbow'}
+                  lookaheadOverride={tempoScale <= 0.7 ? 8 : 6}
                 />
               </div>
 
