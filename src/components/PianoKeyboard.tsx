@@ -87,6 +87,14 @@ function findMidiElementAt(clientX: number, clientY: number): HTMLElement | null
   return target.closest<HTMLElement>('[data-midi]');
 }
 
+function BeaconStarIcon({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="#ffffff" aria-hidden="true">
+      <polygon points="12,2.2 14.9,8.4 21.7,9.2 16.6,13.9 18,20.7 12,17.3 6,20.7 7.4,13.9 2.3,9.2 9.1,8.4" />
+    </svg>
+  );
+}
+
 export function PianoKeyboard({
   layout,
   rangeMode,
@@ -318,15 +326,20 @@ export function PianoKeyboard({
         style={keyStyle}
         className={[
           'group absolute top-0 bottom-0 select-none cursor-pointer border-r transition-transform duration-75',
-          darkMode ? 'border-stone-400/70' : 'border-stone-300',
-          'rounded-b-[5px]',
-          'bg-gradient-to-b from-[#faf8f3] via-[#f4f0e6] to-[#e6dfd1]',
-          'shadow-[inset_0_-6px_0_rgba(120,113,108,0.22),inset_1px_0_0_rgba(255,255,255,0.8)]',
+          darkMode ? 'border-stone-400/70' : 'border-amber-200/90',
+          'rounded-b-xl',
+          'bg-gradient-to-b from-[#fffdf9] via-[#faf6ec] to-[#ece4d4]',
+          'shadow-[inset_0_-7px_0_rgba(120,113,108,0.2),inset_1px_0_0_rgba(255,255,255,0.85)]',
           'data-[user-pressed=true]:translate-y-[2px]',
           'data-[playback=R]:translate-y-[2px]',
           'data-[playback=L]:translate-y-[2px]',
           isRainbow
-            ? 'piano-key-rainbow'
+            ? [
+                'piano-key-rainbow',
+                expectedHand ? 'piano-key-expected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
             : [
                 'data-[user-pressed=true]:bg-gradient-to-b data-[user-pressed=true]:from-emerald-100 data-[user-pressed=true]:via-emerald-200 data-[user-pressed=true]:to-emerald-400',
                 'data-[user-pressed=true]:shadow-[inset_0_3px_8px_rgba(6,95,70,0.35)]',
@@ -343,16 +356,20 @@ export function PianoKeyboard({
               isRainbow
                 ? {
                     backgroundColor: rainbow.stickerBg,
-                    boxShadow: `0 0 14px ${rainbow.glow}, 0 0 0 4px ${rainbow.top}66`,
+                    boxShadow: `0 0 16px ${rainbow.glow}, 0 0 0 4px ${rainbow.top}66`,
                   }
                 : undefined
             }
             className={[
-              'pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full animate-bounce',
-              showAllStickers ? 'bottom-10 sm:bottom-11' : 'bottom-7',
-              isLargeKey ? 'w-4 h-4' : 'w-3.5 h-3.5',
+              'pointer-events-none absolute left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full animate-bounce z-[5]',
+              showAllStickers
+                ? isLargeKey
+                  ? 'bottom-[52px] sm:bottom-14'
+                  : 'bottom-9 sm:bottom-10'
+                : 'bottom-7',
+              isLargeKey ? 'w-6 h-6 sm:w-7 sm:h-7' : 'w-4 h-4',
               isRainbow
-                ? 'ring-2 ring-white/80'
+                ? 'ring-2 ring-white'
                 : expectedHand === 'R'
                   ? 'bg-amber-500 ring-4 ring-amber-400/40 shadow-[0_0_12px_rgba(245,158,11,0.8)]'
                   : 'bg-sky-500 ring-4 ring-sky-400/40 shadow-[0_0_12px_rgba(56,189,248,0.8)]',
@@ -367,6 +384,9 @@ export function PianoKeyboard({
                 .filter(Boolean)
                 .join(' ')}
             />
+            <BeaconStarIcon
+              className={isLargeKey ? 'relative w-3.5 h-3.5 sm:w-4 sm:h-4' : 'relative w-2.5 h-2.5'}
+            />
           </span>
         )}
 
@@ -374,12 +394,12 @@ export function PianoKeyboard({
           <span
             style={isRainbow ? { backgroundColor: sticker.bg, color: sticker.text } : undefined}
             className={[
-              'pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-2 flex items-center justify-center rounded-full font-extrabold tracking-tight shadow-sm',
+              'pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-2.5 flex items-center justify-center rounded-full font-display font-bold tracking-tight shadow-sm',
               isLargeKey
-                ? 'w-7 h-7 sm:w-8 sm:h-8 text-xs sm:text-sm'
+                ? 'w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base'
                 : 'w-5 h-5 sm:w-6 sm:h-6 text-[10px] sm:text-[11px]',
               isRainbow
-                ? 'ring-1 ring-black/10'
+                ? 'ring-2 ring-white/90'
                 : 'bg-stone-200/90 text-stone-700 border border-stone-300/80',
             ].join(' ')}
           >
@@ -433,7 +453,7 @@ export function PianoKeyboard({
         data-user-pressed={isPressed ? 'true' : 'false'}
         style={keyStyle}
         className={[
-          'group absolute top-0 h-[61%] z-10 select-none cursor-pointer rounded-b-[4px] transition-transform duration-75',
+          'group absolute top-0 h-[61%] z-10 select-none cursor-pointer rounded-b-lg transition-transform duration-75',
           'border-x border-b border-black/90',
           'bg-gradient-to-b from-stone-800 via-stone-900 to-black',
           'shadow-[0_4px_6px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.22),inset_0_-4px_2px_rgba(255,255,255,0.08)]',
@@ -441,7 +461,12 @@ export function PianoKeyboard({
           'data-[playback=R]:translate-y-[2px]',
           'data-[playback=L]:translate-y-[2px]',
           isRainbow
-            ? 'piano-key-rainbow-black'
+            ? [
+                'piano-key-rainbow-black',
+                expectedHand ? 'piano-key-expected-black' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
             : [
                 'data-[user-pressed=true]:bg-gradient-to-b data-[user-pressed=true]:from-emerald-500 data-[user-pressed=true]:via-emerald-700 data-[user-pressed=true]:to-emerald-950',
                 'data-[user-pressed=true]:shadow-[0_1px_2px_rgba(0,0,0,0.6),inset_0_2px_6px_rgba(16,185,129,0.55)]',
@@ -464,10 +489,10 @@ export function PianoKeyboard({
                 : undefined
             }
             className={[
-              'pointer-events-none absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full animate-bounce',
+              'pointer-events-none absolute left-1/2 -translate-x-1/2 flex items-center justify-center w-4 h-4 rounded-full animate-bounce',
               showBlackSticker ? 'bottom-7' : 'bottom-3',
               isRainbow
-                ? 'ring-1 ring-white/80'
+                ? 'ring-2 ring-white/90'
                 : expectedHand === 'R'
                   ? 'bg-amber-400 ring-2 ring-amber-300/50 shadow-[0_0_10px_rgba(245,158,11,0.9)]'
                   : 'bg-sky-400 ring-2 ring-sky-300/50 shadow-[0_0_10px_rgba(56,189,248,0.9)]',
@@ -482,6 +507,7 @@ export function PianoKeyboard({
                 .filter(Boolean)
                 .join(' ')}
             />
+            <BeaconStarIcon className="relative w-2.5 h-2.5" />
           </span>
         )}
         {showBlackSticker && (
@@ -616,7 +642,13 @@ export function PianoKeyboard({
       )}
 
       <div className="relative w-full">
-        <div className="h-[4px] w-full bg-gradient-to-b from-red-950 via-red-800 to-red-950 shadow-[0_2px_4px_rgba(0,0,0,0.6)]" />
+        <div
+          className={
+            !darkMode && isRainbow
+              ? 'h-[6px] w-full bg-gradient-to-r from-rose-300 via-amber-300 via-emerald-300 via-sky-300 to-purple-300 shadow-[0_2px_4px_rgba(0,0,0,0.12)]'
+              : 'h-[4px] w-full bg-gradient-to-b from-red-950 via-red-800 to-red-950 shadow-[0_2px_4px_rgba(0,0,0,0.6)]'
+          }
+        />
 
         <div
           onPointerDown={handlePointerDown}
@@ -624,7 +656,7 @@ export function PianoKeyboard({
           onPointerUp={handlePointerUpOrCancel}
           onPointerCancel={handlePointerUpOrCancel}
           onLostPointerCapture={handlePointerUpOrCancel}
-          className="relative w-full h-36 sm:h-44 touch-none select-none bg-stone-950 overflow-hidden"
+          className="relative w-full h-40 sm:h-48 touch-none select-none bg-stone-950 overflow-hidden"
         >
           {layout.whiteKeys.map(renderWhiteKey)}
           {layout.blackKeys.map(renderBlackKey)}
