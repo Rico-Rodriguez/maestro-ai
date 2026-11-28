@@ -183,3 +183,14 @@
     inset 0 2px 6px var(--key-glow),
     0 0 12px var(--key-glow);
 }
+
+@media (max-height: 520px) {
+  .kid-falling-stage {
+    height: 44dvh;
+    min-height: 150px;
+    max-height: 240px;
+  }
+  .kid-piano-keys {
+    height: 108px;
+  }
+}

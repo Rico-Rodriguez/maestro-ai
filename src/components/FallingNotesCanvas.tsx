@@ -611,6 +611,10 @@ export function FallingNotesCanvas({
         const blackBars: DrawableBar[] = [];
         const activeBursts: Array<{ x: number; w: number; palette: NotePalette }> = [];
         const currentActiveIds = new Set<string>();
+        let offLeftPitch: number | null = null;
+        let offRightPitch: number | null = null;
+        let offLeftDist = Infinity;
+        let offRightDist = Infinity;
         const startEventIdx = lowerBoundOnset(
           evData.sorted,
           visibleMinBeat - evData.maxDuration - 0.5,
@@ -621,6 +625,20 @@ export function FallingNotesCanvas({
           if (ev.onset > visibleMaxBeat) break;
           const noteEnd = ev.onset + ev.duration;
           if (noteEnd < visibleMinBeat) continue;
+
+          if (ev.pitch < activeLayout.minMidi) {
+            const dist = ev.onset <= liveBeat && noteEnd >= liveBeat ? 0 : Math.abs(ev.onset - liveBeat);
+            if (offLeftPitch === null || dist < offLeftDist) {
+              offLeftPitch = ev.pitch;
+              offLeftDist = dist;
+            }
+          } else if (ev.pitch > activeLayout.maxMidi) {
+            const dist = ev.onset <= liveBeat && noteEnd >= liveBeat ? 0 : Math.abs(ev.onset - liveBeat);
+            if (offRightPitch === null || dist < offRightDist) {
+              offRightPitch = ev.pitch;
+              offRightDist = dist;
+            }
+          }
 
           const geom = activeLayout.byMidi.get(ev.pitch);
           if (!geom) continue;
@@ -822,6 +840,43 @@ export function FallingNotesCanvas({
 
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(burst.x + 1, strikeY - 1.5, Math.max(2, burst.w - 2), 3);
+        }
+
+        const drawOffscreenPill = (pitch: number, side: 'left' | 'right') => {
+          const palette = resolvePalette(pitch, 'R');
+          const shortLabel = getKeyStickerColor(pitch).shortLabel;
+          const label = side === 'left' ? `◀ ${shortLabel}` : `${shortLabel} ▶`;
+          ctx.save();
+          ctx.font = '700 11px Fredoka, ui-rounded, system-ui, sans-serif';
+          const textW = ctx.measureText(label).width;
+          const pillH = 22;
+          const pillW = Math.ceil(textW + 14);
+          const pillX = side === 'left' ? 8 : width - pillW - 8;
+          const pillY = Math.max(4, strikeY - 10 - pillH);
+
+          ctx.shadowColor = palette.glow;
+          ctx.shadowBlur = 12;
+          traceRoundedRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+          ctx.fillStyle = palette.stickerBg;
+          ctx.fill();
+
+          ctx.shadowBlur = 0;
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.stroke();
+
+          ctx.fillStyle = palette.stickerText;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
+          ctx.restore();
+        };
+
+        if (offLeftPitch !== null) {
+          drawOffscreenPill(offLeftPitch, 'left');
+        }
+        if (offRightPitch !== null) {
+          drawOffscreenPill(offRightPitch, 'right');
         }
 
         if (particles.length > 0) {
