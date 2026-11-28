@@ -44,14 +44,14 @@ const RANGE_OPTIONS: readonly { mode: PianoRangeMode; label: string }[] = [
   { mode: '88', label: '88' },
 ];
 
-const RAINBOW_DOT_CLASSES = [
-  'bg-red-500',
-  'bg-orange-500',
-  'bg-yellow-400',
-  'bg-green-500',
-  'bg-cyan-500',
-  'bg-blue-500',
-  'bg-purple-500',
+const RAINBOW_DOT_COLORS = [
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#22c55e',
+  '#06b6d4',
+  '#3b82f6',
+  '#a855f7',
 ] as const;
 
 function formatSoundBadge(status: AudioEngineStatus): {
@@ -63,14 +63,14 @@ function formatSoundBadge(status: AudioEngineStatus): {
   }
   if (status.usingFallback) {
     return {
-      text: `Loading piano (${status.samplesLoaded}/${status.samplesTotal}) · Synth active`,
+      text: `Loading piano (${status.samplesLoaded}/${status.samplesTotal})`,
       tone: 'loading',
     };
   }
   if (status.voice === 'electric-piano') {
     return { text: 'Electric Piano', tone: 'ready' };
   }
-  return { text: 'Concert Grand · Ready', tone: 'ready' };
+  return { text: 'Concert Grand', tone: 'ready' };
 }
 
 function computeStrikeVelocity(keyEl: Element, clientY: number): number {
@@ -85,14 +85,6 @@ function findMidiElementAt(clientX: number, clientY: number): HTMLElement | null
   const target = document.elementFromPoint(clientX, clientY);
   if (!target) return null;
   return target.closest<HTMLElement>('[data-midi]');
-}
-
-function BeaconStarIcon({ className }: { className: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="#ffffff" aria-hidden="true">
-      <polygon points="12,2.2 14.9,8.4 21.7,9.2 16.6,13.9 18,20.7 12,17.3 6,20.7 7.4,13.9 2.3,9.2 9.1,8.4" />
-    </svg>
-  );
 }
 
 export function PianoKeyboard({
@@ -326,10 +318,10 @@ export function PianoKeyboard({
         style={keyStyle}
         className={[
           'group absolute top-0 bottom-0 select-none cursor-pointer border-r transition-transform duration-75',
-          darkMode ? 'border-stone-400/70' : 'border-amber-200/90',
-          'rounded-b-xl',
-          'bg-gradient-to-b from-[#fffdf9] via-[#faf6ec] to-[#ece4d4]',
-          'shadow-[inset_0_-7px_0_rgba(120,113,108,0.2),inset_1px_0_0_rgba(255,255,255,0.85)]',
+          darkMode ? 'border-[#1f1b16]/50' : 'border-[#1f1b16]/12',
+          'rounded-b-[8px]',
+          'bg-gradient-to-b from-[#fdfbf7] via-[#f9f6ef] to-[#efeae0]',
+          'shadow-[inset_0_-5px_0_rgba(31,27,22,0.08),inset_1px_0_0_rgba(255,255,255,0.75)]',
           'data-[user-pressed=true]:translate-y-[2px]',
           'data-[playback=R]:translate-y-[2px]',
           'data-[playback=L]:translate-y-[2px]',
@@ -341,66 +333,46 @@ export function PianoKeyboard({
                 .filter(Boolean)
                 .join(' ')
             : [
-                'data-[user-pressed=true]:bg-gradient-to-b data-[user-pressed=true]:from-emerald-100 data-[user-pressed=true]:via-emerald-200 data-[user-pressed=true]:to-emerald-400',
-                'data-[user-pressed=true]:shadow-[inset_0_3px_8px_rgba(6,95,70,0.35)]',
-                'data-[playback=R]:bg-gradient-to-b data-[playback=R]:from-amber-100 data-[playback=R]:via-amber-200 data-[playback=R]:to-amber-400',
-                'data-[playback=R]:shadow-[inset_0_3px_8px_rgba(180,83,9,0.35)]',
-                'data-[playback=L]:bg-gradient-to-b data-[playback=L]:from-sky-100 data-[playback=L]:via-sky-200 data-[playback=L]:to-sky-400',
-                'data-[playback=L]:shadow-[inset_0_3px_8px_rgba(3,105,161,0.35)]',
+                'data-[user-pressed=true]:bg-gradient-to-b data-[user-pressed=true]:from-[#dcfce7] data-[user-pressed=true]:to-[#86efac]',
+                'data-[user-pressed=true]:shadow-[inset_0_2px_6px_rgba(22,163,74,0.22)]',
+                'data-[playback=R]:bg-gradient-to-b data-[playback=R]:from-[#fef3c7] data-[playback=R]:to-[#fcd34d]',
+                'data-[playback=R]:shadow-[inset_0_2px_6px_rgba(180,83,9,0.22)]',
+                'data-[playback=L]:bg-gradient-to-b data-[playback=L]:from-[#e0f2fe] data-[playback=L]:to-[#7dd3fc]',
+                'data-[playback=L]:shadow-[inset_0_2px_6px_rgba(3,105,161,0.22)]',
               ].join(' '),
         ].join(' ')}
       >
         {expectedHand && (
           <span
-            style={
-              isRainbow
-                ? {
-                    backgroundColor: rainbow.stickerBg,
-                    boxShadow: `0 0 16px ${rainbow.glow}, 0 0 0 4px ${rainbow.top}66`,
-                  }
-                : undefined
-            }
+            style={isRainbow ? { backgroundColor: rainbow.stickerBg } : undefined}
             className={[
-              'pointer-events-none absolute left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full animate-bounce z-[5]',
+              'pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full ring-2 ring-white z-[5]',
               showAllStickers
                 ? isLargeKey
-                  ? 'bottom-[52px] sm:bottom-14'
+                  ? 'bottom-12 sm:bottom-14'
                   : 'bottom-9 sm:bottom-10'
                 : 'bottom-7',
-              isLargeKey ? 'w-6 h-6 sm:w-7 sm:h-7' : 'w-4 h-4',
+              isLargeKey ? 'w-3 h-3' : 'w-2.5 h-2.5',
               isRainbow
-                ? 'ring-2 ring-white'
+                ? ''
                 : expectedHand === 'R'
-                  ? 'bg-amber-500 ring-4 ring-amber-400/40 shadow-[0_0_12px_rgba(245,158,11,0.8)]'
-                  : 'bg-sky-500 ring-4 ring-sky-400/40 shadow-[0_0_12px_rgba(56,189,248,0.8)]',
+                  ? 'bg-[#d97706]'
+                  : 'bg-[#0284c7]',
             ].join(' ')}
-          >
-            <span
-              style={isRainbow ? { backgroundColor: rainbow.top } : undefined}
-              className={[
-                'absolute inset-0 rounded-full animate-ping opacity-60',
-                !isRainbow && (expectedHand === 'R' ? 'bg-amber-400' : 'bg-sky-400'),
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            />
-            <BeaconStarIcon
-              className={isLargeKey ? 'relative w-3.5 h-3.5 sm:w-4 sm:h-4' : 'relative w-2.5 h-2.5'}
-            />
-          </span>
+          />
         )}
 
         {showAllStickers && (
           <span
             style={isRainbow ? { backgroundColor: sticker.bg, color: sticker.text } : undefined}
             className={[
-              'pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-2.5 flex items-center justify-center rounded-full font-display font-bold tracking-tight shadow-sm',
+              'pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-2.5 flex items-center justify-center rounded-full font-semibold ring-1 ring-black/10',
               isLargeKey
-                ? 'w-9 h-9 sm:w-11 sm:h-11 text-sm sm:text-base'
+                ? 'w-8 h-8 sm:w-9 sm:h-9 text-xs sm:text-sm'
                 : 'w-5 h-5 sm:w-6 sm:h-6 text-[10px] sm:text-[11px]',
               isRainbow
-                ? 'ring-2 ring-white/90'
-                : 'bg-stone-200/90 text-stone-700 border border-stone-300/80',
+                ? ''
+                : 'bg-[#efe9df] text-[#1f1b16]',
             ].join(' ')}
           >
             {sticker.shortLabel}
@@ -411,8 +383,8 @@ export function PianoKeyboard({
           <span
             style={isRainbow ? { backgroundColor: sticker.bg, color: sticker.text } : undefined}
             className={[
-              'pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-1.5 px-1 py-0.5 rounded-full text-[9px] font-bold leading-none tracking-tight shadow-sm',
-              isRainbow ? '' : 'bg-stone-200/90 text-stone-600',
+              'pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-2 px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none ring-1 ring-black/10',
+              isRainbow ? '' : 'bg-[#efe9df] text-[#5e554a]',
             ].join(' ')}
           >
             C
@@ -420,7 +392,7 @@ export function PianoKeyboard({
         )}
 
         {showCompactCLabel && (
-          <span className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[10px] font-semibold tracking-tight text-stone-500">
+          <span className="pointer-events-none absolute inset-x-0 bottom-2 text-center font-mono text-[10px] font-medium text-[#7b7266]">
             {key.label}
           </span>
         )}
@@ -453,10 +425,10 @@ export function PianoKeyboard({
         data-user-pressed={isPressed ? 'true' : 'false'}
         style={keyStyle}
         className={[
-          'group absolute top-0 h-[61%] z-10 select-none cursor-pointer rounded-b-lg transition-transform duration-75',
-          'border-x border-b border-black/90',
-          'bg-gradient-to-b from-stone-800 via-stone-900 to-black',
-          'shadow-[0_4px_6px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.22),inset_0_-4px_2px_rgba(255,255,255,0.08)]',
+          'group absolute top-0 h-[61%] z-10 select-none cursor-pointer rounded-b-[6px] transition-transform duration-75',
+          'border-x border-b border-[#12110f]',
+          'bg-gradient-to-b from-[#2c2824] via-[#211e1b] to-[#171512]',
+          'shadow-[0_3px_5px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]',
           'data-[user-pressed=true]:translate-y-[2px]',
           'data-[playback=R]:translate-y-[2px]',
           'data-[playback=L]:translate-y-[2px]',
@@ -468,54 +440,33 @@ export function PianoKeyboard({
                 .filter(Boolean)
                 .join(' ')
             : [
-                'data-[user-pressed=true]:bg-gradient-to-b data-[user-pressed=true]:from-emerald-500 data-[user-pressed=true]:via-emerald-700 data-[user-pressed=true]:to-emerald-950',
-                'data-[user-pressed=true]:shadow-[0_1px_2px_rgba(0,0,0,0.6),inset_0_2px_6px_rgba(16,185,129,0.55)]',
-                'data-[playback=R]:bg-gradient-to-b data-[playback=R]:from-amber-400 data-[playback=R]:via-amber-600 data-[playback=R]:to-amber-950',
-                'data-[playback=R]:shadow-[0_1px_2px_rgba(0,0,0,0.6),inset_0_2px_6px_rgba(245,158,11,0.55)]',
-                'data-[playback=L]:bg-gradient-to-b data-[playback=L]:from-sky-400 data-[playback=L]:via-sky-600 data-[playback=L]:to-sky-950',
-                'data-[playback=L]:shadow-[0_1px_2px_rgba(0,0,0,0.6),inset_0_2px_6px_rgba(56,189,248,0.55)]',
+                'data-[user-pressed=true]:bg-gradient-to-b data-[user-pressed=true]:from-[#22c55e] data-[user-pressed=true]:to-[#15803d]',
+                'data-[playback=R]:bg-gradient-to-b data-[playback=R]:from-[#f59e0b] data-[playback=R]:to-[#b45309]',
+                'data-[playback=L]:bg-gradient-to-b data-[playback=L]:from-[#38bdf8] data-[playback=L]:to-[#0369a1]',
               ].join(' '),
         ].join(' ')}
       >
-        <div className="pointer-events-none absolute inset-x-[18%] top-1 h-[55%] rounded-b-sm bg-gradient-to-b from-white/15 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-[18%] top-1 h-[55%] rounded-b-[4px] bg-gradient-to-b from-white/10 to-transparent" />
         {expectedHand && (
           <span
-            style={
-              isRainbow
-                ? {
-                    backgroundColor: rainbow.stickerBg,
-                    boxShadow: `0 0 10px ${rainbow.glow}, 0 0 0 3px ${rainbow.top}66`,
-                  }
-                : undefined
-            }
+            style={isRainbow ? { backgroundColor: rainbow.stickerBg } : undefined}
             className={[
-              'pointer-events-none absolute left-1/2 -translate-x-1/2 flex items-center justify-center w-4 h-4 rounded-full animate-bounce',
+              'pointer-events-none absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full ring-2 ring-white',
               showBlackSticker ? 'bottom-7' : 'bottom-3',
               isRainbow
-                ? 'ring-2 ring-white/90'
+                ? ''
                 : expectedHand === 'R'
-                  ? 'bg-amber-400 ring-2 ring-amber-300/50 shadow-[0_0_10px_rgba(245,158,11,0.9)]'
-                  : 'bg-sky-400 ring-2 ring-sky-300/50 shadow-[0_0_10px_rgba(56,189,248,0.9)]',
+                  ? 'bg-[#d97706]'
+                  : 'bg-[#0284c7]',
             ].join(' ')}
-          >
-            <span
-              style={isRainbow ? { backgroundColor: rainbow.top } : undefined}
-              className={[
-                'absolute inset-0 rounded-full animate-ping opacity-60',
-                !isRainbow && (expectedHand === 'R' ? 'bg-amber-400' : 'bg-sky-400'),
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            />
-            <BeaconStarIcon className="relative w-2.5 h-2.5" />
-          </span>
+          />
         )}
         {showBlackSticker && (
           <span
             style={isRainbow ? { backgroundColor: sticker.bg, color: sticker.text } : undefined}
             className={[
-              'pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-1.5 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold leading-none tracking-tight',
-              isRainbow ? 'ring-1 ring-white/30' : 'bg-stone-700/90 text-stone-100',
+              'pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-1.5 px-1 py-0.5 rounded-[4px] text-[9px] font-semibold leading-none ring-1 ring-black/20',
+              isRainbow ? '' : 'bg-[#262421] text-[#efe9de]',
             ].join(' ')}
           >
             {sticker.shortLabel}
@@ -529,27 +480,38 @@ export function PianoKeyboard({
     <div
       className={[
         'w-full flex flex-col overflow-hidden select-none',
-        flushTop ? 'rounded-b-xl border-x border-b' : 'rounded-b-xl border',
-        darkMode ? 'border-stone-800 bg-stone-950' : 'border-stone-300 bg-stone-900',
+        flushTop ? '' : 'rounded-[16px] border',
+        !flushTop && (darkMode ? 'border-[#efe9de]/[0.08] bg-[#1c1a18]' : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7]'),
       ].join(' ')}
     >
       {!flushTop && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-gradient-to-b from-stone-900 via-stone-950 to-black border-b border-stone-800 text-stone-200">
+        <div
+          className={[
+            'flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b text-xs',
+            darkMode
+              ? 'bg-[#1c1a18] border-[#efe9de]/[0.08] text-[#efe9de]'
+              : 'bg-[#fdfbf7] border-[#1f1b16]/[0.08] text-[#1f1b16]',
+          ].join(' ')}
+        >
           <div className="flex items-center gap-3 min-w-0">
             {isRainbow ? (
-              <div className="flex items-center gap-1" title="ChromaNotes Rainbow Colors">
-                {RAINBOW_DOT_CLASSES.map((cls) => (
-                  <span key={cls} className={`w-2 h-2 rounded-full ${cls}`} />
+              <div className="flex items-center gap-1" title="ChromaNotes colors">
+                {RAINBOW_DOT_COLORS.map((hex) => (
+                  <span
+                    key={hex}
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: hex }}
+                  />
                 ))}
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wide">
-                <span className="inline-flex items-center gap-1 text-amber-300">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]" />
+              <div className="flex items-center gap-2.5 text-xs font-medium">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#d97706]" />
                   R
                 </span>
-                <span className="inline-flex items-center gap-1 text-sky-300">
-                  <span className="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#0284c7]" />
                   L
                 </span>
               </div>
@@ -560,10 +522,10 @@ export function PianoKeyboard({
               data-user-sustain={userSustainDown ? 'true' : 'false'}
               data-playback-sustain="false"
               className={[
-                'px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors',
-                'border-stone-700 bg-stone-900/90 text-stone-400',
-                'data-[user-sustain=true]:border-amber-400/70 data-[user-sustain=true]:bg-amber-500/20 data-[user-sustain=true]:text-amber-200 data-[user-sustain=true]:shadow-[0_0_10px_rgba(245,158,11,0.35)]',
-                'data-[playback-sustain=true]:border-amber-400/70 data-[playback-sustain=true]:bg-amber-500/20 data-[playback-sustain=true]:text-amber-200 data-[playback-sustain=true]:shadow-[0_0_10px_rgba(245,158,11,0.35)]',
+                'px-2 py-0.5 rounded-[6px] text-[11px] font-medium border transition-colors duration-150',
+                darkMode
+                  ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#8a847a] data-[user-sustain=true]:border-[#e07047]/60 data-[user-sustain=true]:text-[#e07047] data-[playback-sustain=true]:border-[#e07047]/60 data-[playback-sustain=true]:text-[#e07047]'
+                  : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#7b7266] data-[user-sustain=true]:border-[#c85a32]/50 data-[user-sustain=true]:text-[#c85a32] data-[playback-sustain=true]:border-[#c85a32]/50 data-[playback-sustain=true]:text-[#c85a32]',
               ].join(' ')}
             >
               Sustain
@@ -571,22 +533,26 @@ export function PianoKeyboard({
 
             <div
               className={[
-                'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border truncate',
-                soundBadge.tone === 'ready'
-                  ? 'border-emerald-700/60 bg-emerald-950/60 text-emerald-300'
-                  : soundBadge.tone === 'loading'
-                    ? 'border-amber-700/60 bg-amber-950/60 text-amber-200'
-                    : 'border-stone-700 bg-stone-900 text-stone-300',
+                'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[6px] text-[11px] font-medium border truncate',
+                darkMode
+                  ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#aaa398]'
+                  : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#5e554a]',
               ].join(' ')}
             >
               <span
                 className={[
                   'w-1.5 h-1.5 rounded-full shrink-0',
                   soundBadge.tone === 'ready'
-                    ? 'bg-emerald-400'
+                    ? darkMode
+                      ? 'bg-[#4cc38a]'
+                      : 'bg-[#16a34a]'
                     : soundBadge.tone === 'loading'
-                      ? 'bg-amber-400 animate-pulse'
-                      : 'bg-stone-500',
+                      ? darkMode
+                        ? 'bg-[#e07047]'
+                        : 'bg-[#c85a32]'
+                      : darkMode
+                        ? 'bg-[#8a847a]'
+                        : 'bg-[#7b7266]',
                 ].join(' ')}
               />
               <span className="truncate">{soundBadge.text}</span>
@@ -594,14 +560,19 @@ export function PianoKeyboard({
           </div>
 
           {!hideControls && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               {showOctaveButtons && (
-                <div className="flex items-center gap-1 mr-1">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     disabled={octaveShift <= -2}
                     onClick={() => onOctaveShift(-1)}
-                    className="px-2 py-0.5 rounded text-[11px] font-semibold bg-stone-800 hover:bg-stone-700 disabled:opacity-40 disabled:pointer-events-none text-stone-200 border border-stone-700"
+                    className={[
+                      'px-2 py-0.5 rounded-[6px] font-mono text-[11px] font-medium border transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none',
+                      darkMode
+                        ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#efe9de] hover:bg-[#2f2c28]'
+                        : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#1f1b16] hover:bg-[#e5dfd4]',
+                    ].join(' ')}
                   >
                     -8va
                   </button>
@@ -609,14 +580,24 @@ export function PianoKeyboard({
                     type="button"
                     disabled={octaveShift >= 3}
                     onClick={() => onOctaveShift(1)}
-                    className="px-2 py-0.5 rounded text-[11px] font-semibold bg-stone-800 hover:bg-stone-700 disabled:opacity-40 disabled:pointer-events-none text-stone-200 border border-stone-700"
+                    className={[
+                      'px-2 py-0.5 rounded-[6px] font-mono text-[11px] font-medium border transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none',
+                      darkMode
+                        ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#efe9de] hover:bg-[#2f2c28]'
+                        : 'border-[#1f1b16]/[0.08] bg-[#efe9df] text-[#1f1b16] hover:bg-[#e5dfd4]',
+                    ].join(' ')}
                   >
                     +8va
                   </button>
                 </div>
               )}
 
-              <div className="inline-flex items-center rounded-lg bg-stone-900 p-0.5 border border-stone-800">
+              <div
+                className={[
+                  'inline-flex items-center rounded-[8px] p-0.5',
+                  darkMode ? 'bg-[#262421]' : 'bg-[#efe9df]',
+                ].join(' ')}
+              >
                 {RANGE_OPTIONS.map((opt) => {
                   const active = rangeMode === opt.mode;
                   return (
@@ -625,10 +606,14 @@ export function PianoKeyboard({
                       type="button"
                       onClick={() => onRangeModeChange(opt.mode)}
                       className={[
-                        'px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors',
+                        'px-2 py-0.5 rounded-[6px] text-[11px] font-medium transition-colors duration-150',
                         active
-                          ? 'bg-amber-500 text-stone-950 shadow-sm'
-                          : 'text-stone-400 hover:text-stone-200',
+                          ? darkMode
+                            ? 'bg-[#1c1a18] text-[#efe9de]'
+                            : 'bg-[#fdfbf7] text-[#1f1b16]'
+                          : darkMode
+                            ? 'text-[#aaa398] hover:text-[#efe9de]'
+                            : 'text-[#5e554a] hover:text-[#1f1b16]',
                       ].join(' ')}
                     >
                       {opt.label}
@@ -644,9 +629,9 @@ export function PianoKeyboard({
       <div className="relative w-full">
         <div
           className={
-            !darkMode && isRainbow
-              ? 'h-[6px] w-full bg-gradient-to-r from-rose-300 via-amber-300 via-emerald-300 via-sky-300 to-purple-300 shadow-[0_2px_4px_rgba(0,0,0,0.12)]'
-              : 'h-[4px] w-full bg-gradient-to-b from-red-950 via-red-800 to-red-950 shadow-[0_2px_4px_rgba(0,0,0,0.6)]'
+            darkMode
+              ? 'h-[4px] w-full bg-[#2b201c]'
+              : 'h-[4px] w-full bg-[#3d2b24]'
           }
         />
 
@@ -656,7 +641,7 @@ export function PianoKeyboard({
           onPointerUp={handlePointerUpOrCancel}
           onPointerCancel={handlePointerUpOrCancel}
           onLostPointerCapture={handlePointerUpOrCancel}
-          className="kid-piano-keys relative w-full h-40 sm:h-48 touch-none select-none bg-stone-950 overflow-hidden"
+          className="kid-piano-keys relative w-full h-40 sm:h-48 touch-none select-none bg-[#161513] overflow-hidden"
         >
           {layout.whiteKeys.map(renderWhiteKey)}
           {layout.blackKeys.map(renderBlackKey)}
@@ -667,4 +652,3 @@ export function PianoKeyboard({
 }
 
 export default PianoKeyboard;
-

@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AudioLines,
+  CheckCircle2,
+  ChevronRight,
   FileDown,
   Headphones,
   Library,
   Loader2,
+  Maximize2,
   Mic,
   MicOff,
+  Minimize2,
   Moon,
+  Music2,
   Pause,
   Play,
   Repeat,
   RotateCcw,
-  Sparkles,
-  Star,
   Sun,
   Usb,
   Volume2,
@@ -25,7 +28,6 @@ import { attachKeyboardInput } from '../input/keyboard-adapter';
 import type { MidiInputController } from '../input/midi-adapter';
 import type { MicPitchReading, MidiAccessState, MidiDeviceInfo, NoteInput } from '../input/types';
 import { bpmAtBeat } from '../music/midi-parser';
-import { findToddlerSongSpec } from '../music/toddler-songs';
 import type { Hand, Score } from '../music/types';
 import {
   createPracticeState,
@@ -43,8 +45,7 @@ import FallingNotesCanvas from './FallingNotesCanvas';
 import GrandStaff from './GrandStaff';
 import { deriveKidPrompt } from './kid-feedback';
 import type { SavedMuseScore } from './LibraryView';
-import MascotBuddy from './MascotBuddy';
-import { type ColorMode } from './note-colors';
+import { measureAtBeat, type ColorMode } from './note-colors';
 import {
   autoOctaveShiftForPitches,
   buildPianoLayout,
@@ -109,7 +110,7 @@ const EMPTY_PRACTICE_STATE: PracticeState = {
     missesByMeasure: {},
   },
   finished: false,
-  lastFeedback: { status: 'idle', text: 'Open a score to begin.' },
+  lastFeedback: { status: 'idle', text: 'Open a score to begin' },
 };
 
 const VOICE_OPTIONS: readonly { id: InstrumentVoice; label: string }[] = [
@@ -144,8 +145,8 @@ const COLOR_MODE_OPTIONS: readonly { id: ColorMode; label: string }[] = [
 ];
 
 const GROWNUP_PRACTICE_MODES: readonly { id: PracticeMode; label: string }[] = [
-  { id: 'wait', label: 'Learn (Wait)' },
-  { id: 'tempo', label: 'Keep Time (Tempo)' },
+  { id: 'wait', label: 'Learn' },
+  { id: 'tempo', label: 'Tempo' },
   { id: 'listen', label: 'Listen' },
 ];
 
@@ -165,7 +166,6 @@ export default function PracticeStudio({
   darkMode,
   onToggleDarkMode,
   showSettings: controlledShowSettings,
-  onToggleSettings,
   onCloseSettings,
   midiController,
   midiState,
@@ -746,8 +746,12 @@ export default function PracticeStudio({
   const avgOffsetMs = getAverageOffsetMs(practiceState.stats);
   const hardestMeasure = getHardestMeasure(practiceState.stats);
   const totalMeasures = score ? Math.max(1, score.totalMeasures) : 1;
-  const activeToddlerSpec = findToddlerSongSpec(score?.id ?? null);
-  const songEmoji = activeToddlerSpec?.emoji ?? '🎹';
+  const currentBar = score
+    ? Math.min(
+        totalMeasures,
+        measureAtBeat(score.timeSignatures, defaultBeatsPerMeasure, practiceState.beat),
+      )
+    : 1;
 
   const unopenedSaved = useMemo(() => {
     const openIds = new Set(sessionScores.map((s) => s.id));
@@ -778,25 +782,31 @@ export default function PracticeStudio({
     schedulerRef.current?.play();
   };
 
-  const surface = darkMode
-    ? 'bg-[#1a2042]/90 border-indigo-800/70 text-amber-50'
-    : 'bg-white/95 border-amber-200/80 text-amber-950 shadow-sm';
+  const cardSurface = darkMode
+    ? 'bg-[#1c1a18] border-[#efe9de]/[0.08] text-[#efe9de]'
+    : 'bg-[#fdfbf7] border-[#1f1b16]/[0.08] text-[#1f1b16]';
   const drawerCard = darkMode
-    ? 'rounded-2xl border border-indigo-800/70 bg-[#141936]/75 p-3.5'
-    : 'rounded-2xl border border-amber-200/80 bg-[#fffbf0]/90 p-3.5';
-  const pillGroup = darkMode
-    ? 'bg-[#141936]/90 border-indigo-800/80'
-    : 'bg-amber-100/70 border-amber-200/90';
-  const pillInactive = darkMode
-    ? 'text-indigo-200/75 hover:text-amber-100'
-    : 'text-amber-800/75 hover:text-amber-950';
-  const pillActive = darkMode
-    ? 'bg-indigo-700 text-amber-200 shadow-sm'
-    : 'bg-white text-amber-950 shadow-sm';
-  const mutedText = darkMode ? 'text-indigo-200/70' : 'text-amber-800/70';
-  const subtleBtn = darkMode
-    ? 'border-indigo-700/80 bg-indigo-900/60 text-amber-100 hover:bg-indigo-800'
-    : 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100';
+    ? 'rounded-[12px] border border-[#efe9de]/[0.08] bg-[#161513] p-4'
+    : 'rounded-[12px] border border-[#1f1b16]/[0.08] bg-[#f7f4ee] p-4';
+  const segmentedTrack = darkMode ? 'bg-[#262421]' : 'bg-[#efe9df]';
+  const segmentedInactive = darkMode
+    ? 'text-[#aaa398] hover:text-[#efe9de]'
+    : 'text-[#5e554a] hover:text-[#1f1b16]';
+  const segmentedActive = darkMode
+    ? 'bg-[#1c1a18] text-[#efe9de]'
+    : 'bg-[#fdfbf7] text-[#1f1b16]';
+  const secondaryText = darkMode ? 'text-[#aaa398]' : 'text-[#5e554a]';
+  const mutedText = darkMode ? 'text-[#8a847a]' : 'text-[#7b7266]';
+  const hairlineBorder = darkMode ? 'border-[#efe9de]/[0.08]' : 'border-[#1f1b16]/[0.08]';
+  const controlBtn = darkMode
+    ? 'border-[#efe9de]/[0.08] bg-[#262421] text-[#efe9de] hover:bg-[#2f2c28]'
+    : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#1f1b16] hover:bg-[#efe9df]';
+  const accentFill = darkMode
+    ? 'bg-[#efe9de] text-[#161513] hover:bg-white'
+    : 'bg-[#c85a32] text-white hover:bg-[#b44e29]';
+  const accentText = darkMode ? 'text-[#e07047]' : 'text-[#c85a32]';
+  const accentInput = darkMode ? 'accent-[#e07047]' : 'accent-[#c85a32]';
+  const positiveText = darkMode ? 'text-[#4cc38a]' : 'text-[#16a34a]';
 
   const selectValue = score ? score.id : '';
   const songWiderThanKeys = Boolean(
@@ -835,29 +845,31 @@ export default function PracticeStudio({
   );
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-2.5">
+    <div className="mx-auto flex max-w-[1440px] flex-col gap-3">
       <div
-        className={`flex flex-wrap items-center justify-between gap-2 rounded-3xl border px-3 py-2 sm:px-4 ${surface}`}
+        className={`flex flex-wrap items-center justify-between gap-2 rounded-[16px] border p-2 ${cardSurface}`}
       >
         <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={!score}
             onClick={togglePlay}
-            className={`inline-flex shrink-0 items-center gap-2 rounded-2xl border-b-4 px-4 py-2 text-sm font-extrabold shadow-sm transition active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-[8px] px-4 text-sm font-medium transition-colors duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${
               practiceState.running
-                ? 'border-amber-600 bg-amber-400 text-amber-950 hover:bg-amber-300'
-                : 'border-emerald-700 bg-emerald-500 text-white hover:bg-emerald-400'
+                ? darkMode
+                  ? 'border border-[#efe9de]/25 bg-[#262421] text-[#efe9de] hover:bg-[#2f2c28]'
+                  : 'border border-[#c85a32]/40 bg-[#c85a32]/10 text-[#c85a32] hover:bg-[#c85a32]/15'
+                : accentFill
             }`}
           >
             {practiceState.running ? (
               <>
-                <Pause className="h-4 w-4 fill-current" />
+                <Pause className="h-4 w-4 fill-current" strokeWidth={1.5} />
                 <span>Pause</span>
               </>
             ) : (
               <>
-                <Play className="h-4 w-4 fill-current" />
+                <Play className="h-4 w-4 fill-current" strokeWidth={1.5} />
                 <span>Play</span>
               </>
             )}
@@ -869,26 +881,26 @@ export default function PracticeStudio({
             onClick={handleRestart}
             title="Start song over"
             aria-label="Restart song"
-            className={`inline-flex shrink-0 items-center justify-center rounded-2xl border border-b-4 p-2 transition active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
+            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border transition-colors duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${controlBtn}`}
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
           </button>
         </div>
 
         {kidLocked ? (
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-            <span className="truncate font-display text-sm font-bold sm:text-base">
-              {songEmoji} {score ? score.title : 'Ready to Play'}
+          <div className="flex min-w-0 flex-1 items-center justify-end pr-2">
+            <span className="truncate text-sm font-medium">
+              {score ? score.title : 'Ready to play'}
             </span>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className={`inline-flex items-center rounded-2xl border p-0.5 ${pillGroup}`}>
+            <div className={`inline-flex items-center rounded-[10px] p-1 ${segmentedTrack}`}>
               <button
                 type="button"
                 onClick={() => handleModeChange('wait')}
-                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
-                  practiceState.mode === 'wait' ? pillActive : pillInactive
+                className={`h-7 rounded-[6px] px-3 text-[13px] font-medium transition-colors duration-150 ${
+                  practiceState.mode === 'wait' ? segmentedActive : segmentedInactive
                 }`}
               >
                 Learn
@@ -896,8 +908,8 @@ export default function PracticeStudio({
               <button
                 type="button"
                 onClick={() => handleModeChange('listen')}
-                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
-                  practiceState.mode === 'listen' ? pillActive : pillInactive
+                className={`h-7 rounded-[6px] px-3 text-[13px] font-medium transition-colors duration-150 ${
+                  practiceState.mode === 'listen' ? segmentedActive : segmentedInactive
                 }`}
               >
                 Listen
@@ -906,31 +918,31 @@ export default function PracticeStudio({
                 <button
                   type="button"
                   onClick={() => handleModeChange('tempo')}
-                  className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${pillActive}`}
+                  className={`h-7 rounded-[6px] px-3 text-[13px] font-medium transition-colors duration-150 ${segmentedActive}`}
                 >
                   Tempo
                 </button>
               ) : null}
             </div>
 
-            <div className={`inline-flex items-center rounded-2xl border p-0.5 ${pillGroup}`}>
+            <div className={`inline-flex items-center rounded-[10px] p-1 ${segmentedTrack}`}>
               <button
                 type="button"
                 onClick={() => setTempoScale(0.65)}
-                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
-                  tempoScale <= 0.7 ? pillActive : pillInactive
+                className={`h-7 rounded-[6px] px-3 text-[13px] font-medium transition-colors duration-150 ${
+                  tempoScale <= 0.7 ? segmentedActive : segmentedInactive
                 }`}
               >
-                🐢 Slow
+                Slow
               </button>
               <button
                 type="button"
                 onClick={() => setTempoScale(0.85)}
-                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
-                  tempoScale > 0.7 ? pillActive : pillInactive
+                className={`h-7 rounded-[6px] px-3 text-[13px] font-medium transition-colors duration-150 ${
+                  tempoScale > 0.7 ? segmentedActive : segmentedInactive
                 }`}
               >
-                🐰 Normal
+                Normal
               </button>
             </div>
 
@@ -938,40 +950,42 @@ export default function PracticeStudio({
               <button
                 type="button"
                 onClick={() => handleManualRangeModeChange('auto')}
-                className={`inline-flex shrink-0 items-center gap-1 rounded-2xl border px-2.5 py-1 text-xs font-bold transition ${subtleBtn}`}
+                className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
               >
-                ↔ Fit Full Song
+                <Maximize2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                <span>Fit song</span>
               </button>
             ) : score && isNarrowSongFit ? (
               <button
                 type="button"
                 onClick={() => handleManualRangeModeChange('compact')}
-                className={`inline-flex shrink-0 items-center gap-1 rounded-2xl border px-2.5 py-1 text-xs font-bold transition ${subtleBtn}`}
+                className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
               >
-                🎹 Bigger Keys
+                <Minimize2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                <span>Bigger keys</span>
               </button>
             ) : null}
 
             <button
               type="button"
               onClick={onGoToLibrary}
-              title="Pick a different song"
-              className={`inline-flex max-w-[190px] items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-xs font-bold transition sm:max-w-[260px] ${subtleBtn}`}
+              title="Choose a song"
+              className={`inline-flex h-9 max-w-[200px] items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 sm:max-w-[260px] ${controlBtn}`}
             >
-              <span className="shrink-0">{songEmoji}</span>
-              <span className="truncate">{score ? score.title : 'Pick a Song'}</span>
+              <span className="truncate">{score ? score.title : 'Choose song'}</span>
+              <ChevronRight className={`h-4 w-4 shrink-0 ${mutedText}`} strokeWidth={1.5} />
             </button>
           </div>
         )}
       </div>
 
       {showSettings && !kidLocked ? (
-        <section className={`rounded-3xl border p-4 ${surface}`}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-amber-300/30 pb-2.5">
+        <section className={`rounded-[16px] border p-5 ${cardSurface}`}>
+          <div className={`mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3 ${hairlineBorder}`}>
             <div>
-              <h2 className="font-display text-lg font-bold">Grown-up Studio Settings</h2>
+              <h2 className="text-base font-semibold">Studio settings</h2>
               <p className={`text-xs ${mutedText}`}>
-                Fine-tune practice mode, keyboard size, audio, MIDI, and acoustic mic.
+                Practice mode, keyboard range, audio, MIDI, and microphone
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -979,35 +993,39 @@ export default function PracticeStudio({
                 <button
                   type="button"
                   onClick={onToggleDarkMode}
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold transition ${subtleBtn}`}
+                  className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
                 >
-                  {darkMode ? <Sun className="h-3.5 w-3.5 text-amber-300" /> : <Moon className="h-3.5 w-3.5" />}
-                  <span>{darkMode ? 'Sunny Day' : 'Cozy Night'}</span>
+                  {darkMode ? (
+                    <Sun className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                  ) : (
+                    <Moon className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                  )}
+                  <span>{darkMode ? 'Light' : 'Dark'}</span>
                 </button>
               ) : null}
               <button
                 type="button"
                 onClick={closeSettings}
                 aria-label="Close settings"
-                className={`inline-flex items-center justify-center rounded-xl border p-1.5 transition ${subtleBtn}`}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-[8px] border transition-colors duration-150 ${controlBtn}`}
               >
-                <X className="h-4 w-4" />
+                <X className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
-            <div className={`space-y-3 ${drawerCard}`}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className={`space-y-4 ${drawerCard}`}>
               <div>
-                <div className="mb-1.5 text-xs font-bold">Practice Mode</div>
-                <div className={`inline-flex flex-wrap items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                <div className="mb-1.5 text-xs font-medium">Practice mode</div>
+                <div className={`inline-flex flex-wrap items-center rounded-[10px] p-1 ${segmentedTrack}`}>
                   {GROWNUP_PRACTICE_MODES.map((m) => (
                     <button
                       key={m.id}
                       type="button"
                       onClick={() => handleModeChange(m.id)}
-                      className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
-                        practiceState.mode === m.id ? pillActive : pillInactive
+                      className={`h-7 rounded-[6px] px-2.5 text-xs font-medium transition-colors duration-150 ${
+                        practiceState.mode === m.id ? segmentedActive : segmentedInactive
                       }`}
                     >
                       {m.label}
@@ -1017,15 +1035,15 @@ export default function PracticeStudio({
               </div>
 
               <div>
-                <div className="mb-1.5 text-xs font-bold">View</div>
-                <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                <div className="mb-1.5 text-xs font-medium">View</div>
+                <div className={`inline-flex items-center rounded-[10px] p-1 ${segmentedTrack}`}>
                   {LAYOUT_OPTIONS.map((opt) => (
                     <button
                       key={opt.id}
                       type="button"
                       onClick={() => setViewLayout(opt.id)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                        viewLayout === opt.id ? pillActive : pillInactive
+                      className={`h-7 rounded-[6px] px-2.5 text-xs font-medium transition-colors duration-150 ${
+                        viewLayout === opt.id ? segmentedActive : segmentedInactive
                       }`}
                     >
                       {opt.label}
@@ -1035,15 +1053,15 @@ export default function PracticeStudio({
               </div>
 
               <div>
-                <div className="mb-1.5 flex items-center justify-between text-xs font-bold">
-                  <span>Key Size</span>
+                <div className="mb-1.5 flex items-center justify-between text-xs font-medium">
+                  <span>Key size</span>
                   {(rangeMode === 'kid' || rangeMode === 'compact') && (
                     <div className="inline-flex items-center gap-1">
                       <button
                         type="button"
                         disabled={octaveShift <= -2}
                         onClick={() => shiftOctave(-1)}
-                        className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold disabled:opacity-40 ${subtleBtn}`}
+                        className={`rounded-[6px] border px-2 py-0.5 font-mono text-[11px] font-medium disabled:opacity-40 ${controlBtn}`}
                       >
                         -8va
                       </button>
@@ -1051,21 +1069,21 @@ export default function PracticeStudio({
                         type="button"
                         disabled={octaveShift >= 2}
                         onClick={() => shiftOctave(1)}
-                        className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold disabled:opacity-40 ${subtleBtn}`}
+                        className={`rounded-[6px] border px-2 py-0.5 font-mono text-[11px] font-medium disabled:opacity-40 ${controlBtn}`}
                       >
                         +8va
                       </button>
                     </div>
                   )}
                 </div>
-                <div className={`inline-flex flex-wrap items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                <div className={`inline-flex flex-wrap items-center rounded-[10px] p-1 ${segmentedTrack}`}>
                   {KEY_SIZE_OPTIONS.map((opt) => (
                     <button
                       key={opt.mode}
                       type="button"
                       onClick={() => handleManualRangeModeChange(opt.mode)}
-                      className={`rounded-lg px-2 py-1 text-xs font-bold transition ${
-                        rangeMode === opt.mode ? pillActive : pillInactive
+                      className={`h-7 rounded-[6px] px-2.5 text-xs font-medium transition-colors duration-150 ${
+                        rangeMode === opt.mode ? segmentedActive : segmentedInactive
                       }`}
                     >
                       {opt.label}
@@ -1074,17 +1092,17 @@ export default function PracticeStudio({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="mb-1 text-xs font-bold">Hand Focus</div>
-                  <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                  <div className="mb-1.5 text-xs font-medium">Hand focus</div>
+                  <div className={`inline-flex items-center rounded-[10px] p-1 ${segmentedTrack}`}>
                     {HAND_OPTIONS.map((h) => (
                       <button
                         key={h.id}
                         type="button"
                         onClick={() => handleHandChange(h.id)}
-                        className={`rounded-lg px-2 py-1 text-xs font-bold transition ${
-                          practiceState.handFilter === h.id ? pillActive : pillInactive
+                        className={`h-7 rounded-[6px] px-2.5 text-xs font-medium transition-colors duration-150 ${
+                          practiceState.handFilter === h.id ? segmentedActive : segmentedInactive
                         }`}
                       >
                         {h.label}
@@ -1094,15 +1112,15 @@ export default function PracticeStudio({
                 </div>
 
                 <div>
-                  <div className="mb-1 text-xs font-bold">Colors</div>
-                  <div className={`inline-flex items-center rounded-xl border p-0.5 ${pillGroup}`}>
+                  <div className="mb-1.5 text-xs font-medium">Note colors</div>
+                  <div className={`inline-flex items-center rounded-[10px] p-1 ${segmentedTrack}`}>
                     {COLOR_MODE_OPTIONS.map((opt) => (
                       <button
                         key={opt.id}
                         type="button"
                         onClick={() => setColorMode(opt.id)}
-                        className={`rounded-lg px-2 py-1 text-xs font-bold transition ${
-                          colorMode === opt.id ? pillActive : pillInactive
+                        className={`h-7 rounded-[6px] px-2.5 text-xs font-medium transition-colors duration-150 ${
+                          colorMode === opt.id ? segmentedActive : segmentedInactive
                         }`}
                       >
                         {opt.label}
@@ -1114,20 +1132,20 @@ export default function PracticeStudio({
 
               {(sessionScores.length > 0 || unopenedSaved.length > 0) && (
                 <div>
-                  <div className="mb-1 text-xs font-bold">Switch Grown-up Score</div>
+                  <div className="mb-1.5 text-xs font-medium">Switch score</div>
                   <select
                     aria-label="Open score"
                     value={selectValue}
                     disabled={scoreBusy}
                     onChange={(e) => handleScoreDropdown(e.target.value)}
-                    className={`w-full truncate rounded-xl border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${
+                    className={`h-9 w-full truncate rounded-[8px] border px-2.5 text-xs font-medium focus:outline-none ${
                       darkMode
-                        ? 'border-indigo-800 bg-[#1a2042] text-amber-50'
-                        : 'border-amber-200 bg-white text-amber-950'
+                        ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#efe9de]'
+                        : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#1f1b16]'
                     }`}
                   >
                     {!score || score.id.startsWith('toddler:') ? (
-                      <option value="">Choose uploaded or saved score…</option>
+                      <option value="">Choose uploaded or saved score</option>
                     ) : null}
                     {sessionScores.length > 0 ? (
                       <optgroup label="Opened">
@@ -1139,7 +1157,7 @@ export default function PracticeStudio({
                       </optgroup>
                     ) : null}
                     {unopenedSaved.length > 0 ? (
-                      <optgroup label="Saved Library">
+                      <optgroup label="Saved library">
                         {unopenedSaved.map((row) => (
                           <option key={row.scoreId} value={`saved:${row.scoreId}`}>
                             {row.title}
@@ -1152,11 +1170,15 @@ export default function PracticeStudio({
               )}
             </div>
 
-            <div className={`space-y-3 ${drawerCard}`}>
+            <div className={`space-y-4 ${drawerCard}`}>
               <div>
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span>Tempo Speed ({effectiveBpm} BPM)</span>
-                  <span className="font-mono text-amber-500">{Math.round(tempoScale * 100)}%</span>
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span>
+                    Tempo (<span className="font-mono tabular-nums">{effectiveBpm}</span> BPM)
+                  </span>
+                  <span className={`font-mono tabular-nums ${accentText}`}>
+                    {Math.round(tempoScale * 100)}%
+                  </span>
                 </div>
                 <input
                   type="range"
@@ -1165,14 +1187,16 @@ export default function PracticeStudio({
                   step={0.05}
                   value={tempoScale}
                   onChange={(e) => setTempoScale(Number(e.target.value))}
-                  className="mt-1.5 w-full accent-amber-500"
+                  className={`mt-2 w-full ${accentInput}`}
                 />
-                <div className={`mt-1 flex items-center justify-between text-[11px] ${mutedText}`}>
+                <div className={`mt-1 flex items-center justify-between font-mono text-[11px] tabular-nums ${mutedText}`}>
                   <span>40%</span>
                   <button
                     type="button"
                     onClick={() => setTempoScale(1)}
-                    className="font-semibold hover:text-amber-500"
+                    className={`font-sans text-[11px] font-medium transition-colors duration-150 ${
+                      darkMode ? 'hover:text-[#efe9de]' : 'hover:text-[#1f1b16]'
+                    }`}
                   >
                     Reset 100%
                   </button>
@@ -1181,42 +1205,42 @@ export default function PracticeStudio({
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold">Metronome Click</span>
+                <span className="text-xs font-medium">Metronome click</span>
                 <input
                   type="checkbox"
                   checked={metronomeOn}
                   onChange={(e) => setMetronomeOn(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
+                  className={`h-4 w-4 ${accentInput}`}
                 />
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold">Guide Piano</div>
+                  <div className="text-xs font-medium">Guide piano</div>
                   <div className={`text-[11px] ${mutedText}`}>Plays reference notes in Tempo mode</div>
                 </div>
                 <input
                   type="checkbox"
                   checked={guideSoundOn}
                   onChange={(e) => setGuideSoundOn(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
+                  className={`h-4 w-4 ${accentInput}`}
                 />
               </div>
 
               <div>
-                <div className="text-xs font-bold">Piano Voice</div>
-                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                <div className="text-xs font-medium">Audio</div>
+                <div className="mt-2 grid grid-cols-3 gap-2">
                   {VOICE_OPTIONS.map((opt) => (
                     <button
                       key={opt.id}
                       type="button"
                       onClick={() => setVoice(opt.id)}
-                      className={`rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${
+                      className={`h-8 rounded-[8px] border px-2 text-[11px] font-medium transition-colors duration-150 ${
                         voice === opt.id
                           ? darkMode
-                            ? 'border-amber-400 bg-amber-400/20 text-amber-200'
-                            : 'border-amber-500 bg-amber-400/20 text-amber-900'
-                          : subtleBtn
+                            ? 'border-[#e07047]/60 bg-[#262421] text-[#efe9de]'
+                            : 'border-[#c85a32]/50 bg-[#fdfbf7] text-[#c85a32]'
+                          : controlBtn
                       }`}
                     >
                       {opt.label}
@@ -1226,12 +1250,12 @@ export default function PracticeStudio({
               </div>
 
               <div>
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Volume2 className="h-3.5 w-3.5 text-amber-500" />
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="inline-flex items-center gap-2">
+                    <Volume2 className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
                     Volume
                   </span>
-                  <span className="font-mono text-[11px]">{Math.round(volume * 100)}%</span>
+                  <span className="font-mono text-xs tabular-nums">{Math.round(volume * 100)}%</span>
                 </div>
                 <input
                   type="range"
@@ -1240,15 +1264,15 @@ export default function PracticeStudio({
                   step={0.02}
                   value={volume}
                   onChange={(e) => setVolume(Number(e.target.value))}
-                  className="mt-1 w-full accent-amber-500"
+                  className={`mt-2 w-full ${accentInput}`}
                 />
               </div>
 
-              <div className="space-y-2 border-t border-amber-300/30 pt-2.5">
+              <div className={`space-y-2 border-t pt-3 ${hairlineBorder}`}>
                 <div className="flex items-center justify-between">
-                  <label className="inline-flex items-center gap-1.5 text-xs font-bold">
-                    <Repeat className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Measure Loop</span>
+                  <label className="inline-flex items-center gap-2 text-xs font-medium">
+                    <Repeat className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                    <span>Measure loop</span>
                   </label>
                   <input
                     type="checkbox"
@@ -1260,7 +1284,7 @@ export default function PracticeStudio({
                         loop: { enabled: e.target.checked },
                       })
                     }
-                    className="h-4 w-4 accent-amber-500"
+                    className={`h-4 w-4 ${accentInput}`}
                   />
                 </div>
                 <div className="flex items-center gap-2 text-xs">
@@ -1277,10 +1301,10 @@ export default function PracticeStudio({
                         loop: { startMeasure: Number(e.target.value) || 1 },
                       })
                     }
-                    className={`w-16 rounded-lg border px-2 py-1 font-mono text-xs ${
+                    className={`h-8 w-16 rounded-[8px] border px-2 font-mono text-xs tabular-nums ${
                       darkMode
-                        ? 'border-indigo-800 bg-[#1a2042] text-amber-50'
-                        : 'border-amber-200 bg-white text-amber-950'
+                        ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#efe9de]'
+                        : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#1f1b16]'
                     }`}
                   />
                   <span className={mutedText}>to</span>
@@ -1296,25 +1320,25 @@ export default function PracticeStudio({
                         loop: { endMeasure: Number(e.target.value) || totalMeasures },
                       })
                     }
-                    className={`w-16 rounded-lg border px-2 py-1 font-mono text-xs ${
+                    className={`h-8 w-16 rounded-[8px] border px-2 font-mono text-xs tabular-nums ${
                       darkMode
-                        ? 'border-indigo-800 bg-[#1a2042] text-amber-50'
-                        : 'border-amber-200 bg-white text-amber-950'
+                        ? 'border-[#efe9de]/[0.08] bg-[#1c1a18] text-[#efe9de]'
+                        : 'border-[#1f1b16]/[0.08] bg-[#fdfbf7] text-[#1f1b16]'
                     }`}
                   />
                 </div>
               </div>
             </div>
 
-            <div className={`space-y-3 ${drawerCard}`}>
-              <div className="space-y-1">
+            <div className={`space-y-4 ${drawerCard}`}>
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <div className="inline-flex items-center gap-1.5 text-xs font-bold">
-                      <Usb className="h-3.5 w-3.5 text-amber-500" />
-                      MIDI Keyboard
+                    <div className="inline-flex items-center gap-2 text-xs font-medium">
+                      <Usb className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                      MIDI keyboard
                     </div>
-                    <div className={`text-[11px] ${mutedText}`}>
+                    <div className={`mt-0.5 text-[11px] ${mutedText}`}>
                       {midiDevices.length > 0
                         ? midiDevices.map((d) => d.name).join(', ')
                         : midiState === 'denied'
@@ -1329,10 +1353,10 @@ export default function PracticeStudio({
                   <button
                     type="button"
                     onClick={onConnectMidi}
-                    className={`rounded-lg border px-2.5 py-1 text-xs font-bold transition ${subtleBtn}`}
+                    className={`h-8 rounded-[8px] border px-3 text-xs font-medium transition-colors duration-150 ${controlBtn}`}
                   >
                     {midiState === 'ready' && midiDevices.length === 0
-                      ? 'Connect / Scan'
+                      ? 'Scan'
                       : midiState === 'ready'
                         ? 'Refresh'
                         : 'Connect'}
@@ -1340,99 +1364,109 @@ export default function PracticeStudio({
                 </div>
                 {midiDevices.length === 0 ? (
                   <p className={`text-[11px] leading-snug ${mutedText}`}>
-                    Plug in USB-MIDI or tap Connect / Scan for Bluetooth MIDI
+                    Plug in USB-MIDI or tap Scan for Bluetooth MIDI
                   </p>
                 ) : null}
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold">Mute local sound for MIDI</div>
+                  <div className="text-xs font-medium">Mute local sound for MIDI</div>
                   <div className={`text-[11px] ${mutedText}`}>
-                    Use digital piano speakers without double audio
+                    Avoid double audio with piano speakers
                   </div>
                 </div>
                 <input
                   type="checkbox"
                   checked={muteLocalForMidi}
                   onChange={(e) => setMuteLocalForMidi(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
+                  className={`h-4 w-4 ${accentInput}`}
                 />
               </div>
 
-              <div className="space-y-2 border-t border-amber-300/30 pt-2.5">
+              <div className={`space-y-2.5 border-t pt-3 ${hairlineBorder}`}>
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <div className="inline-flex items-center gap-1.5 text-xs font-bold">
-                      <AudioLines className="h-3.5 w-3.5 text-amber-500" />
-                      Acoustic Mic
+                    <div className="inline-flex items-center gap-2 text-xs font-medium">
+                      <AudioLines className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                      Acoustic microphone
                     </div>
-                    <div className="font-mono text-[11px] text-amber-500">
+                    <div className={`mt-0.5 font-mono text-[11px] tabular-nums ${mutedText}`}>
                       {micActive
                         ? micPitch
                           ? `${micPitch.name} · ${micPitch.centsOff >= 0 ? '+' : ''}${micPitch.centsOff}¢`
                           : audioStatus.playbackSounding && !headphonesMode
-                            ? 'Paused during speaker playback'
-                            : 'Listening…'
+                            ? 'Paused during playback'
+                            : 'Listening'
                         : 'Off'}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={onToggleMic}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-xs font-medium transition-colors duration-150 ${
                       micActive
-                        ? 'bg-rose-600 text-white hover:bg-rose-500'
-                        : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                        ? darkMode
+                          ? 'bg-[#e5484d] text-white hover:bg-[#dc2626]'
+                          : 'bg-[#dc2626] text-white hover:bg-[#b91c1c]'
+                        : accentFill
                     }`}
                   >
-                    {micActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                    {micActive ? 'Stop Mic' : 'Enable Mic'}
+                    {micActive ? (
+                      <Mic className="h-4 w-4" strokeWidth={1.5} />
+                    ) : (
+                      <MicOff className="h-4 w-4" strokeWidth={1.5} />
+                    )}
+                    {micActive ? 'Stop' : 'Enable'}
                   </button>
                 </div>
 
                 <div>
                   <div className={`mb-1 flex items-center justify-between text-[11px] ${mutedText}`}>
-                    <span>Mic Level</span>
-                    <span className="font-mono">{Math.round(micLevel * 100)}%</span>
+                    <span>Input level</span>
+                    <span className="font-mono tabular-nums">{Math.round(micLevel * 100)}%</span>
                   </div>
                   <div
-                    className={`h-1.5 w-full overflow-hidden rounded-full ${
-                      darkMode ? 'bg-indigo-950' : 'bg-amber-100'
-                    }`}
+                    className={`h-1.5 w-full overflow-hidden rounded-full ${segmentedTrack}`}
                   >
                     <div
-                      className="h-full rounded-full bg-emerald-400 transition-[width] duration-75"
+                      className={`h-full rounded-full transition-[width] duration-75 ${
+                        darkMode ? 'bg-[#4cc38a]' : 'bg-[#16a34a]'
+                      }`}
                       style={{ width: `${Math.round(micLevel * 100)}%` }}
                     />
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <label className="inline-flex items-center gap-1.5 text-xs font-bold">
-                    <Headphones className="h-3.5 w-3.5 text-amber-500" />
-                    Using Headphones
+                  <label className="inline-flex items-center gap-2 text-xs font-medium">
+                    <Headphones className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                    Using headphones
                   </label>
                   <input
                     type="checkbox"
                     checked={headphonesMode}
                     onChange={(e) => setHeadphonesMode(e.target.checked)}
-                    className="h-4 w-4 accent-amber-500"
+                    className={`h-4 w-4 ${accentInput}`}
                   />
                 </div>
 
-                {micError ? <p className="text-[11px] font-medium text-rose-500">{micError}</p> : null}
+                {micError ? (
+                  <p className={`text-[11px] font-medium ${darkMode ? 'text-[#e5484d]' : 'text-[#dc2626]'}`}>
+                    {micError}
+                  </p>
+                ) : null}
               </div>
 
-              <div className="border-t border-amber-300/30 pt-2.5">
+              <div className={`border-t pt-3 ${hairlineBorder}`}>
                 <button
                   type="button"
                   disabled={!score}
                   onClick={() => score && onExportPdf(score)}
-                  className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${subtleBtn}`}
+                  className={`inline-flex h-9 w-full items-center justify-center gap-2 rounded-[8px] border px-3 text-xs font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${controlBtn}`}
                 >
-                  <FileDown className="h-3.5 w-3.5" />
-                  <span>Export Sheet Music PDF</span>
+                  <FileDown className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                  <span>Export sheet music PDF</span>
                 </button>
               </div>
             </div>
@@ -1441,91 +1475,86 @@ export default function PracticeStudio({
       ) : null}
 
       {score ? (
-        <div className={`rounded-3xl border px-3.5 py-2.5 sm:px-4 ${surface}`}>
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <MascotBuddy mood={kidPrompt.mood} size="sm" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-display text-base font-bold leading-tight sm:text-lg">
-                    {kidPrompt.headline}
-                  </span>
-                  {kidPrompt.targetNote ? (
-                    <span
-                      style={{
-                        backgroundColor: kidPrompt.targetNote.bg,
-                        color: kidPrompt.targetNote.text,
-                      }}
-                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold shadow-sm ring-2 ring-white/80"
-                    >
-                      {kidPrompt.targetNote.colorName} {kidPrompt.targetNote.letter}
-                    </span>
-                  ) : null}
-                  {kidPrompt.cheerBadge ? (
-                    <span
-                      key={`${kidPrompt.starsEarned}-${kidPrompt.cheerBadge}`}
-                      className="animate-kid-pop inline-flex items-center rounded-full bg-gradient-to-r from-amber-300 to-rose-300 px-2.5 py-0.5 text-xs font-extrabold text-amber-950 shadow-sm"
-                    >
-                      {kidPrompt.cheerBadge}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-[12px] border px-4 py-3 ${cardSurface}`}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {kidPrompt.targetNote && !practiceState.finished && practiceState.mode !== 'listen' ? (
+              <span
+                style={{
+                  backgroundColor: kidPrompt.targetNote.bg,
+                  color: kidPrompt.targetNote.text,
+                }}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ring-1 ring-black/10"
+              >
+                {kidPrompt.targetNote.letter}
+              </span>
+            ) : practiceState.finished ? (
+              <CheckCircle2 className={`h-4 w-4 shrink-0 ${positiveText}`} strokeWidth={1.5} />
+            ) : (
+              <Music2 className={`h-4 w-4 shrink-0 ${secondaryText}`} strokeWidth={1.5} />
+            )}
 
-            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-100/90 px-3 py-1 text-xs font-extrabold text-amber-900 shadow-sm">
-              <span>⭐ {kidPrompt.starsEarned}</span>
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-sm font-medium">{kidPrompt.headline}</span>
+              {kidPrompt.cheerBadge ? (
+                <span className={`text-[13px] font-medium ${positiveText}`}>
+                  {kidPrompt.cheerBadge}
+                </span>
+              ) : null}
             </div>
           </div>
 
-          <div
-            aria-label="Song progress"
-            className={`mt-2 h-2.5 w-full overflow-hidden rounded-full ${
-              darkMode ? 'bg-indigo-950/90' : 'bg-amber-100'
-            }`}
-          >
+          <div className="flex shrink-0 items-center gap-3">
+            <span className={`font-mono text-xs tabular-nums ${mutedText}`}>
+              {practiceState.mode === 'listen'
+                ? `Bar ${currentBar}`
+                : `${practiceState.stats.hits} / ${Math.max(1, practiceState.chords.length)}`}
+            </span>
             <div
-              className="h-full rounded-full bg-gradient-to-r from-rose-400 via-amber-400 via-emerald-400 via-sky-400 to-purple-400 transition-[width] duration-300"
-              style={{ width: `${Math.round(kidPrompt.progressRatio * 100)}%` }}
-            />
+              aria-label="Song progress"
+              className={`h-1 w-24 overflow-hidden rounded-full sm:w-32 ${segmentedTrack}`}
+            >
+              <div
+                className={`h-full rounded-full transition-[width] duration-150 ${
+                  darkMode ? 'bg-[#e07047]' : 'bg-[#c85a32]'
+                }`}
+                style={{ width: `${Math.round(kidPrompt.progressRatio * 100)}%` }}
+              />
+            </div>
           </div>
         </div>
       ) : null}
 
       {score && practiceState.finished ? (
         <div
-          className={`flex flex-col items-center justify-between gap-4 rounded-3xl border-2 p-5 sm:flex-row ${
-            darkMode
-              ? 'border-amber-400/50 bg-[#1d244c] text-amber-50'
-              : 'border-amber-300 bg-gradient-to-r from-amber-50 via-rose-50/70 to-sky-50 text-amber-950 shadow-sm'
-          }`}
+          className={`flex flex-col justify-between gap-4 rounded-[16px] border p-5 sm:flex-row sm:items-center ${cardSurface}`}
         >
-          <div className="flex items-center gap-4">
-            <MascotBuddy mood="celebrating" size="lg" />
+          <div className="flex items-start gap-3">
+            <CheckCircle2
+              className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${positiveText}`}
+              strokeWidth={1.5}
+            />
             <div>
-              <div className="mb-1 flex items-center gap-1 text-amber-400">
-                <Star className="h-5 w-5 fill-amber-400" />
-                <Star className="h-6 w-6 fill-amber-400" />
-                <Star className="h-5 w-5 fill-amber-400" />
+              <p className="text-base font-semibold">{score.title}</p>
+              <div className={`mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs tabular-nums ${mutedText}`}>
+                <span>{practiceState.stats.hits} notes played</span>
+                {!kidLocked ? (
+                  <>
+                    <span>Accuracy {totalAttempts > 0 ? `${accuracyPct}%` : '—'}</span>
+                    <span>
+                      Avg offset{' '}
+                      {practiceState.stats.offsetsMs.length > 0
+                        ? `${avgOffsetMs >= 0 ? '+' : ''}${avgOffsetMs} ms`
+                        : '—'}
+                    </span>
+                    <span>Best streak {practiceState.stats.bestStreak}</span>
+                    <span>
+                      Hardest measure {hardestMeasure !== null ? `Bar ${hardestMeasure}` : 'None'}
+                    </span>
+                  </>
+                ) : null}
               </div>
-              <p className="font-display text-2xl font-bold sm:text-3xl">
-                Hooray! You played {score.title}!
-              </p>
-              {!kidLocked ? (
-                <div className={`mt-1.5 flex flex-wrap items-center gap-3 font-mono text-xs ${mutedText}`}>
-                  <span>Accuracy: {totalAttempts > 0 ? `${accuracyPct}%` : '—'}</span>
-                  <span>
-                    Avg Offset:{' '}
-                    {practiceState.stats.offsetsMs.length > 0
-                      ? `${avgOffsetMs >= 0 ? '+' : ''}${avgOffsetMs} ms`
-                      : '—'}
-                  </span>
-                  <span>Best Streak: {practiceState.stats.bestStreak}</span>
-                  <span>
-                    Hardest Measure: {hardestMeasure !== null ? `Bar ${hardestMeasure}` : 'None'}
-                  </span>
-                </div>
-              ) : null}
             </div>
           </div>
 
@@ -1533,29 +1562,29 @@ export default function PracticeStudio({
             <button
               type="button"
               onClick={handleRestart}
-              className="inline-flex items-center gap-1.5 rounded-2xl border-b-4 border-emerald-700 bg-emerald-500 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-emerald-400 active:translate-y-[1px]"
+              className={`inline-flex h-9 items-center gap-2 rounded-[8px] px-4 text-[13px] font-medium transition-colors duration-150 active:scale-[0.98] ${accentFill}`}
             >
-              <RotateCcw className="h-4 w-4" />
-              Play Again!
+              <RotateCcw className="h-4 w-4" strokeWidth={1.5} />
+              <span>Play again</span>
             </button>
             {!kidLocked ? (
               <button
                 type="button"
                 onClick={onGoToLibrary}
-                className="inline-flex items-center gap-1.5 rounded-2xl border-b-4 border-amber-600 bg-amber-400 px-4 py-2.5 text-sm font-extrabold text-amber-950 transition hover:bg-amber-300 active:translate-y-[1px]"
+                className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
               >
-                <Library className="h-4 w-4" />
-                Pick Another Song!
+                <Library className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                <span>Choose song</span>
               </button>
             ) : null}
             {!kidLocked && hardestMeasure !== null ? (
               <button
                 type="button"
                 onClick={handleDrillHardest}
-                className={`inline-flex items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-xs font-bold transition ${subtleBtn}`}
+                className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
               >
-                <Repeat className="h-3.5 w-3.5" />
-                Drill Bar {hardestMeasure} at 75%
+                <Repeat className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                <span>Drill bar {hardestMeasure}</span>
               </button>
             ) : null}
           </div>
@@ -1564,32 +1593,32 @@ export default function PracticeStudio({
 
       {!score ? (
         <>
-          <div className={`flex flex-col items-center justify-center rounded-3xl border px-6 py-12 text-center ${surface}`}>
-            <h2 className="font-display text-3xl font-bold tracking-tight">Ready at the Bench</h2>
+          <div className={`flex flex-col items-center justify-center rounded-[16px] border px-6 py-12 text-center ${cardSurface}`}>
+            <h2 className="text-xl font-semibold">Ready at the bench</h2>
             <p className={`mt-2 max-w-md text-xs leading-relaxed ${mutedText}`}>
-              Pick a toddler starter song, open a saved score, or load the bundled sample piece.
+              Pick a starter song, open a saved score, or load the bundled sample piece
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
                 disabled={sampleLoading}
                 onClick={() => void onLoadSample()}
-                className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-4 py-2 text-xs font-bold text-amber-950 shadow-sm transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`inline-flex h-9 items-center gap-2 rounded-[8px] px-4 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${accentFill}`}
               >
                 {sampleLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
                 ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Play className="h-4 w-4" strokeWidth={1.5} />
                 )}
-                Load Sample: Merry-Go-Round of Life
+                <span>Load sample</span>
               </button>
               <button
                 type="button"
                 onClick={onGoToLibrary}
-                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-bold transition ${subtleBtn}`}
+                className={`inline-flex h-9 items-center gap-2 rounded-[8px] border px-4 text-[13px] font-medium transition-colors duration-150 ${controlBtn}`}
               >
-                <Library className="h-3.5 w-3.5" />
-                Browse Songs
+                <Library className={`h-4 w-4 ${secondaryText}`} strokeWidth={1.5} />
+                <span>Browse songs</span>
               </button>
             </div>
           </div>
@@ -1612,12 +1641,7 @@ export default function PracticeStudio({
           ) : null}
 
           {viewLayout === 'falling' || viewLayout === 'combined' ? (
-            <div
-              className={[
-                'flex flex-col overflow-hidden rounded-3xl border-2 shadow-sm',
-                darkMode ? 'border-indigo-800/80' : 'border-amber-200/90',
-              ].join(' ')}
-            >
+            <div className={`flex flex-col overflow-hidden rounded-[16px] border ${hairlineBorder}`}>
               <div
                 className={
                   viewLayout === 'combined'
