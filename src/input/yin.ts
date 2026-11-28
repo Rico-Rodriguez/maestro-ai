@@ -11,6 +11,17 @@ export type YinResult = {
   rms: number;
 };
 
+export function computeRms(buffer: Float32Array): number {
+  if (buffer.length === 0) return 0;
+  let sumSq = 0;
+  for (let i = 0; i < buffer.length; i += 1) {
+    const sample = buffer[i];
+    sumSq += sample * sample;
+  }
+  const rms = Math.sqrt(sumSq / buffer.length);
+  return Number.isFinite(rms) ? rms : 0;
+}
+
 export function detectPitchYin(
   buffer: Float32Array,
   sampleRate: number,
@@ -20,15 +31,10 @@ export function detectPitchYin(
 
   const minFreq = options?.minFreq ?? 27;
   const maxFreq = options?.maxFreq ?? 4250;
-  const threshold = options?.threshold ?? 0.15;
-  const rmsGate = options?.rmsGate ?? 0.012;
+  const threshold = options?.threshold ?? 0.18;
+  const rmsGate = options?.rmsGate ?? 0.005;
 
-  let sumSq = 0;
-  for (let i = 0; i < buffer.length; i += 1) {
-    const sample = buffer[i];
-    sumSq += sample * sample;
-  }
-  const rms = Math.sqrt(sumSq / buffer.length);
+  const rms = computeRms(buffer);
   if (!Number.isFinite(rms) || rms < rmsGate) return null;
 
   const minLag = Math.max(2, Math.floor(sampleRate / maxFreq));
@@ -41,7 +47,7 @@ export function detectPitchYin(
   const diff = new Float32Array(maxLag + 1);
   for (let tau = 1; tau <= maxLag; tau += 1) {
     let sum = 0;
-    for (let j = 0; j < windowSize; j += 1) {
+    for (let j = 0; j < windowSize; j += 2) {
       const delta = buffer[j] - buffer[j + tau];
       sum += delta * delta;
     }
@@ -76,7 +82,7 @@ export function detectPitchYin(
         minTau = tau;
       }
     }
-    if (minVal >= 0.24) return null;
+    if (minVal >= 0.28) return null;
     bestTau = minTau;
   }
 
@@ -114,7 +120,7 @@ const CONFIRM_FRAMES = 2;
 const SILENCE_RELEASE_MS = 100;
 const REATTACK_MIN_INTERVAL_MS = 140;
 const REATTACK_RMS_RATIO = 1.75;
-const REATTACK_MIN_RMS = 0.025;
+const REATTACK_MIN_RMS = 0.012;
 
 export function createPitchOnsetTracker(): PitchOnsetTracker {
   let activeMidi: number | null = null;

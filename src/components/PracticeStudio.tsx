@@ -69,6 +69,7 @@ export interface PracticeStudioProps {
   onConnectMidi: () => void;
   micActive: boolean;
   micPitch: MicPitchReading | null;
+  micLevel?: number;
   micError: string | null;
   onToggleMic: () => void;
   audioStatus: AudioEngineStatus;
@@ -150,6 +151,7 @@ export default function PracticeStudio({
   onConnectMidi,
   micActive,
   micPitch,
+  micLevel = 0,
   micError,
   onToggleMic,
   audioStatus,
@@ -1091,31 +1093,42 @@ export default function PracticeStudio({
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold">
-                    <Usb className="h-3.5 w-3.5 text-amber-400" />
-                    MIDI Keyboard
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-semibold">
+                      <Usb className="h-3.5 w-3.5 text-amber-400" />
+                      MIDI Keyboard
+                    </div>
+                    <div className={`text-[11px] ${mutedText}`}>
+                      {midiDevices.length > 0
+                        ? midiDevices.map((d) => d.name).join(', ')
+                        : midiState === 'denied'
+                          ? 'Permission denied'
+                          : midiState === 'unsupported'
+                            ? 'Web MIDI unsupported'
+                            : midiState === 'ready'
+                              ? 'Ready · no device plugged in'
+                              : 'Not connected'}
+                    </div>
                   </div>
-                  <div className={`text-[11px] ${mutedText}`}>
-                    {midiDevices.length > 0
-                      ? midiDevices.map((d) => d.name).join(', ')
-                      : midiState === 'denied'
-                        ? 'Permission denied'
-                        : midiState === 'unsupported'
-                          ? 'Web MIDI unsupported'
-                          : midiState === 'ready'
-                            ? 'Ready · no device plugged in'
-                            : 'Not connected'}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={onConnectMidi}
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${subtleBtn}`}
+                  >
+                    {midiState === 'ready' && midiDevices.length === 0
+                      ? 'Connect / Scan'
+                      : midiState === 'ready'
+                        ? 'Refresh'
+                        : 'Connect'}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={onConnectMidi}
-                  className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${subtleBtn}`}
-                >
-                  {midiState === 'ready' ? 'Refresh' : 'Connect'}
-                </button>
+                {midiDevices.length === 0 ? (
+                  <p className={`text-[11px] leading-snug ${mutedText}`}>
+                    Plug in USB-MIDI or tap Connect / Scan for Bluetooth MIDI
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex items-center justify-between">
@@ -1144,7 +1157,9 @@ export default function PracticeStudio({
                       {micActive
                         ? micPitch
                           ? `${micPitch.name} · ${micPitch.centsOff >= 0 ? '+' : ''}${micPitch.centsOff}¢`
-                          : 'Listening…'
+                          : audioStatus.playbackSounding && !headphonesMode
+                            ? 'Paused during speaker playback'
+                            : 'Listening…'
                         : 'Off'}
                     </div>
                   </div>
@@ -1160,6 +1175,23 @@ export default function PracticeStudio({
                     {micActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
                     {micActive ? 'Stop Mic' : 'Enable Mic'}
                   </button>
+                </div>
+
+                <div>
+                  <div className={`mb-1 flex items-center justify-between text-[11px] ${mutedText}`}>
+                    <span>Mic Level</span>
+                    <span className="font-mono">{Math.round(micLevel * 100)}%</span>
+                  </div>
+                  <div
+                    className={`h-1.5 w-full overflow-hidden rounded-full ${
+                      darkMode ? 'bg-stone-800' : 'bg-stone-200'
+                    }`}
+                  >
+                    <div
+                      className="h-full rounded-full bg-emerald-400 transition-[width] duration-75"
+                      style={{ width: `${Math.round(micLevel * 100)}%` }}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between">

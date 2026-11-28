@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Lock, LockOpen, Mic, MicOff, Moon, Music2, Sun, Usb } from 'lucide-react';
+import { Lock, LockOpen, Mic, MicOff, Moon, Music2, Sun, Usb, X } from 'lucide-react';
 import { pianoEngine, type AudioEngineStatus } from './audio/piano-engine';
 import LibraryView, { type MuseScoreController } from './components/LibraryView';
 import PracticeStudio from './components/PracticeStudio';
@@ -65,10 +65,12 @@ export default function App() {
   const [midiController] = useState(() => new MidiInputController());
   const [midiState, setMidiState] = useState<MidiAccessState>('unknown');
   const [midiDevices, setMidiDevices] = useState<MidiDeviceInfo[]>([]);
+  const [midiNotice, setMidiNotice] = useState<string | null>(null);
 
   const [micController] = useState(() => new MicInputController());
   const [micActive, setMicActive] = useState(false);
   const [micPitch, setMicPitch] = useState<MicPitchReading | null>(null);
+  const [micLevel, setMicLevel] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
 
   const [audioStatus, setAudioStatus] = useState<AudioEngineStatus>(() =>
@@ -108,6 +110,9 @@ export default function App() {
     const unsub = midiController.onStateChange((nextState, nextDevices) => {
       setMidiState(nextState);
       setMidiDevices(nextDevices);
+      if (nextDevices.length > 0) {
+        setMidiNotice(null);
+      }
     });
     void midiController.probeIfPermitted();
     return () => {
@@ -117,9 +122,15 @@ export default function App() {
   }, [midiController]);
 
   useEffect(() => {
+    if (!midiNotice) return;
+    const timer = window.setTimeout(() => setMidiNotice(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [midiNotice]);
+
+  useEffect(() => {
     return () => {
       micController.stop();
-      pianoEngine.setRecordingSession(false);
+      void pianoEngine.setRecordingSession(false);
     };
   }, [micController]);
 
@@ -172,40 +183,72 @@ export default function App() {
     }
   }, [openScoreInPractice]);
 
-  const handleConnectMidi = useCallback(() => {
-    void midiController.connect();
+  const handleConnectMidi = useCallback(async () => {
+    setMidiNotice(null);
+    const state = await midiController.connect({ interactive: true });
+    if (midiController.getDevices().length > 0) {
+      setMidiNotice(null);
+      return;
+    }
+    if (state === 'unsupported') {
+      setMidiNotice(
+        globalThis.__maestroNativeMidi
+          ? 'MIDI unavailable on this device.'
+          : 'Web MIDI is not supported in this browser. Use Chrome/Edge or the iOS app.',
+      );
+    } else if (state === 'denied') {
+      setMidiNotice('MIDI permission denied. Check browser or Bluetooth settings.');
+    } else if (state === 'ready') {
+      setMidiNotice(
+        globalThis.__maestroNativeMidi
+          ? 'No MIDI keyboard detected yet. Plug in a USB-MIDI adapter or pair one in the Bluetooth MIDI picker.'
+          : 'MIDI ready, but no keyboard detected. Plug in a USB-MIDI keyboard and try again.',
+      );
+    }
   }, [midiController]);
 
   const handleToggleMic = useCallback(async () => {
     if (micActive) {
       micController.stop();
-      pianoEngine.setRecordingSession(false);
+      void pianoEngine.setRecordingSession(false);
       setMicActive(false);
       setMicPitch(null);
+      setMicLevel(0);
       setMicError(null);
       return;
     }
 
     setMicError(null);
-    await pianoEngine.unlockFromGesture();
-    pianoEngine.setRecordingSession(true);
+    setMicLevel(0);
+    if (!globalThis.__maestroNativeMic) {
+      await pianoEngine.unlockFromGesture();
+      await pianoEngine.setRecordingSession(true);
+    }
 
     try {
       await micController.start({
         audioContext: pianoEngine.getContext() ?? undefined,
+        onLevel: setMicLevel,
         onPitch: (reading) => setMicPitch(reading),
         onNote: (event) => noteHandlerRef.current?.(event),
         shouldGate: () =>
           micGateRef.current ? micGateRef.current() : pianoEngine.isPlaybackSounding(),
       });
+      await pianoEngine.setRecordingSession(true);
       setMicActive(true);
+      void pianoEngine.unlockFromGesture();
     } catch (err) {
-      pianoEngine.setRecordingSession(false);
+      void pianoEngine.setRecordingSession(false);
       setMicActive(false);
       setMicPitch(null);
+      setMicLevel(0);
       const name = err instanceof Error ? err.name : '';
       if (name === 'NotAllowedError' || name === 'SecurityError') {
-        setMicError('Microphone permission denied. Allow mic access in your browser settings.');
+        setMicError(
+          globalThis.__maestroNativeMic
+            ? 'Microphone permission denied. Enable it in iOS Settings -> Maestro AI -> Microphone.'
+            : 'Microphone permission denied. Allow mic access in your browser settings.',
+        );
       } else if (name === 'NotFoundError') {
         setMicError('No microphone found on this device.');
       } else {
@@ -326,7 +369,7 @@ export default function App() {
               <>
                 <button
                   type="button"
-                  onClick={handleConnectMidi}
+                  onClick={() => void handleConnectMidi()}
                   title={
                     midiDevices.length > 0
                       ? midiDevices.map((d) => d.name).join(', ')
@@ -358,9 +401,22 @@ export default function App() {
                 >
                   {micActive ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
                   {micActive ? (
-                    <span className="max-w-[44px] truncate sm:max-w-none">
-                      {micPitch ? micPitch.name : 'On'}
-                    </span>
+                    <>
+                      <span className="max-w-[44px] truncate sm:max-w-none">
+                        {micPitch ? micPitch.name : 'On'}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className={`h-1.5 w-6 overflow-hidden rounded-full ${
+                          darkMode ? 'bg-stone-800' : 'bg-stone-300'
+                        }`}
+                      >
+                        <span
+                          className="block h-full rounded-full bg-emerald-400 transition-[width] duration-75"
+                          style={{ width: `${Math.round(micLevel * 100)}%` }}
+                        />
+                      </span>
+                    </>
                   ) : (
                     <span className="hidden sm:inline">Mic</span>
                   )}
@@ -408,6 +464,32 @@ export default function App() {
             {pdfNotice}
           </div>
         ) : null}
+        {micError ? (
+          <div className="flex items-center justify-center gap-2 border-t border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-xs font-medium text-rose-400">
+            <span>{micError}</span>
+            <button
+              type="button"
+              onClick={() => setMicError(null)}
+              aria-label="Dismiss microphone notice"
+              className="rounded p-0.5 hover:bg-rose-500/20"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : null}
+        {midiNotice ? (
+          <div className="flex items-center justify-center gap-2 border-t border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-medium text-amber-400">
+            <span>{midiNotice}</span>
+            <button
+              type="button"
+              onClick={() => setMidiNotice(null)}
+              aria-label="Dismiss MIDI notice"
+              className="rounded p-0.5 hover:bg-amber-500/20"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : null}
       </header>
 
       <main className="px-2.5 py-2 sm:px-6 sm:py-4">
@@ -427,9 +509,10 @@ export default function App() {
             midiController={midiController}
             midiState={midiState}
             midiDevices={midiDevices}
-            onConnectMidi={handleConnectMidi}
+            onConnectMidi={() => void handleConnectMidi()}
             micActive={micActive}
             micPitch={micPitch}
+            micLevel={micLevel}
             micError={micError}
             onToggleMic={() => void handleToggleMic()}
             audioStatus={audioStatus}

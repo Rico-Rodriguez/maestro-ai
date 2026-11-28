@@ -129,7 +129,7 @@ export class PianoAudioEngine {
     }
 
     this.disposed = false;
-    this.applyAudioSession();
+    void this.applyAudioSession();
 
     const AudioCtx =
       typeof window !== 'undefined'
@@ -186,7 +186,7 @@ export class PianoAudioEngine {
   }
 
   async unlockFromGesture(): Promise<boolean> {
-    this.applyAudioSession();
+    await this.applyAudioSession();
     let ctx: AudioContext;
     try {
       ctx = this.ensureContext();
@@ -432,10 +432,10 @@ export class PianoAudioEngine {
     }
   }
 
-  setRecordingSession(recording: boolean): void {
+  async setRecordingSession(recording: boolean): Promise<void> {
     if (this.recording === recording) return;
     this.recording = recording;
-    this.applyAudioSession();
+    await this.applyAudioSession();
   }
 
   getContext(): AudioContext | null {
@@ -806,16 +806,18 @@ export class PianoAudioEngine {
     }, remainingMs);
   }
 
-  private applyAudioSession(): void {
-    void globalThis.__maestroPrimeAudioSession?.(this.recording)?.catch?.(() => {});
-    if (typeof navigator === 'undefined') return;
-    const nav = navigator as NavigatorWithAudioSession;
-    if (!nav.audioSession) return;
-    try {
-      nav.audioSession.type = this.recording ? 'play-and-record' : 'playback';
-    } catch {
-      // Unsupported audioSession value
+  private async applyAudioSession(): Promise<void> {
+    if (typeof navigator !== 'undefined') {
+      const nav = navigator as NavigatorWithAudioSession;
+      if (nav.audioSession) {
+        try {
+          nav.audioSession.type = this.recording ? 'play-and-record' : 'playback';
+        } catch {
+          // Unsupported audioSession value
+        }
+      }
     }
+    await globalThis.__maestroPrimeAudioSession?.(this.recording)?.catch?.(() => {});
   }
 
   private kickHtmlSilence(): void {
@@ -864,3 +866,9 @@ export class PianoAudioEngine {
 }
 
 export const pianoEngine = new PianoAudioEngine();
+
+if (typeof window !== 'undefined') {
+  globalThis.__maestroResumeAudio = () => {
+    void pianoEngine.unlockFromGesture();
+  };
+}

@@ -3,13 +3,32 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { createServer } from 'vite';
 import { iosIndexHtml } from '../src/ios-viewport.mjs';
 import { nativeHttpToResponse, shouldUseNativeScoreFetch } from '../src/score-fetch.mjs';
 import { buildSideloadSource } from '../scripts/update-sideload-source.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+let viteServer;
+
+async function loadTsModule(modulePath) {
+  if (!viteServer) {
+    viteServer = await createServer({
+      root,
+      configFile: path.join(root, 'vite.config.ts'),
+      server: { middlewareMode: true, hmr: false },
+      appType: 'custom',
+      logLevel: 'error',
+    });
+  }
+  return viteServer.ssrLoadModule(modulePath);
+}
+
+after(async () => {
+  if (viteServer) await viteServer.close();
+});
 
 const SALAMANDER_SAMPLES = [
   'A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3',
@@ -246,4 +265,136 @@ test('update-sideload-source CLI merges --existing and ignores missing --existin
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+});
+
+test('MidiInputController distinguishes auto-probe from interactive reconnect on native MIDI', async () => {
+  const { MidiInputController } = await loadTsModule('/src/input/midi-adapter.ts');
+  const prevNativeMidi = globalThis.__maestroNativeMidi;
+  const prevNavigatorDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const calls = [];
+  const inputs = new Map([
+    [
+      'kb-1',
+      {
+        id: 'kb-1',
+        name: 'Digital Piano',
+        manufacturer: 'Roland',
+        state: 'connected',
+        onmidimessage: null,
+      },
+    ],
+  ]);
+
+  try {
+    globalThis.__maestroNativeMidi = true;
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: {
+        requestMIDIAccess: async (options) => {
+          calls.push(options);
+          return {
+            inputs,
+            outputs: new Map(),
+            sysexEnabled: false,
+            onstatechange: null,
+          };
+        },
+      },
+    });
+
+    const controller = new MidiInputController();
+    const received = [];
+    controller.subscribe((ev) => received.push(ev));
+
+    const probeState = await controller.probeIfPermitted();
+    assert.equal(probeState, 'ready');
+    assert.deepEqual(calls[0], { sysex: false, presentBluetooth: false });
+    assert.equal(controller.getDevices().length, 1);
+
+    const connectState = await controller.connect({ interactive: true });
+    assert.equal(connectState, 'ready');
+    assert.deepEqual(calls[1], { sysex: false, presentBluetooth: true });
+
+    const input = inputs.get('kb-1');
+    input.onmidimessage({ data: Uint8Array.from([0x90, 60, 100]) });
+    assert.equal(received.length, 1);
+    assert.equal(received[0].kind, 'on');
+    assert.equal(received[0].pitch, 60);
+    assert.equal(received[0].source, 'midi');
+
+    controller.dispose();
+  } finally {
+    globalThis.__maestroNativeMidi = prevNativeMidi;
+    if (prevNavigatorDesc) {
+      Object.defineProperty(globalThis, 'navigator', prevNavigatorDesc);
+    } else {
+      delete globalThis.navigator;
+    }
+  }
+});
+
+test('MicInputController uses __maestroNativeMic for level, pitch, note onset, and cleanup', async () => {
+  const { MicInputController } = await loadTsModule('/src/input/mic-adapter.ts');
+  const prevNativeMic = globalThis.__maestroNativeMic;
+  let emitFrame = null;
+  let stopCalled = 0;
+
+  try {
+    globalThis.__maestroNativeMic = {
+      async start(onFrame) {
+        emitFrame = onFrame;
+        return async () => {
+          stopCalled += 1;
+        };
+      },
+    };
+
+    const controller = new MicInputController();
+    const levels = [];
+    const pitches = [];
+    const notes = [];
+
+    await controller.start({
+      onLevel: (level) => levels.push(level),
+      onPitch: (reading) => pitches.push(reading),
+      onNote: (event) => notes.push(event),
+      shouldGate: () => false,
+    });
+
+    assert.equal(controller.isActive(), true);
+    assert.equal(typeof emitFrame, 'function');
+
+    emitFrame({ rms: 0.05, freq: 440, clarity: 0.96 });
+    emitFrame({ rms: 0.05, freq: 440, clarity: 0.97 });
+
+    assert.equal(levels.length, 2);
+    assert.ok(Math.abs(levels[0] - 0.3) < 1e-6);
+    assert.equal(pitches[0]?.name, 'A4');
+    assert.equal(pitches[0]?.midi, 69);
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0].kind, 'on');
+    assert.equal(notes[0].pitch, 69);
+    assert.equal(notes[0].source, 'mic');
+
+    controller.stop();
+    assert.equal(controller.isActive(), false);
+    assert.equal(stopCalled, 1);
+    assert.equal(notes.some((n) => n.kind === 'off' && n.pitch === 69), true);
+  } finally {
+    globalThis.__maestroNativeMic = prevNativeMic;
+  }
+});
+
+test('MaestroNative.swift and Main.storyboard wire native mic, CoreMIDI, and bridge controller', () => {
+  const swift = fs.readFileSync(path.join(root, 'ios', 'App', 'App', 'MaestroNative.swift'), 'utf8');
+  assert.ok(swift.includes('startMic'));
+  assert.ok(swift.includes('stopMic'));
+  assert.ok(swift.includes('unsafeSequence'));
+  assert.ok(swift.includes('runningStatus'));
+
+  const storyboard = fs.readFileSync(
+    path.join(root, 'ios', 'App', 'App', 'Base.lproj', 'Main.storyboard'),
+    'utf8',
+  );
+  assert.ok(storyboard.includes('MaestroBridgeViewController'));
 });
